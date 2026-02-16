@@ -130,6 +130,7 @@ select:focus{outline:none;border-color:var(--ac)}
         <button class="btn btn-s active" data-layer="buurten" onclick="toggleLayer('buurten')">Buurten</button>
         <button class="btn btn-s" data-layer="wijken" onclick="toggleLayer('wijken')">Wijken</button>
         <button class="btn btn-s" data-layer="bag" onclick="toggleLayer('bag')">BAG Adressen</button>
+        <button class="btn btn-s" data-layer="panden" onclick="toggleLayer('panden')">BAG Panden</button>
       </div>
 
       <div class="sh">Indicator</div>
@@ -183,8 +184,12 @@ select:focus{outline:none;border-color:var(--ac)}
             <span style="font-family:'Space Mono',monospace;color:var(--ac)" id="dsWijken">—</span>
           </div>
           <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
-            <span style="color:var(--tx);font-weight:600">BAG</span>
-            <span style="font-family:'Space Mono',monospace;color:var(--ai)">WMS live (PDOK)</span>
+            <span style="color:var(--tx);font-weight:600">BAG Adressen</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--ai)">WMS live (dagelijks)</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
+            <span style="color:var(--tx);font-weight:600">BAG Panden</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--ai)">WMS live (dagelijks)</span>
           </div>
           <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
             <span style="color:var(--tx);font-weight:600">CBS Jaar</span>
@@ -197,6 +202,35 @@ select:focus{outline:none;border-color:var(--ac)}
           <div style="display:flex;justify-content:space-between;padding:4px 0">
             <span style="color:var(--tx);font-weight:600">Indicatoren</span>
             <span style="font-family:'Space Mono',monospace;color:var(--ac)">24</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sh">Databronnen</div>
+      <div class="card">
+        <div style="font-size:11px;color:var(--mt);line-height:1.7">
+          <div style="padding:4px 0;border-bottom:1px solid var(--bd)">
+            <div style="color:var(--tx);font-weight:600">&#128202; CBS Kerncijfers wijken en buurten</div>
+            <div>Bron: CBS via PDOK WFS &middot; Frequentie: jaarlijks &middot; Peildatum: 1 jan 2022</div>
+            <div>Indicatoren: bevolking, woningen, inkomen, energie, arbeid, voorzieningen</div>
+            <div>API: <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--ai)">service.pdok.nl/cbs/wijkenbuurten</span></div>
+          </div>
+          <div style="padding:4px 0;border-bottom:1px solid var(--bd)">
+            <div style="color:var(--tx);font-weight:600">&#127758; BAG Basisregistratie Adressen en Gebouwen</div>
+            <div>Bron: Kadaster via PDOK WMS &middot; Frequentie: <span style="color:var(--ac)">dagelijks</span></div>
+            <div>9.9M verblijfsobjecten &middot; Panden met bouwjaar, oppervlakte, status</div>
+            <div>API: <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--ai)">service.pdok.nl/lv/bag/wms/v2_0</span></div>
+          </div>
+          <div style="padding:4px 0;border-bottom:1px solid var(--bd)">
+            <div style="color:var(--tx);font-weight:600">&#128269; PDOK Locatieserver</div>
+            <div>Bron: Kadaster &middot; Frequentie: <span style="color:var(--ac)">continu</span></div>
+            <div>Adres zoeken, geocodering, autocomplete</div>
+            <div>API: <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--ai)">api.pdok.nl/bzk/locatieserver</span></div>
+          </div>
+          <div style="padding:4px 0">
+            <div style="color:var(--tx);font-weight:600">&#128506; Basemaps</div>
+            <div>CARTO (donker/licht) &middot; OpenStreetMap &middot; Esri Satelliet &middot; BRT Topo (Kadaster)</div>
+            <div>Frequentie: <span style="color:var(--ac)">continu (live tiles)</span></div>
           </div>
         </div>
       </div>
@@ -239,9 +273,9 @@ select:focus{outline:none;border-color:var(--ac)}
 
       <div class="sh">Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 13px 'Space Mono',monospace;color:var(--ac)">GeoInzicht v3.1</div>
+        <div style="font:700 13px 'Space Mono',monospace;color:var(--ac)">GeoInzicht v3.2</div>
         <div style="font-size:11px;color:var(--mt);margin-top:6px;line-height:1.6">
-          Buurten + Wijken + BAG WMS + Zoeken<br>
+          Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken<br>
           <div style="margin-top:4px">
             <div>&#128202; <b style="color:var(--tx)">CBS</b> — Kerncijfers wijken en buurten</div>
             <div>&#127758; <b style="color:var(--tx)">PDOK</b> — Geometrie, BAG WMS, Locatieserver</div>
@@ -333,9 +367,10 @@ var _map, _currentBasemap;
 var _buurtData = null, _buurtLayer = null;
 var _wijkData = null, _wijkLayer = null;
 var _bagWmsLayer = null;
+var _pandWmsLayer = null;
 var _searchMarker = null;
 var _gemeenten = new Set();
-var _layerState = {buurten: true, wijken: false, bag: false};
+var _layerState = {buurten: true, wijken: false, bag: false, panden: false};
 
 // ============================================================
 // MAP
@@ -345,10 +380,11 @@ function initMap(){
   L.control.zoom({position:'bottomright'}).addTo(_map);
   setBasemap('dark');
 
-  // BAG click handler
+  // BAG click handler (adressen of panden)
   _map.on('click', function(e){
-    if(_bagWmsLayer && _map.getZoom() >= 14){
-      bagGetFeatureInfo(e);
+    if(_map.getZoom() >= 14){
+      if(_pandWmsLayer) pandGetFeatureInfo(e);
+      else if(_bagWmsLayer) bagGetFeatureInfo(e);
     }
   });
 }
@@ -497,6 +533,9 @@ function toggleLayer(type){
   else if(type === 'bag'){
     toggleBagLayer(_layerState.bag);
   }
+  else if(type === 'panden'){
+    togglePandLayer(_layerState.panden);
+  }
 }
 
 // ============================================================
@@ -550,6 +589,68 @@ function bagGetFeatureInfo(e){
     if(p.status) html += '<div class="info-row"><span>Status</span><span class="info-val">'+p.status+'</span></div>';
     document.getElementById('infoContent').innerHTML = html;
     document.getElementById('infoPanel').classList.add('show');
+  }).catch(function(){});
+}
+
+// ============================================================
+// BAG PANDEN WMS
+// ============================================================
+function togglePandLayer(on){
+  if(!_map) return;
+  if(on){
+    if(_pandWmsLayer) return;
+    _pandWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, {
+      layers:'bag:pand',
+      format:'image/png',
+      transparent:true,
+      version:'1.1.1',
+      opacity:0.6,
+      maxZoom:22,
+      tileSize:256,
+      minZoom:14
+    }).addTo(_map);
+    _pandWmsLayer.bringToFront();
+    if(_bagWmsLayer) _bagWmsLayer.bringToFront();
+    toast('BAG panden zichtbaar bij zoom \u226514');
+  } else {
+    if(_pandWmsLayer){_map.removeLayer(_pandWmsLayer);_pandWmsLayer=null}
+  }
+}
+
+function pandGetFeatureInfo(e){
+  var size = _map.getSize();
+  var bounds = _map.getBounds();
+  var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+  var bbox = sw.lng+','+sw.lat+','+ne.lng+','+ne.lat;
+  var pt = _map.latLngToContainerPoint(e.latlng);
+  var url = PDOK_BAG_WMS+'?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo'+
+    '&FORMAT=image/png&TRANSPARENT=true'+
+    '&QUERY_LAYERS=bag:pand&LAYERS=bag:pand'+
+    '&INFO_FORMAT=application/json&FEATURE_COUNT=1&BUFFER=12'+
+    '&X='+Math.round(pt.x)+'&Y='+Math.round(pt.y)+
+    '&SRS=EPSG:4326&WIDTH='+size.x+'&HEIGHT='+size.y+'&BBOX='+bbox;
+  fetch(url).then(function(r){return r.json()}).then(function(d){
+    if(!d.features||!d.features.length) return;
+    var p = d.features[0].properties;
+    document.getElementById('infoBuurtNaam').textContent = 'BAG Pand';
+    var html = '';
+    if(p.bouwjaar) html += '<div class="info-row"><span>Bouwjaar</span><span class="info-val">'+p.bouwjaar+'</span></div>';
+    if(p.status) html += '<div class="info-row"><span>Status</span><span class="info-val">'+p.status+'</span></div>';
+    if(p.gebruiksdoel) html += '<div class="info-row"><span>Gebruiksdoel</span><span class="info-val">'+p.gebruiksdoel+'</span></div>';
+    if(p.aantal_verblijfsobjecten) html += '<div class="info-row"><span>Verblijfsobjecten</span><span class="info-val">'+p.aantal_verblijfsobjecten+'</span></div>';
+    if(p.oppervlakte_min && p.oppervlakte_max){
+      if(p.oppervlakte_min === p.oppervlakte_max)
+        html += '<div class="info-row"><span>Oppervlakte</span><span class="info-val">'+p.oppervlakte_min+' m\u00b2</span></div>';
+      else
+        html += '<div class="info-row"><span>Oppervlakte</span><span class="info-val">'+p.oppervlakte_min+' \u2013 '+p.oppervlakte_max+' m\u00b2</span></div>';
+    }
+    if(p.identificatie) html += '<div class="info-row"><span>Pand ID</span><span class="info-val" style="font-size:9px">'+p.identificatie+'</span></div>';
+    document.getElementById('infoContent').innerHTML = html;
+    document.getElementById('infoPanel').classList.add('show');
+    // Also query verblijfsobject for address info
+    if(_bagWmsLayer){
+      bagGetFeatureInfo(e);
+    }
   }).catch(function(){});
 }
 
