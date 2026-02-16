@@ -6,13 +6,19 @@ Downloads buurt/wijk geometrie + CBS kerncijfers from PDOK WFS
 selects only the fields the app needs, and writes a compact GeoJSON file.
 
 Usage:
-    python build_geojson.py --type buurten --year 2024
-    python build_geojson.py --type wijken --year 2024 --tolerance 0.0005
+    python build_geojson.py --type buurten --year 2022
+    python build_geojson.py --type wijken --year 2022 --tolerance 0.0005
 
-Data verversen:
-    python build_geojson.py --type buurten --year 2024
-    python build_geojson.py --type wijken  --year 2024 --tolerance 0.0005
+Data verversen (meest recente jaar met volledige CBS data is 2022):
+    python build_geojson.py --type buurten --year 2022
+    python build_geojson.py --type wijken  --year 2022 --tolerance 0.0005
     git add *.geojson && git commit -m "Data update" && git push
+
+NB: CBS publiceert data per jaar, maar niet alle indicatoren zijn meteen
+    beschikbaar in het nieuwste jaar:
+    - 2024: alleen bevolkingsdata (inwoners, leeftijd, huishoudens)
+    - 2023: + WOZ, koopwoningen, woningvoorraad, bedrijfsvestigingen
+    - 2022: + gasverbruik, elektriciteit, arbeidsparticipatie (meest compleet)
 
 Dependencies:
     pip install requests shapely
@@ -204,7 +210,7 @@ def main():
     parser = argparse.ArgumentParser(description="Build static GeoJSON for GeoInzicht")
     parser.add_argument("--type", choices=["buurten", "wijken"], default="buurten",
                         help="Type: buurten of wijken (default: buurten)")
-    parser.add_argument("--year", type=int, default=2024)
+    parser.add_argument("--year", type=int, default=2022)
     parser.add_argument("--tolerance", type=float, default=None,
                         help="Simplificatie-tolerantie in graden. "
                              "Default: 0.0003 voor buurten, 0.0005 voor wijken")

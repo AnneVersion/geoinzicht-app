@@ -18,6 +18,9 @@
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);overflow:hidden;height:100vh;height:100dvh}
 .app{display:flex;height:100vh;height:100dvh}
 .sidebar{width:340px;background:var(--p);border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;z-index:100;transition:transform .3s}
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--bd);text-align:center;flex-shrink:0}
+.neon-text{font:900 16px 'Space Mono',monospace;color:#39ff14;text-shadow:0 0 7px #39ff14,0 0 10px #39ff14,0 0 21px #39ff14,0 0 42px #0fa,0 0 82px #0fa;letter-spacing:2px;animation:neonPulse 2s ease-in-out infinite alternate}
+@keyframes neonPulse{from{text-shadow:0 0 5px #39ff14,0 0 10px #39ff14,0 0 20px #39ff14,0 0 40px #0fa}to{text-shadow:0 0 10px #39ff14,0 0 20px #39ff14,0 0 40px #39ff14,0 0 80px #0fa,0 0 120px #0fa}}
 .sidebar.hidden{transform:translateX(-100%);position:absolute;height:100%}
 .map-wrap{flex:1;position:relative}
 #map{width:100%;height:100%}
@@ -164,30 +167,92 @@ select:focus{outline:none;border-color:var(--ac)}
       <div class="card">
         <p style="font-size:12px;line-height:1.6;color:var(--mt)">
           CBS buurtdata op de kaart. Geometrie en statistieken vooraf samengevoegd
-          vanuit PDOK (CBS Wijken &amp; Buurten 2024).
-        </p>
-        <p style="font-size:12px;line-height:1.6;color:var(--mt);margin-top:6px">
-          14.668 buurten &middot; 3.475 wijken &middot; 24 indicatoren
+          vanuit PDOK WFS (CBS Wijken &amp; Buurten).
         </p>
       </div>
-      <div class="sh">Indicatoren</div>
-      <div class="card" id="indicatorDefs" style="font-size:11px;color:var(--mt)"></div>
-      <div class="sh">Data verversen</div>
-      <div class="card">
-        <p style="font-size:11px;color:var(--mt);line-height:1.6">
-          <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:10px">python build_geojson.py --type buurten</code><br>
-          <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:10px">python build_geojson.py --type wijken</code><br>
-          <span style="margin-top:4px;display:block">Daarna: git add, commit, push</span>
-        </p>
-      </div>
-      <div class="sh">Versie</div>
-      <div class="card">
-        <div style="font:700 13px 'Space Mono',monospace;color:var(--ac)">GeoInzicht v3.0</div>
-        <div style="font-size:11px;color:var(--mt);margin-top:4px">
-          Buurten + Wijken + BAG WMS + Zoeken<br>
-          Bronnen: CBS, PDOK/Kadaster
+
+      <div class="sh">Datasets</div>
+      <div class="card" id="datasetInfo">
+        <div style="font-size:11px;color:var(--mt);line-height:1.8">
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
+            <span style="color:var(--tx);font-weight:600">Buurten</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--ac)" id="dsBuurten">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
+            <span style="color:var(--tx);font-weight:600">Wijken</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--ac)" id="dsWijken">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
+            <span style="color:var(--tx);font-weight:600">BAG</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--ai)">WMS live (PDOK)</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
+            <span style="color:var(--tx);font-weight:600">CBS Jaar</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--wn)" id="dsJaar">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
+            <span style="color:var(--tx);font-weight:600">Gegenereerd</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--mt)" id="dsGenerated">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0">
+            <span style="color:var(--tx);font-weight:600">Indicatoren</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--ac)">24</span>
+          </div>
         </div>
       </div>
+
+      <div class="sh">CBS data per jaar</div>
+      <div class="card">
+        <div style="font-size:11px;color:var(--mt);line-height:1.7">
+          <div style="color:var(--tx);font-weight:600;margin-bottom:4px">Waarom jaar 2022?</div>
+          CBS publiceert kerncijfers per jaar, maar niet alle indicatoren zijn
+          meteen beschikbaar in het nieuwste jaar. De data wordt gefaseerd
+          toegevoegd:
+          <div style="margin-top:6px">
+            <div style="padding:3px 0"><span style="color:var(--ac)">&#9679;</span> <b style="color:var(--tx)">2024</b> — Alleen bevolking (inwoners, leeftijd, huishoudens)</div>
+            <div style="padding:3px 0"><span style="color:var(--wn)">&#9679;</span> <b style="color:var(--tx)">2023</b> — + WOZ, koopwoningen, woningvoorraad</div>
+            <div style="padding:3px 0"><span style="color:var(--up)">&#9679;</span> <b style="color:var(--tx)">2022</b> — + gas, elektriciteit, arbeidsparticipatie <span style="color:var(--ac)">(meest compleet)</span></div>
+          </div>
+          <div style="margin-top:6px;padding:6px 8px;background:var(--bg);border-radius:6px;border-left:3px solid var(--wn)">
+            &#9888; Zodra CBS meer indicatoren publiceert voor een nieuwer jaar,
+            kun je de data verversen met het build script.
+          </div>
+        </div>
+      </div>
+
+      <div class="sh">Indicatoren</div>
+      <div class="card" id="indicatorDefs" style="font-size:11px;color:var(--mt)"></div>
+
+      <div class="sh">Data verversen</div>
+      <div class="card">
+        <div style="font-size:11px;color:var(--mt);line-height:1.8">
+          <div style="color:var(--tx);font-weight:600;margin-bottom:4px">Stap 1: GeoJSON opnieuw genereren</div>
+          <code style="display:block;background:var(--bg);padding:6px 8px;border-radius:4px;font-size:10px;margin:4px 0">python build_geojson.py --type buurten --year 2022</code>
+          <code style="display:block;background:var(--bg);padding:6px 8px;border-radius:4px;font-size:10px;margin:4px 0">python build_geojson.py --type wijken --year 2022</code>
+          <div style="color:var(--tx);font-weight:600;margin:8px 0 4px">Stap 2: Publiceren op GitHub Pages</div>
+          <code style="display:block;background:var(--bg);padding:6px 8px;border-radius:4px;font-size:10px;margin:4px 0">git add *.geojson<br>git commit -m "Data update"<br>git push</code>
+          <div style="color:var(--tx);font-weight:600;margin:8px 0 4px">Ander jaar proberen?</div>
+          <code style="display:block;background:var(--bg);padding:6px 8px;border-radius:4px;font-size:10px;margin:4px 0">python build_geojson.py --type buurten --year 2023</code>
+          <div style="margin-top:4px;font-size:10px">Pas daarna BUURTEN_URL / WIJKEN_URL in index.html aan.</div>
+        </div>
+      </div>
+
+      <div class="sh">Bron &amp; Versie</div>
+      <div class="card">
+        <div style="font:700 13px 'Space Mono',monospace;color:var(--ac)">GeoInzicht v3.1</div>
+        <div style="font-size:11px;color:var(--mt);margin-top:6px;line-height:1.6">
+          Buurten + Wijken + BAG WMS + Zoeken<br>
+          <div style="margin-top:4px">
+            <div>&#128202; <b style="color:var(--tx)">CBS</b> — Kerncijfers wijken en buurten</div>
+            <div>&#127758; <b style="color:var(--tx)">PDOK</b> — Geometrie, BAG WMS, Locatieserver</div>
+            <div>&#128506; <b style="color:var(--tx)">Kadaster</b> — BAG verblijfsobjecten</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="neon-text">DATA CONSULTANTS</div>
     </div>
   </div>
 
@@ -206,8 +271,8 @@ select:focus{outline:none;border-color:var(--ac)}
 // ============================================================
 // CONFIG
 // ============================================================
-var BUURTEN_URL = 'buurten_2024.geojson';
-var WIJKEN_URL  = 'wijken_2024.geojson';
+var BUURTEN_URL = 'buurten_2022.geojson';
+var WIJKEN_URL  = 'wijken_2022.geojson';
 var PDOK_BAG_WMS = 'https://service.pdok.nl/lv/bag/wms/v2_0';
 var PDOK_SUGGEST = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/suggest?q=';
 var PDOK_LOOKUP  = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/lookup?id=';
@@ -419,6 +484,7 @@ function toggleLayer(type){
         fetch(WIJKEN_URL).then(function(r){return r.json()}).then(function(d){
           _wijkData = d;
           toast(d.features.length + ' wijken geladen');
+          document.getElementById('dsWijken').textContent = d.features.length.toLocaleString('nl-NL') + ' features';
           renderChoropleth('wijken');
         }).catch(function(e){toast('Fout laden wijken: '+e.message);_layerState.wijken=false;document.querySelector('[data-layer="wijken"]').classList.remove('active')});
       } else {
@@ -692,7 +758,7 @@ async function init(){
     setupSearch();
 
     loadMsg.textContent = 'Buurtdata laden...';
-    loadSub.textContent = '14.668 buurten ophalen';
+    loadSub.textContent = 'CBS buurtdata ophalen';
     loadBar.style.width = '20%';
 
     var resp = await fetch(BUURTEN_URL);
@@ -713,6 +779,12 @@ async function init(){
     loadMsg.textContent = 'Kaart renderen...';
     loadBar.style.width = '90%';
     renderChoropleth('buurten');
+
+    // Dataset metadata invullen
+    var meta = _buurtData.metadata || {};
+    document.getElementById('dsBuurten').textContent = _buurtData.features.length.toLocaleString('nl-NL') + ' features';
+    document.getElementById('dsJaar').textContent = meta.year || '—';
+    document.getElementById('dsGenerated').textContent = meta.generated ? meta.generated.substring(0,10) : '—';
 
     loadBar.style.width = '100%';
     loadMsg.textContent = 'Klaar!';
