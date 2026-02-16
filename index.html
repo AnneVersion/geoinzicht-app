@@ -373,7 +373,7 @@ select option{background:var(--bg);color:var(--tx)}
 
       <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v4.0</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v5.1</div>
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
@@ -515,10 +515,11 @@ var LAYER_CONFIG = {
 };
 
 function renderChoropleth(type){
+  try {
   var cfg = LAYER_CONFIG[type];
-  if(!cfg) return;
+  if(!cfg){console.warn('renderChoropleth: no config for',type);return}
   var data = cfg.data();
-  if(!data || !_map) return;
+  if(!data || !_map){console.warn('renderChoropleth: no data or map',type,!!data,!!_map);return}
 
   // Verwijder oude laag
   if(type === 'gemeenten' && _gemeenteLayer){ _map.removeLayer(_gemeenteLayer); _gemeenteLayer = null; }
@@ -535,7 +536,8 @@ function renderChoropleth(type){
     var v = p[indicator];
     if(v !== undefined && v !== null && v >= 0) vals.push(v);
   });
-  if(!vals.length) return;
+  console.log('renderChoropleth',type,'indicator='+indicator,'vals='+vals.length,'features='+data.features.length);
+  if(!vals.length){console.warn('renderChoropleth: geen waarden voor',indicator);return}
 
   vals.sort(function(a,b){return a-b});
   var breaks = quantileBreaks(vals, 7);
@@ -593,12 +595,16 @@ function renderChoropleth(type){
   if(type === 'buurten'){ _buurtLayer = newLayer; }
   if(type === 'wijken'){ _wijkLayer = newLayer; }
 
+  // Basemap altijd achteraan
+  if(_currentBasemap) _currentBasemap.bringToBack();
+
   // Primaire laag bepaalt legenda/stats (de meest gedetailleerde actieve laag)
   var primaryType = _layerState.buurten ? 'buurten' : (_layerState.wijken ? 'wijken' : 'gemeenten');
   if(type === primaryType){
     updateLegend(breaks, colors);
-    updateStats(vals, type);
+    updateActiveStats();
   }
+  } catch(err){console.error('renderChoropleth ERROR:',err)}
 }
 
 // ============================================================
@@ -933,7 +939,7 @@ function computeStats(key){
 
 function updateActiveStats(){
   var container = document.getElementById('activeStatsContainer');
-  if(!_buurtData || !_activeIndicators.length){container.innerHTML='';return}
+  if(!getActiveData() || !_activeIndicators.length){container.innerHTML='';return}
   var html = '';
   _activeIndicators.forEach(function(key, i){
     var fm = getIndicator(key);
@@ -970,17 +976,21 @@ function filterGemeente(){
   updateMap();
   updateActiveStats();
   var gem = document.getElementById('gemeenteFilter').value;
-  if(gem !== 'all' && _buurtData){
-    var bounds = [];
-    _buurtData.features.forEach(function(f){
-      if(f.properties.gemeentenaam === gem && f.geometry){
-        bounds.push(L.geoJSON(f).getBounds());
+  if(gem !== 'all'){
+    // Gebruik beschikbare data voor bounds (buurt > wijk > gemeente)
+    var src = _buurtData || _wijkData || _gemeenteData;
+    if(src){
+      var bounds = [];
+      src.features.forEach(function(f){
+        if(f.properties.gemeentenaam === gem && f.geometry){
+          try{ bounds.push(L.geoJSON(f).getBounds()); }catch(e){}
+        }
+      });
+      if(bounds.length){
+        var combined = bounds[0];
+        bounds.forEach(function(b){combined.extend(b)});
+        _map.fitBounds(combined,{padding:[20,20]});
       }
-    });
-    if(bounds.length){
-      var combined = bounds[0];
-      bounds.forEach(function(b){combined.extend(b)});
-      _map.fitBounds(combined,{padding:[20,20]});
     }
   }
 }
@@ -988,8 +998,18 @@ function filterGemeente(){
 function buildGemeenteFilter(){
   var sel = document.getElementById('gemeenteFilter');
   var sorted = Array.from(_gemeenteNamen).sort();
-  sel.innerHTML = '<option value="all">Alle gemeenten ('+sorted.length+')</option>';
-  sorted.forEach(function(g){sel.innerHTML += '<option value="'+g+'">'+g+'</option>'});
+  // Gebruik DOM API i.p.v. innerHTML+= om issues met speciale tekens te voorkomen
+  sel.innerHTML = '';
+  var allOpt = document.createElement('option');
+  allOpt.value = 'all';
+  allOpt.textContent = 'Alle gemeenten ('+sorted.length+')';
+  sel.appendChild(allOpt);
+  sorted.forEach(function(g){
+    var opt = document.createElement('option');
+    opt.value = g;
+    opt.textContent = g;
+    sel.appendChild(opt);
+  });
   document.getElementById('sGemeenten').textContent = sorted.length;
 }
 
