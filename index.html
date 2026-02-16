@@ -9,78 +9,147 @@
 <link rel="manifest" href="manifest.json">
 <title>GeoInzicht — CBS Buurtdata</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-:root{--bg:#0f1724;--p:#1a2332;--p2:#243044;--bd:#2d3a4d;--tx:#e2e8f0;--mt:#64748b;--ac:#39ff14;--ac2:#22c55e;--up:#22c55e;--dn:#ef4444;--pu:#a78bfa;--ai:#38bdf8;--wn:#fbbf24;--cyan:#06b6d4;--radius:10px}
+:root{--bg:#0a0f1a;--p:rgba(15,20,35,.85);--p2:rgba(25,32,52,.7);--bd:rgba(55,65,90,.5);--tx:#e2e8f0;--mt:#64748b;--ac:#39ff14;--ac2:#22c55e;--up:#22c55e;--dn:#ef4444;--pu:#a78bfa;--ai:#38bdf8;--wn:#fbbf24;--cyan:#06b6d4;--radius:12px;--glass:rgba(20,28,50,.6);--glass-bd:rgba(80,100,140,.3);--shadow:0 8px 32px rgba(0,0,0,.4)}
 *{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);overflow:hidden;height:100vh;height:100dvh}
 .app{display:flex;height:100vh;height:100dvh}
-.sidebar{width:340px;background:var(--p);border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;z-index:100;transition:transform .3s}
-.sidebar-footer{padding:12px 16px;border-top:1px solid var(--bd);text-align:center;flex-shrink:0}
-.neon-text{font:900 16px 'Space Mono',monospace;color:#39ff14;text-shadow:0 0 7px #39ff14,0 0 10px #39ff14,0 0 21px #39ff14,0 0 42px #0fa,0 0 82px #0fa;letter-spacing:2px;animation:neonPulse 2s ease-in-out infinite alternate}
-@keyframes neonPulse{from{text-shadow:0 0 5px #39ff14,0 0 10px #39ff14,0 0 20px #39ff14,0 0 40px #0fa}to{text-shadow:0 0 10px #39ff14,0 0 20px #39ff14,0 0 40px #39ff14,0 0 80px #0fa,0 0 120px #0fa}}
+
+/* Material Icons */
+.mi{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;font-size:18px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-smoothing:antialiased;font-variation-settings:'FILL' 1,'wght' 400,'GRAD' 0,'opsz' 24}
+.mi-sm{font-size:14px}
+.mi-lg{font-size:22px}
+
+/* Sidebar with glass effect */
+.sidebar{width:360px;background:var(--p);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border-right:1px solid var(--glass-bd);display:flex;flex-direction:column;overflow:hidden;z-index:100;transition:transform .4s cubic-bezier(.4,0,.2,1)}
 .sidebar.hidden{transform:translateX(-100%);position:absolute;height:100%}
+.sidebar-footer{padding:14px 16px;border-top:1px solid var(--glass-bd);text-align:center;flex-shrink:0;background:rgba(10,15,26,.5)}
+.neon-text{font:900 15px 'Space Mono',monospace;color:#39ff14;text-shadow:0 0 7px #39ff14,0 0 10px #39ff14,0 0 21px #39ff14,0 0 42px #0fa,0 0 82px #0fa;letter-spacing:3px;animation:neonPulse 2s ease-in-out infinite alternate}
+@keyframes neonPulse{from{text-shadow:0 0 5px #39ff14,0 0 10px #39ff14,0 0 20px #39ff14,0 0 40px #0fa}to{text-shadow:0 0 10px #39ff14,0 0 20px #39ff14,0 0 40px #39ff14,0 0 80px #0fa,0 0 120px #0fa}}
+
 .map-wrap{flex:1;position:relative}
 #map{width:100%;height:100%}
-.header{padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px}
-.sb-logo{font-family:'Space Mono',monospace;font-size:16px;font-weight:700;background:linear-gradient(135deg,#39ff14,#22c55e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+
+/* Header */
+.header{padding:14px 16px;border-bottom:1px solid var(--glass-bd);display:flex;align-items:center;gap:10px;background:rgba(10,15,26,.4)}
+.sb-logo{font-family:'Space Mono',monospace;font-size:17px;font-weight:700;background:linear-gradient(135deg,#39ff14 0%,#22c55e 50%,#06b6d4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .header-right{margin-left:auto;display:flex;gap:6px;align-items:center}
-.search-wrap{padding:8px 12px;border-bottom:1px solid var(--bd);position:relative}
-.search-wrap input{background:var(--p2);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:8px 10px 8px 30px;font:13px 'DM Sans',sans-serif;width:100%;outline:none}
-.search-wrap input:focus{border-color:var(--ac)}
-.search-wrap .icon{position:absolute;left:20px;top:50%;transform:translateY(-50%);color:var(--mt);font-size:12px;pointer-events:none}
-.search-results{display:none;position:absolute;left:12px;right:12px;top:44px;background:var(--p);border:1px solid var(--bd);border-radius:6px;max-height:200px;overflow-y:auto;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.5)}
-.search-item{padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--bd)}
-.search-item:hover{background:var(--p2)}
+
+/* Search */
+.search-wrap{padding:10px 14px;border-bottom:1px solid var(--glass-bd);position:relative}
+.search-wrap input{background:var(--glass);color:var(--tx);border:1px solid var(--glass-bd);border-radius:10px;padding:10px 12px 10px 36px;font:400 13px 'DM Sans',sans-serif;width:100%;outline:none;transition:all .3s cubic-bezier(.4,0,.2,1);backdrop-filter:blur(10px)}
+.search-wrap input:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(57,255,20,.1),0 0 20px rgba(57,255,20,.05)}
+.search-wrap input::placeholder{color:var(--mt);transition:opacity .2s}
+.search-wrap input:focus::placeholder{opacity:.5}
+.search-wrap .s-icon{position:absolute;left:24px;top:50%;transform:translateY(-50%);color:var(--mt);transition:color .3s}
+.search-wrap input:focus ~ .s-icon,.search-wrap input:focus + .s-icon{color:var(--ac)}
+.search-results{display:none;position:absolute;left:14px;right:14px;top:50px;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--glass-bd);border-radius:10px;max-height:220px;overflow-y:auto;z-index:200;box-shadow:var(--shadow);animation:slideDown .2s ease-out}
+@keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.search-item{padding:10px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--glass-bd);transition:all .15s ease}
+.search-item:hover{background:rgba(57,255,20,.08);padding-left:16px}
 .search-item:last-child{border:none}
-.tabs{display:flex;border-bottom:1px solid var(--bd)}
-.tab{flex:1;padding:10px 8px;text-align:center;font-size:11px;font-weight:600;color:var(--mt);cursor:pointer;border-bottom:2px solid transparent;transition:.2s}
+
+/* Tabs */
+.tabs{display:flex;border-bottom:1px solid var(--glass-bd);background:rgba(10,15,26,.3)}
+.tab{flex:1;padding:12px 8px;text-align:center;font-size:11px;font-weight:600;color:var(--mt);cursor:pointer;border-bottom:2px solid transparent;transition:all .3s cubic-bezier(.4,0,.2,1);letter-spacing:.3px;text-transform:uppercase;position:relative}
 .tab.active{color:var(--ac);border-bottom-color:var(--ac)}
-.tab:hover{color:var(--tx)}
-.pane{display:none;flex:1;overflow-y:auto;padding:14px}
-.pane.active{display:block}
-.sh{font:700 12px 'Space Mono',monospace;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px}
+.tab:hover{color:var(--tx);background:rgba(255,255,255,.02)}
+.tab.active::after{content:'';position:absolute;bottom:-1px;left:20%;right:20%;height:2px;background:var(--ac);filter:blur(4px)}
+
+/* Panes */
+.pane{display:none;flex:1;overflow-y:auto;padding:16px;scroll-behavior:smooth}
+.pane::-webkit-scrollbar{width:4px}
+.pane::-webkit-scrollbar-track{background:transparent}
+.pane::-webkit-scrollbar-thumb{background:var(--glass-bd);border-radius:4px}
+.pane::-webkit-scrollbar-thumb:hover{background:var(--ac)}
+.pane.active{display:block;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* Section headers */
+.sh{font:700 11px 'Space Mono',monospace;color:var(--pu);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px;display:flex;align-items:center;gap:6px}
 .sh:first-child{margin-top:0}
-.card{background:var(--p2);border:1px solid var(--bd);border-radius:var(--radius);padding:12px;margin-bottom:10px}
+.sh .mi{font-size:16px;color:var(--pu)}
+
+/* Glass cards */
+.card{background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--glass-bd);border-radius:var(--radius);padding:14px;margin-bottom:10px;transition:all .3s cubic-bezier(.4,0,.2,1)}
+.card:hover{border-color:rgba(100,120,160,.4);box-shadow:0 4px 20px rgba(0,0,0,.2)}
+
+/* Stats */
 .stat-row{display:flex;gap:10px;margin-bottom:10px}
-.stat{flex:1;background:var(--p2);border:1px solid var(--bd);border-radius:8px;padding:10px;text-align:center}
-.stat b{display:block;font:700 20px 'Space Mono',monospace;color:var(--ac)}
-.stat small{font-size:10px;color:var(--mt)}
-.btn{border:none;border-radius:6px;padding:6px 12px;font:600 11px 'DM Sans',sans-serif;cursor:pointer;transition:.2s}
-.btn-p{background:var(--ac);color:#000}.btn-p:hover{background:var(--ac2)}
-.btn-o{background:transparent;color:var(--ac);border:1px solid var(--ac)}.btn-o:hover{background:rgba(57,255,20,.1)}
-.btn-s{background:var(--p2);color:var(--tx);border:1px solid var(--bd)}.btn-s:hover{background:var(--bd)}
-.btn-s.active{border-color:var(--ac);color:var(--ac);background:rgba(57,255,20,.1)}
-select{background:var(--p2);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:8px 10px;font:13px 'DM Sans',sans-serif;width:100%}
-select:focus{outline:none;border-color:var(--ac)}
-.legend{display:flex;flex-direction:column;gap:4px;margin-top:10px}
-.legend-row{display:flex;align-items:center;gap:8px;font-size:11px}
-.legend-color{width:24px;height:14px;border-radius:3px;border:1px solid rgba(255,255,255,.1)}
-.progress{height:4px;background:var(--bd);border-radius:2px;overflow:hidden;margin:6px 0}
-.progress-bar{height:100%;background:var(--ac);border-radius:2px;transition:width .3s}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--p2);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:10px 20px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
-.toast.show{opacity:1}
-.info-panel{position:absolute;top:10px;right:10px;background:rgba(26,35,50,.95);border:1px solid var(--bd);border-radius:var(--radius);padding:14px;z-index:500;min-width:240px;max-width:320px;backdrop-filter:blur(10px);display:none}
+.stat{flex:1;background:var(--glass);backdrop-filter:blur(8px);border:1px solid var(--glass-bd);border-radius:10px;padding:12px 8px;text-align:center;transition:all .3s ease}
+.stat:hover{border-color:var(--ac);transform:translateY(-2px);box-shadow:0 4px 16px rgba(57,255,20,.1)}
+.stat b{display:block;font:700 20px 'Space Mono',monospace;color:var(--ac);transition:transform .2s}
+.stat:hover b{transform:scale(1.05)}
+.stat small{font-size:10px;color:var(--mt);letter-spacing:.3px}
+
+/* Buttons */
+.btn{border:none;border-radius:8px;padding:7px 14px;font:600 11px 'DM Sans',sans-serif;cursor:pointer;transition:all .25s cubic-bezier(.4,0,.2,1);display:inline-flex;align-items:center;gap:5px;position:relative;overflow:hidden}
+.btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.05),transparent);opacity:0;transition:opacity .2s}
+.btn:hover::before{opacity:1}
+.btn:active{transform:scale(.96)}
+.btn-p{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#000;font-weight:700}.btn-p:hover{box-shadow:0 4px 20px rgba(57,255,20,.3)}
+.btn-o{background:transparent;color:var(--ac);border:1px solid var(--ac)}.btn-o:hover{background:rgba(57,255,20,.08);box-shadow:0 0 20px rgba(57,255,20,.1)}
+.btn-s{background:var(--glass);color:var(--tx);border:1px solid var(--glass-bd)}.btn-s:hover{background:rgba(255,255,255,.08);border-color:rgba(100,120,160,.5)}
+.btn-s.active{border-color:var(--ac);color:var(--ac);background:rgba(57,255,20,.08);box-shadow:0 0 12px rgba(57,255,20,.1)}
+
+/* Select */
+select{background:var(--glass);color:var(--tx);border:1px solid var(--glass-bd);border-radius:10px;padding:10px 12px;font:500 13px 'DM Sans',sans-serif;width:100%;outline:none;appearance:none;-webkit-appearance:none;cursor:pointer;transition:all .3s ease;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+select:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(57,255,20,.08)}
+select:hover{border-color:rgba(100,120,160,.6)}
+select option{background:var(--bg);color:var(--tx)}
+
+/* Legend */
+.legend{display:flex;flex-direction:column;gap:3px;margin-top:8px}
+.legend-row{display:flex;align-items:center;gap:8px;font-size:11px;padding:2px 0;transition:opacity .2s}
+.legend-row:hover{opacity:.8}
+.legend-color{width:28px;height:14px;border-radius:4px;border:1px solid rgba(255,255,255,.08);transition:transform .2s}
+.legend-row:hover .legend-color{transform:scaleX(1.1)}
+
+/* Progress */
+.progress{height:4px;background:rgba(45,58,77,.5);border-radius:4px;overflow:hidden;margin:6px 0}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--ac),var(--ac2));border-radius:4px;transition:width .4s cubic-bezier(.4,0,.2,1)}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:var(--tx);border:1px solid var(--glass-bd);border-radius:12px;padding:12px 24px;font-size:13px;font-weight:500;z-index:999;opacity:0;transition:all .4s cubic-bezier(.4,0,.2,1);pointer-events:none;box-shadow:var(--shadow)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Info panel */
+.info-panel{position:absolute;top:12px;right:12px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border:1px solid var(--glass-bd);border-radius:var(--radius);padding:16px;z-index:500;min-width:250px;max-width:340px;display:none;box-shadow:var(--shadow);animation:slideIn .3s cubic-bezier(.4,0,.2,1)}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 .info-panel.show{display:block}
-.info-panel h3{font:700 14px 'Space Mono',monospace;color:var(--ac);margin-bottom:8px}
-.info-row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--bd)}
+.info-panel h3{font:700 14px 'Space Mono',monospace;color:var(--ac);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.info-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid rgba(55,65,90,.3);transition:background .15s}
+.info-row:hover{background:rgba(255,255,255,.02);padding-left:4px}
 .info-row:last-child{border:none}
 .info-val{font:700 12px 'Space Mono',monospace;color:var(--ai)}
-.sidebar-toggle{position:absolute;top:10px;left:10px;z-index:600;background:var(--p);border:1px solid var(--bd);border-radius:8px;width:36px;height:36px;display:none;place-items:center;cursor:pointer;color:var(--ac);font-size:18px}
-.loading-overlay{position:fixed;inset:0;background:rgba(15,23,36,.95);z-index:9999;display:grid;place-items:center}
+
+/* Sidebar toggle */
+.sidebar-toggle{position:absolute;top:12px;left:12px;z-index:600;background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--glass-bd);border-radius:10px;width:40px;height:40px;display:none;place-items:center;cursor:pointer;color:var(--ac);font-size:20px;transition:all .3s;box-shadow:var(--shadow)}
+.sidebar-toggle:hover{background:rgba(57,255,20,.1);border-color:var(--ac)}
+
+/* Loading */
+.loading-overlay{position:fixed;inset:0;background:rgba(10,15,26,.97);z-index:9999;display:grid;place-items:center}
 .loading-overlay .inner{text-align:center}
-.loading-overlay .spinner{width:48px;height:48px;border:3px solid var(--bd);border-top-color:var(--ac);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
-.loading-overlay .msg{font:600 14px 'DM Sans',sans-serif;color:var(--tx)}
-.loading-overlay .sub{font-size:11px;color:var(--mt);margin-top:6px}
+.loading-overlay .spinner{width:52px;height:52px;border:3px solid var(--glass-bd);border-top-color:var(--ac);border-radius:50%;animation:spin .8s cubic-bezier(.4,0,.2,1) infinite;margin:0 auto 20px;filter:drop-shadow(0 0 8px rgba(57,255,20,.3))}
+.loading-overlay .msg{font:600 15px 'DM Sans',sans-serif;color:var(--tx)}
+.loading-overlay .sub{font-size:12px;color:var(--mt);margin-top:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* Responsive */
 @media(max-width:900px){
   .sidebar{width:100%;position:absolute;height:100%;z-index:500}
   .sidebar.hidden{transform:translateX(-100%)}
   .sidebar-toggle{display:grid}
 }
 @media(max-width:600px){.sidebar{width:100%}.stat-row{flex-wrap:wrap}.stat{min-width:calc(50% - 5px)}}
+
+/* Leaflet overrides */
+.leaflet-control-zoom a{background:var(--glass) !important;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:var(--tx) !important;border-color:var(--glass-bd) !important;transition:all .2s !important}
+.leaflet-control-zoom a:hover{background:rgba(57,255,20,.15) !important;color:var(--ac) !important}
 </style>
 </head>
 <body>
@@ -90,64 +159,66 @@ select:focus{outline:none;border-color:var(--ac)}
     <div class="spinner"></div>
     <div class="msg" id="loadMsg">GeoInzicht laden...</div>
     <div class="sub" id="loadSub">Buurtdata ophalen</div>
-    <div class="progress" style="width:200px;margin-top:12px"><div class="progress-bar" id="loadProgress" style="width:0%"></div></div>
+    <div class="progress" style="width:220px;margin-top:14px"><div class="progress-bar" id="loadProgress" style="width:0%"></div></div>
   </div>
 </div>
 
 <div class="app">
-  <div class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">&#9776;</div>
+  <div class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()"><span class="mi">menu</span></div>
 
   <div class="sidebar" id="sidebar">
     <div class="header">
-      <div style="display:flex;align-items:center;gap:8px">
-        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><radialGradient id='g' cx='35%25' cy='30%25' r='65%25'><stop offset='0%25' stop-color='%2334d399' stop-opacity='.95'/><stop offset='50%25' stop-color='%2322c55e' stop-opacity='.85'/><stop offset='100%25' stop-color='%23064e3b' stop-opacity='.7'/></radialGradient></defs><circle cx='50' cy='50' r='38' fill='url(%23g)'/><circle cx='50' cy='50' r='38' fill='none' stroke='%2339ff14' stroke-width='1' opacity='.3'/><ellipse cx='50' cy='50' rx='18' ry='38' fill='none' stroke='%2339ff14' stroke-width='.6' opacity='.25'/><ellipse cx='50' cy='50' rx='32' ry='38' fill='none' stroke='%2339ff14' stroke-width='.5' opacity='.2'/><ellipse cx='50' cy='50' rx='38' ry='6' fill='none' stroke='%2339ff14' stroke-width='.6' opacity='.25'/><ellipse cx='50' cy='50' rx='48' ry='18' fill='none' stroke='%2306b6d4' stroke-width='.8' opacity='.35' transform='rotate(-25 50 50)'/><ellipse cx='50' cy='50' rx='46' ry='15' fill='none' stroke='%238b5cf6' stroke-width='.6' opacity='.25' transform='rotate(30 50 50)'/><circle cx='50' cy='50' r='46' fill='none' stroke='%2339ff14' stroke-width='.4' opacity='.15'/></svg>" alt="GeoInzicht" style="width:36px;height:36px;border-radius:50%;filter:drop-shadow(0 0 6px #39ff14)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,rgba(57,255,20,.2),rgba(6,182,212,.2));display:grid;place-items:center;border:1px solid rgba(57,255,20,.3)">
+          <span class="mi mi-lg" style="color:var(--ac)">public</span>
+        </div>
         <div>
           <div class="sb-logo">GeoInzicht</div>
-          <span style="font-size:8px;color:var(--mt)">CBS buurtdata op de kaart</span>
+          <span style="font-size:9px;color:var(--mt);letter-spacing:.5px">CBS buurtdata op de kaart</span>
         </div>
       </div>
       <div class="header-right">
-        <button class="btn btn-s" onclick="toggleSidebar()" style="display:none;font-size:16px;padding:4px 10px" id="closeSidebar">&#10005;</button>
+        <button class="btn btn-s" onclick="toggleSidebar()" style="display:none;padding:6px 10px" id="closeSidebar"><span class="mi mi-sm">close</span></button>
       </div>
     </div>
 
     <!-- Zoekbalk -->
     <div class="search-wrap">
-      <span class="icon">&#128269;</span>
+      <span class="mi mi-sm s-icon">search</span>
       <input type="text" id="searchInput" placeholder="Zoek adres, buurt, gemeente..." autocomplete="off">
       <div class="search-results" id="searchResults"></div>
     </div>
 
     <div class="tabs">
-      <div class="tab active" data-tab="kaart" onclick="switchTab('kaart')">Kaart</div>
-      <div class="tab" data-tab="info" onclick="switchTab('info')">Info</div>
+      <div class="tab active" data-tab="kaart" onclick="switchTab('kaart')"><span class="mi mi-sm" style="vertical-align:-3px">map</span> Kaart</div>
+      <div class="tab" data-tab="info" onclick="switchTab('info')"><span class="mi mi-sm" style="vertical-align:-3px">info</span> Info</div>
     </div>
 
     <!-- KAART TAB -->
     <div class="pane active" id="p-kaart">
-      <div class="sh">Lagen</div>
+      <div class="sh"><span class="mi">layers</span> Lagen</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-s active" data-layer="buurten" onclick="toggleLayer('buurten')">Buurten</button>
-        <button class="btn btn-s" data-layer="wijken" onclick="toggleLayer('wijken')">Wijken</button>
-        <button class="btn btn-s" data-layer="bag" onclick="toggleLayer('bag')">BAG Adressen</button>
-        <button class="btn btn-s" data-layer="panden" onclick="toggleLayer('panden')">BAG Panden</button>
+        <button class="btn btn-s active" data-layer="buurten" onclick="toggleLayer('buurten')"><span class="mi mi-sm">grid_on</span> Buurten</button>
+        <button class="btn btn-s" data-layer="wijken" onclick="toggleLayer('wijken')"><span class="mi mi-sm">grid_view</span> Wijken</button>
+        <button class="btn btn-s" data-layer="bag" onclick="toggleLayer('bag')"><span class="mi mi-sm">location_on</span> BAG Adressen</button>
+        <button class="btn btn-s" data-layer="panden" onclick="toggleLayer('panden')"><span class="mi mi-sm">apartment</span> BAG Panden</button>
       </div>
 
-      <div class="sh">Indicator</div>
+      <div class="sh"><span class="mi">bar_chart</span> Indicator</div>
       <select id="indicatorSelect" onchange="updateMap()"></select>
 
-      <div class="sh">Filter gemeente</div>
+      <div class="sh"><span class="mi">filter_alt</span> Filter gemeente</div>
       <select id="gemeenteFilter" onchange="filterGemeente()">
         <option value="all">Alle gemeenten</option>
       </select>
 
-      <div class="sh">Basemap</div>
-      <div style="display:flex;gap:4px;flex-wrap:wrap" id="basemapBtns"></div>
+      <div class="sh"><span class="mi">palette</span> Basemap</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap" id="basemapBtns"></div>
 
-      <div class="sh">Legenda</div>
+      <div class="sh"><span class="mi">gradient</span> Legenda</div>
       <div class="legend" id="legend"></div>
 
-      <div class="sh" style="margin-top:16px">Statistieken</div>
+      <div class="sh" style="margin-top:18px"><span class="mi">analytics</span> Statistieken</div>
       <div class="stat-row">
         <div class="stat"><b id="sBuurten">0</b><small>Buurten</small></div>
         <div class="stat"><b id="sGemeenten">0</b><small>Gemeenten</small></div>
@@ -164,122 +235,122 @@ select:focus{outline:none;border-color:var(--ac)}
 
     <!-- INFO TAB -->
     <div class="pane" id="p-info">
-      <div class="sh">Over GeoInzicht</div>
+      <div class="sh"><span class="mi">info</span> Over GeoInzicht</div>
       <div class="card">
-        <p style="font-size:12px;line-height:1.6;color:var(--mt)">
+        <p style="font-size:12px;line-height:1.7;color:var(--mt)">
           CBS buurtdata op de kaart. Geometrie en statistieken vooraf samengevoegd
           vanuit PDOK WFS (CBS Wijken &amp; Buurten).
         </p>
       </div>
 
-      <div class="sh">Datasets</div>
+      <div class="sh"><span class="mi">database</span> Datasets</div>
       <div class="card" id="datasetInfo">
-        <div style="font-size:11px;color:var(--mt);line-height:1.8">
-          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
-            <span style="color:var(--tx);font-weight:600">Buurten</span>
-            <span style="font-family:'Space Mono',monospace;color:var(--ac)" id="dsBuurten">—</span>
+        <div style="font-size:11px;color:var(--mt);line-height:1.9">
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--glass-bd);padding:5px 0">
+            <span style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">grid_on</span> Buurten</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--ac);font-size:10px" id="dsBuurten">&#8212;</span>
           </div>
-          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
-            <span style="color:var(--tx);font-weight:600">Wijken</span>
-            <span style="font-family:'Space Mono',monospace;color:var(--ac)" id="dsWijken">—</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--glass-bd);padding:5px 0">
+            <span style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">grid_view</span> Wijken</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--ac);font-size:10px" id="dsWijken">&#8212;</span>
           </div>
-          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
-            <span style="color:var(--tx);font-weight:600">BAG Adressen</span>
-            <span style="font-family:'Space Mono',monospace;color:var(--ai)">WMS live (dagelijks)</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--glass-bd);padding:5px 0">
+            <span style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ai)">location_on</span> BAG Adressen</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--ai);font-size:10px">WMS live (dagelijks)</span>
           </div>
-          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
-            <span style="color:var(--tx);font-weight:600">BAG Panden</span>
-            <span style="font-family:'Space Mono',monospace;color:var(--ai)">WMS live (dagelijks)</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--glass-bd);padding:5px 0">
+            <span style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ai)">apartment</span> BAG Panden</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--ai);font-size:10px">WMS live (dagelijks)</span>
           </div>
-          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
-            <span style="color:var(--tx);font-weight:600">CBS Jaar</span>
-            <span style="font-family:'Space Mono',monospace;color:var(--wn)" id="dsJaar">—</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--glass-bd);padding:5px 0">
+            <span style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--wn)">calendar_today</span> CBS Jaar</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--wn);font-size:10px" id="dsJaar">&#8212;</span>
           </div>
-          <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--bd);padding:4px 0">
-            <span style="color:var(--tx);font-weight:600">Gegenereerd</span>
-            <span style="font-family:'Space Mono',monospace;color:var(--mt)" id="dsGenerated">—</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--glass-bd);padding:5px 0">
+            <span style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--mt)">schedule</span> Gegenereerd</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--mt);font-size:10px" id="dsGenerated">&#8212;</span>
           </div>
-          <div style="display:flex;justify-content:space-between;padding:4px 0">
-            <span style="color:var(--tx);font-weight:600">Indicatoren</span>
-            <span style="font-family:'Space Mono',monospace;color:var(--ac)">24</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0">
+            <span style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">bar_chart</span> Indicatoren</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--ac);font-size:10px">24</span>
           </div>
         </div>
       </div>
 
-      <div class="sh">Databronnen</div>
+      <div class="sh"><span class="mi">hub</span> Databronnen</div>
       <div class="card">
         <div style="font-size:11px;color:var(--mt);line-height:1.7">
-          <div style="padding:4px 0;border-bottom:1px solid var(--bd)">
-            <div style="color:var(--tx);font-weight:600">&#128202; CBS Kerncijfers wijken en buurten</div>
+          <div style="padding:5px 0;border-bottom:1px solid var(--glass-bd)">
+            <div style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--pu)">query_stats</span> CBS Kerncijfers wijken en buurten</div>
             <div>Bron: CBS via PDOK WFS &middot; Frequentie: jaarlijks &middot; Peildatum: 1 jan 2022</div>
             <div>Indicatoren: bevolking, woningen, inkomen, energie, arbeid, voorzieningen</div>
-            <div>API: <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--ai)">service.pdok.nl/cbs/wijkenbuurten</span></div>
+            <div>API: <code style="font-family:'Space Mono',monospace;font-size:9px;color:var(--ai);background:rgba(56,189,248,.08);padding:1px 4px;border-radius:3px">service.pdok.nl/cbs/wijkenbuurten</code></div>
           </div>
-          <div style="padding:4px 0;border-bottom:1px solid var(--bd)">
-            <div style="color:var(--tx);font-weight:600">&#127758; BAG Basisregistratie Adressen en Gebouwen</div>
+          <div style="padding:5px 0;border-bottom:1px solid var(--glass-bd)">
+            <div style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--cyan)">domain</span> BAG Basisregistratie Adressen en Gebouwen</div>
             <div>Bron: Kadaster via PDOK WMS &middot; Frequentie: <span style="color:var(--ac)">dagelijks</span></div>
             <div>9.9M verblijfsobjecten &middot; Panden met bouwjaar, oppervlakte, status</div>
-            <div>API: <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--ai)">service.pdok.nl/lv/bag/wms/v2_0</span></div>
+            <div>API: <code style="font-family:'Space Mono',monospace;font-size:9px;color:var(--ai);background:rgba(56,189,248,.08);padding:1px 4px;border-radius:3px">service.pdok.nl/lv/bag/wms/v2_0</code></div>
           </div>
-          <div style="padding:4px 0;border-bottom:1px solid var(--bd)">
-            <div style="color:var(--tx);font-weight:600">&#128269; PDOK Locatieserver</div>
+          <div style="padding:5px 0;border-bottom:1px solid var(--glass-bd)">
+            <div style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">search</span> PDOK Locatieserver</div>
             <div>Bron: Kadaster &middot; Frequentie: <span style="color:var(--ac)">continu</span></div>
             <div>Adres zoeken, geocodering, autocomplete</div>
-            <div>API: <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--ai)">api.pdok.nl/bzk/locatieserver</span></div>
+            <div>API: <code style="font-family:'Space Mono',monospace;font-size:9px;color:var(--ai);background:rgba(56,189,248,.08);padding:1px 4px;border-radius:3px">api.pdok.nl/bzk/locatieserver</code></div>
           </div>
-          <div style="padding:4px 0">
-            <div style="color:var(--tx);font-weight:600">&#128506; Basemaps</div>
+          <div style="padding:5px 0">
+            <div style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--wn)">map</span> Basemaps</div>
             <div>CARTO (donker/licht) &middot; OpenStreetMap &middot; Esri Satelliet &middot; BRT Topo (Kadaster)</div>
             <div>Frequentie: <span style="color:var(--ac)">continu (live tiles)</span></div>
           </div>
         </div>
       </div>
 
-      <div class="sh">CBS data per jaar</div>
+      <div class="sh"><span class="mi">timeline</span> CBS data per jaar</div>
       <div class="card">
         <div style="font-size:11px;color:var(--mt);line-height:1.7">
-          <div style="color:var(--tx);font-weight:600;margin-bottom:4px">Waarom jaar 2022?</div>
+          <div style="color:var(--tx);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--wn)">help</span> Waarom jaar 2022?</div>
           CBS publiceert kerncijfers per jaar, maar niet alle indicatoren zijn
           meteen beschikbaar in het nieuwste jaar. De data wordt gefaseerd
           toegevoegd:
-          <div style="margin-top:6px">
-            <div style="padding:3px 0"><span style="color:var(--ac)">&#9679;</span> <b style="color:var(--tx)">2024</b> — Alleen bevolking (inwoners, leeftijd, huishoudens)</div>
-            <div style="padding:3px 0"><span style="color:var(--wn)">&#9679;</span> <b style="color:var(--tx)">2023</b> — + WOZ, koopwoningen, woningvoorraad</div>
-            <div style="padding:3px 0"><span style="color:var(--up)">&#9679;</span> <b style="color:var(--tx)">2022</b> — + gas, elektriciteit, arbeidsparticipatie <span style="color:var(--ac)">(meest compleet)</span></div>
+          <div style="margin-top:8px">
+            <div style="padding:4px 0;display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--ac);display:inline-block;flex-shrink:0"></span> <b style="color:var(--tx)">2024</b> &#8212; Alleen bevolking (inwoners, leeftijd, huishoudens)</div>
+            <div style="padding:4px 0;display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--wn);display:inline-block;flex-shrink:0"></span> <b style="color:var(--tx)">2023</b> &#8212; + WOZ, koopwoningen, woningvoorraad</div>
+            <div style="padding:4px 0;display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:var(--up);display:inline-block;flex-shrink:0"></span> <b style="color:var(--tx)">2022</b> &#8212; + gas, elektriciteit, arbeidsparticipatie <span style="color:var(--ac);font-weight:600">(meest compleet)</span></div>
           </div>
-          <div style="margin-top:6px;padding:6px 8px;background:var(--bg);border-radius:6px;border-left:3px solid var(--wn)">
-            &#9888; Zodra CBS meer indicatoren publiceert voor een nieuwer jaar,
-            kun je de data verversen met het build script.
+          <div style="margin-top:8px;padding:8px 10px;background:rgba(251,191,36,.05);border-radius:8px;border-left:3px solid var(--wn);display:flex;align-items:flex-start;gap:6px">
+            <span class="mi mi-sm" style="color:var(--wn);flex-shrink:0;margin-top:1px">warning</span>
+            <span>Zodra CBS meer indicatoren publiceert voor een nieuwer jaar, kun je de data verversen met het build script.</span>
           </div>
         </div>
       </div>
 
-      <div class="sh">Indicatoren</div>
+      <div class="sh"><span class="mi">tune</span> Indicatoren</div>
       <div class="card" id="indicatorDefs" style="font-size:11px;color:var(--mt)"></div>
 
-      <div class="sh">Data verversen</div>
+      <div class="sh"><span class="mi">refresh</span> Data verversen</div>
       <div class="card">
-        <div style="font-size:11px;color:var(--mt);line-height:1.8">
-          <div style="color:var(--tx);font-weight:600;margin-bottom:4px">Stap 1: GeoJSON opnieuw genereren</div>
-          <code style="display:block;background:var(--bg);padding:6px 8px;border-radius:4px;font-size:10px;margin:4px 0">python build_geojson.py --type buurten --year 2022</code>
-          <code style="display:block;background:var(--bg);padding:6px 8px;border-radius:4px;font-size:10px;margin:4px 0">python build_geojson.py --type wijken --year 2022</code>
-          <div style="color:var(--tx);font-weight:600;margin:8px 0 4px">Stap 2: Publiceren op GitHub Pages</div>
-          <code style="display:block;background:var(--bg);padding:6px 8px;border-radius:4px;font-size:10px;margin:4px 0">git add *.geojson<br>git commit -m "Data update"<br>git push</code>
-          <div style="color:var(--tx);font-weight:600;margin:8px 0 4px">Ander jaar proberen?</div>
-          <code style="display:block;background:var(--bg);padding:6px 8px;border-radius:4px;font-size:10px;margin:4px 0">python build_geojson.py --type buurten --year 2023</code>
-          <div style="margin-top:4px;font-size:10px">Pas daarna BUURTEN_URL / WIJKEN_URL in index.html aan.</div>
+        <div style="font-size:11px;color:var(--mt);line-height:1.9">
+          <div style="color:var(--tx);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">terminal</span> Stap 1: GeoJSON opnieuw genereren</div>
+          <code style="display:block;background:rgba(10,15,26,.6);padding:8px 10px;border-radius:8px;font:400 10px 'Space Mono',monospace;color:var(--ai);margin:4px 0;border:1px solid var(--glass-bd)">python build_geojson.py --type buurten --year 2022</code>
+          <code style="display:block;background:rgba(10,15,26,.6);padding:8px 10px;border-radius:8px;font:400 10px 'Space Mono',monospace;color:var(--ai);margin:4px 0;border:1px solid var(--glass-bd)">python build_geojson.py --type wijken --year 2022</code>
+          <div style="color:var(--tx);font-weight:600;margin:10px 0 6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">cloud_upload</span> Stap 2: Publiceren op GitHub Pages</div>
+          <code style="display:block;background:rgba(10,15,26,.6);padding:8px 10px;border-radius:8px;font:400 10px 'Space Mono',monospace;color:var(--ai);margin:4px 0;border:1px solid var(--glass-bd)">git add *.geojson<br>git commit -m "Data update"<br>git push</code>
+          <div style="color:var(--tx);font-weight:600;margin:10px 0 6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--wn)">swap_horiz</span> Ander jaar proberen?</div>
+          <code style="display:block;background:rgba(10,15,26,.6);padding:8px 10px;border-radius:8px;font:400 10px 'Space Mono',monospace;color:var(--ai);margin:4px 0;border:1px solid var(--glass-bd)">python build_geojson.py --type buurten --year 2023</code>
+          <div style="margin-top:4px;font-size:10px;color:var(--mt)">Pas daarna BUURTEN_URL / WIJKEN_URL in index.html aan.</div>
         </div>
       </div>
 
-      <div class="sh">Bron &amp; Versie</div>
+      <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 13px 'Space Mono',monospace;color:var(--ac)">GeoInzicht v3.2</div>
-        <div style="font-size:11px;color:var(--mt);margin-top:6px;line-height:1.6">
-          Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken<br>
-          <div style="margin-top:4px">
-            <div>&#128202; <b style="color:var(--tx)">CBS</b> — Kerncijfers wijken en buurten</div>
-            <div>&#127758; <b style="color:var(--tx)">PDOK</b> — Geometrie, BAG WMS, Locatieserver</div>
-            <div>&#128506; <b style="color:var(--tx)">Kadaster</b> — BAG verblijfsobjecten</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v4.0</div>
+        <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
+          Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
+          <div style="margin-top:6px">
+            <div style="display:flex;align-items:center;gap:4px;padding:2px 0"><span class="mi mi-sm" style="color:var(--pu)">query_stats</span> <b style="color:var(--tx)">CBS</b> &#8212; Kerncijfers wijken en buurten</div>
+            <div style="display:flex;align-items:center;gap:4px;padding:2px 0"><span class="mi mi-sm" style="color:var(--cyan)">public</span> <b style="color:var(--tx)">PDOK</b> &#8212; Geometrie, BAG WMS, Locatieserver</div>
+            <div style="display:flex;align-items:center;gap:4px;padding:2px 0"><span class="mi mi-sm" style="color:var(--ai)">domain</span> <b style="color:var(--tx)">Kadaster</b> &#8212; BAG verblijfsobjecten &amp; panden</div>
           </div>
         </div>
       </div>
@@ -293,7 +364,7 @@ select:focus{outline:none;border-color:var(--ac)}
   <div class="map-wrap">
     <div id="map"></div>
     <div class="info-panel" id="infoPanel">
-      <h3 id="infoBuurtNaam">-</h3>
+      <h3 id="infoBuurtNaam"><span class="mi mi-sm">place</span> -</h3>
       <div id="infoContent"></div>
     </div>
   </div>
@@ -312,38 +383,38 @@ var PDOK_SUGGEST = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/suggest?q=
 var PDOK_LOOKUP  = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/lookup?id=';
 
 var BASEMAPS = {
-  dark:  {url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', naam:'Donker', sub:'abcd'},
-  light: {url:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', naam:'Licht', sub:'abcd'},
-  osm:   {url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', naam:'OSM', sub:'abc'},
-  sat:   {url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', naam:'Satelliet'},
-  brt:   {url:'https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png', naam:'BRT Topo'}
+  dark:  {url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', naam:'Donker', icon:'dark_mode', sub:'abcd'},
+  light: {url:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', naam:'Licht', icon:'light_mode', sub:'abcd'},
+  osm:   {url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', naam:'OSM', icon:'map', sub:'abc'},
+  sat:   {url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', naam:'Satelliet', icon:'satellite_alt'},
+  brt:   {url:'https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png', naam:'BRT Topo', icon:'terrain'}
 };
 
 var INDICATORS = [
-  {key:'aantal_inwoners',       naam:'Aantal inwoners',         eenheid:'personen', icon:'\ud83d\udc65'},
-  {key:'gem_woz_waarde',        naam:'Gem. WOZ-waarde',         eenheid:'x1000',    icon:'\ud83c\udfe0'},
-  {key:'gem_inkomen_inwoner',   naam:'Gem. inkomen/inwoner',    eenheid:'x1000',    icon:'\ud83d\udcb0'},
-  {key:'koopwoningen',          naam:'Koopwoningen',            eenheid:'%',        icon:'\ud83d\udd11'},
-  {key:'65plus',                naam:'65-plussers',             eenheid:'%',        icon:'\ud83d\udc74'},
-  {key:'bevolkingsdichtheid',   naam:'Bevolkingsdichtheid',     eenheid:'/km\u00b2',icon:'\ud83d\udccd'},
-  {key:'gem_aardgas',           naam:'Gem. aardgas',            eenheid:'m\u00b3',  icon:'\ud83d\udd25'},
-  {key:'gem_elektriciteit',     naam:'Gem. elektriciteit',      eenheid:'kWh',      icon:'\u26a1'},
-  {key:'huishoudens',           naam:'Huishoudens',             eenheid:'aantal',   icon:'\ud83c\udfd8'},
-  {key:'woningvoorraad',        naam:'Woningvoorraad',          eenheid:'aantal',   icon:'\ud83c\udfd7'},
-  {key:'gem_huishouden_grootte',naam:'Gem. huishoudensgrootte', eenheid:'pers.',    icon:'\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67'},
-  {key:'arbeidsparticipatie',   naam:'Arbeidsparticipatie',     eenheid:'%',        icon:'\ud83d\udcbc'},
-  {key:'bedrijfsvestigingen',   naam:'Bedrijfsvestigingen',     eenheid:'aantal',   icon:'\ud83c\udfe2'},
-  {key:'afstand_huisarts',      naam:'Afstand huisarts',        eenheid:'km',       icon:'\ud83c\udfe5'},
-  {key:'afstand_supermarkt',    naam:'Afstand supermarkt',      eenheid:'km',       icon:'\ud83d\uded2'},
-  {key:'mannen',                naam:'Mannen',                  eenheid:'personen', icon:'\ud83d\udc68'},
-  {key:'vrouwen',               naam:'Vrouwen',                 eenheid:'personen', icon:'\ud83d\udc69'},
-  {key:'0_15',                  naam:'0-15 jaar',               eenheid:'%',        icon:'\ud83d\udc76'},
-  {key:'15_25',                 naam:'15-25 jaar',              eenheid:'%',        icon:'\ud83e\uddd1'},
-  {key:'25_45',                 naam:'25-45 jaar',              eenheid:'%',        icon:'\ud83d\udc68\u200d\ud83d\udcbc'},
-  {key:'45_65',                 naam:'45-65 jaar',              eenheid:'%',        icon:'\ud83d\udc68\u200d\ud83e\uddb3'},
-  {key:'huurwoningen',          naam:'Huurwoningen',            eenheid:'%',        icon:'\ud83c\udfe2'},
-  {key:'pct_eengezins',         naam:'Eengezinswoningen',       eenheid:'%',        icon:'\ud83c\udfe1'},
-  {key:'personenautos',         naam:"Personenauto's",          eenheid:'aantal',   icon:'\ud83d\ude97'}
+  {key:'aantal_inwoners',       naam:'Aantal inwoners',         eenheid:'personen', icon:'groups'},
+  {key:'gem_woz_waarde',        naam:'Gem. WOZ-waarde',         eenheid:'x1000',    icon:'home'},
+  {key:'gem_inkomen_inwoner',   naam:'Gem. inkomen/inwoner',    eenheid:'x1000',    icon:'payments'},
+  {key:'koopwoningen',          naam:'Koopwoningen',            eenheid:'%',        icon:'key'},
+  {key:'65plus',                naam:'65-plussers',             eenheid:'%',        icon:'elderly'},
+  {key:'bevolkingsdichtheid',   naam:'Bevolkingsdichtheid',     eenheid:'/km\u00b2',icon:'density_small'},
+  {key:'gem_aardgas',           naam:'Gem. aardgas',            eenheid:'m\u00b3',  icon:'local_fire_department'},
+  {key:'gem_elektriciteit',     naam:'Gem. elektriciteit',      eenheid:'kWh',      icon:'bolt'},
+  {key:'huishoudens',           naam:'Huishoudens',             eenheid:'aantal',   icon:'family_restroom'},
+  {key:'woningvoorraad',        naam:'Woningvoorraad',          eenheid:'aantal',   icon:'location_city'},
+  {key:'gem_huishouden_grootte',naam:'Gem. huishoudensgrootte', eenheid:'pers.',    icon:'group'},
+  {key:'arbeidsparticipatie',   naam:'Arbeidsparticipatie',     eenheid:'%',        icon:'work'},
+  {key:'bedrijfsvestigingen',   naam:'Bedrijfsvestigingen',     eenheid:'aantal',   icon:'business'},
+  {key:'afstand_huisarts',      naam:'Afstand huisarts',        eenheid:'km',       icon:'local_hospital'},
+  {key:'afstand_supermarkt',    naam:'Afstand supermarkt',      eenheid:'km',       icon:'shopping_cart'},
+  {key:'mannen',                naam:'Mannen',                  eenheid:'personen', icon:'man'},
+  {key:'vrouwen',               naam:'Vrouwen',                 eenheid:'personen', icon:'woman'},
+  {key:'0_15',                  naam:'0-15 jaar',               eenheid:'%',        icon:'child_care'},
+  {key:'15_25',                 naam:'15-25 jaar',              eenheid:'%',        icon:'school'},
+  {key:'25_45',                 naam:'25-45 jaar',              eenheid:'%',        icon:'person'},
+  {key:'45_65',                 naam:'45-65 jaar',              eenheid:'%',        icon:'person_4'},
+  {key:'huurwoningen',          naam:'Huurwoningen',            eenheid:'%',        icon:'real_estate_agent'},
+  {key:'pct_eengezins',         naam:'Eengezinswoningen',       eenheid:'%',        icon:'cottage'},
+  {key:'personenautos',         naam:"Personenauto's",          eenheid:'aantal',   icon:'directions_car'}
 ];
 
 var DROPDOWN_KEYS = [
@@ -380,7 +451,6 @@ function initMap(){
   L.control.zoom({position:'bottomright'}).addTo(_map);
   setBasemap('dark');
 
-  // BAG click handler (adressen of panden)
   _map.on('click', function(e){
     if(_map.getZoom() >= 14){
       if(_pandWmsLayer) pandGetFeatureInfo(e);
@@ -405,16 +475,17 @@ function buildBasemapButtons(){
   var el = document.getElementById('basemapBtns');
   var html = '';
   for(var id in BASEMAPS){
-    html += '<button class="btn btn-s'+(id==='dark'?' active':'')+'" data-bm="'+id+'" onclick="setBasemap(\''+id+'\')">'+BASEMAPS[id].naam+'</button>';
+    var bm = BASEMAPS[id];
+    html += '<button class="btn btn-s'+(id==='dark'?' active':'')+'" data-bm="'+id+'" onclick="setBasemap(\''+id+'\')"><span class="mi mi-sm">'+bm.icon+'</span> '+bm.naam+'</button>';
   }
   el.innerHTML = html;
 }
 
 // ============================================================
-// CHOROPLETH RENDERING (buurten of wijken)
+// CHOROPLETH RENDERING
 // ============================================================
 function renderChoropleth(type){
-  var data, layer, nameField, codeField;
+  var data, nameField, codeField;
   if(type === 'buurten'){
     data = _buurtData; nameField = 'buurtnaam'; codeField = 'buurtcode';
   } else {
@@ -422,7 +493,6 @@ function renderChoropleth(type){
   }
   if(!data || !_map) return;
 
-  // Remove old layer
   if(type === 'buurten' && _buurtLayer){ _map.removeLayer(_buurtLayer); _buurtLayer = null; }
   if(type === 'wijken' && _wijkLayer){ _map.removeLayer(_wijkLayer); _wijkLayer = null; }
 
@@ -464,7 +534,7 @@ function renderChoropleth(type){
         var v = p[indicator];
         if(v !== undefined && v !== null)
           html += '<div class="info-row"><span>'+fm.naam+'</span><span class="info-val">'+formatVal(v)+' '+fm.eenheid+'</span></div>';
-        document.getElementById('infoBuurtNaam').textContent = p[nameField] || p[codeField] || '-';
+        document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">place</span> '+(p[nameField] || p[codeField] || '-');
         document.getElementById('infoContent').innerHTML = html;
         document.getElementById('infoPanel').classList.add('show');
       });
@@ -474,14 +544,14 @@ function renderChoropleth(type){
       });
       layer.on('click', function(){
         var p = feature.properties;
-        document.getElementById('infoBuurtNaam').textContent = p[nameField] || p[codeField] || '-';
+        document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">place</span> '+(p[nameField] || p[codeField] || '-');
         var html = '<div class="info-row"><span>Code</span><span class="info-val">'+(p[codeField]||'-')+'</span></div>';
         html += '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
         INFO_KEYS.forEach(function(k){
           var fm = getIndicator(k);
           var v = p[k];
           if(v !== undefined && v !== null && v >= 0)
-            html += '<div class="info-row"><span>'+fm.icon+' '+fm.naam+'</span><span class="info-val">'+formatVal(v)+'</span></div>';
+            html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">'+fm.icon+'</span> '+fm.naam+'</span><span class="info-val">'+formatVal(v)+'</span></div>';
         });
         document.getElementById('infoContent').innerHTML = html;
         document.getElementById('infoPanel').classList.add('show');
@@ -492,7 +562,6 @@ function renderChoropleth(type){
   if(type === 'buurten'){ _buurtLayer = newLayer; }
   else { _wijkLayer = newLayer; }
 
-  // Only update legend/stats for the primary visible layer
   if(type === 'buurten' || !_layerState.buurten){
     updateLegend(breaks, colors);
     updateStats(vals, type);
@@ -507,11 +576,8 @@ function toggleLayer(type){
   document.querySelector('[data-layer="'+type+'"]').classList.toggle('active', _layerState[type]);
 
   if(type === 'buurten'){
-    if(_layerState.buurten){
-      renderChoropleth('buurten');
-    } else {
-      if(_buurtLayer){_map.removeLayer(_buurtLayer);_buurtLayer=null}
-    }
+    if(_layerState.buurten) renderChoropleth('buurten');
+    else if(_buurtLayer){_map.removeLayer(_buurtLayer);_buurtLayer=null}
   }
   else if(type === 'wijken'){
     if(_layerState.wijken){
@@ -523,19 +589,11 @@ function toggleLayer(type){
           document.getElementById('dsWijken').textContent = d.features.length.toLocaleString('nl-NL') + ' features';
           renderChoropleth('wijken');
         }).catch(function(e){toast('Fout laden wijken: '+e.message);_layerState.wijken=false;document.querySelector('[data-layer="wijken"]').classList.remove('active')});
-      } else {
-        renderChoropleth('wijken');
-      }
-    } else {
-      if(_wijkLayer){_map.removeLayer(_wijkLayer);_wijkLayer=null}
-    }
+      } else renderChoropleth('wijken');
+    } else if(_wijkLayer){_map.removeLayer(_wijkLayer);_wijkLayer=null}
   }
-  else if(type === 'bag'){
-    toggleBagLayer(_layerState.bag);
-  }
-  else if(type === 'panden'){
-    togglePandLayer(_layerState.panden);
-  }
+  else if(type === 'bag') toggleBagLayer(_layerState.bag);
+  else if(type === 'panden') togglePandLayer(_layerState.panden);
 }
 
 // ============================================================
@@ -546,20 +604,12 @@ function toggleBagLayer(on){
   if(on){
     if(_bagWmsLayer) return;
     _bagWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, {
-      layers:'bag:verblijfsobject',
-      format:'image/png',
-      transparent:true,
-      version:'1.1.1',
-      opacity:0.7,
-      maxZoom:22,
-      tileSize:256,
-      minZoom:14
+      layers:'bag:verblijfsobject',format:'image/png',transparent:true,
+      version:'1.1.1',opacity:0.7,maxZoom:22,tileSize:256,minZoom:14
     }).addTo(_map);
     _bagWmsLayer.bringToFront();
     toast('BAG adressen zichtbaar bij zoom \u226514');
-  } else {
-    if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
-  }
+  } else if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
 }
 
 function bagGetFeatureInfo(e){
@@ -577,16 +627,16 @@ function bagGetFeatureInfo(e){
   fetch(url).then(function(r){return r.json()}).then(function(d){
     if(!d.features||!d.features.length) return;
     var p = d.features[0].properties;
-    var straat = p.openbare_ruimte_naam || p.openbareruimtenaam || '';
+    var straat = p.openbare_ruimte_naam || p.openbareruimtenaam || p.openbare_ruimte || '';
     var hnr = (p.huisnummer||'') + (p.huisletter||'') + (p.toevoeging?' '+p.toevoeging:'');
-    document.getElementById('infoBuurtNaam').textContent = (straat+' '+hnr).trim() || 'BAG Object';
+    document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">location_on</span> '+((straat+' '+hnr).trim() || 'BAG Object');
     var html = '';
-    if(p.postcode) html += '<div class="info-row"><span>Postcode</span><span class="info-val">'+p.postcode+'</span></div>';
-    if(p.woonplaats||p.woonplaatsnaam) html += '<div class="info-row"><span>Woonplaats</span><span class="info-val">'+(p.woonplaats||p.woonplaatsnaam)+'</span></div>';
-    if(p.gebruiksdoel) html += '<div class="info-row"><span>Gebruiksdoel</span><span class="info-val">'+p.gebruiksdoel+'</span></div>';
-    if(p.bouwjaar) html += '<div class="info-row"><span>Bouwjaar</span><span class="info-val">'+p.bouwjaar+'</span></div>';
-    if(p.oppervlakte) html += '<div class="info-row"><span>Oppervlakte</span><span class="info-val">'+p.oppervlakte+' m\u00b2</span></div>';
-    if(p.status) html += '<div class="info-row"><span>Status</span><span class="info-val">'+p.status+'</span></div>';
+    if(p.postcode) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">mail</span> Postcode</span><span class="info-val">'+p.postcode+'</span></div>';
+    if(p.woonplaats||p.woonplaatsnaam) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">location_city</span> Woonplaats</span><span class="info-val">'+(p.woonplaats||p.woonplaatsnaam)+'</span></div>';
+    if(p.gebruiksdoel) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">category</span> Gebruiksdoel</span><span class="info-val">'+p.gebruiksdoel+'</span></div>';
+    if(p.bouwjaar) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">event</span> Bouwjaar</span><span class="info-val">'+p.bouwjaar+'</span></div>';
+    if(p.oppervlakte) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">square_foot</span> Oppervlakte</span><span class="info-val">'+p.oppervlakte+' m\u00b2</span></div>';
+    if(p.status) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">info</span> Status</span><span class="info-val">'+p.status+'</span></div>';
     document.getElementById('infoContent').innerHTML = html;
     document.getElementById('infoPanel').classList.add('show');
   }).catch(function(){});
@@ -600,21 +650,13 @@ function togglePandLayer(on){
   if(on){
     if(_pandWmsLayer) return;
     _pandWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, {
-      layers:'bag:pand',
-      format:'image/png',
-      transparent:true,
-      version:'1.1.1',
-      opacity:0.6,
-      maxZoom:22,
-      tileSize:256,
-      minZoom:14
+      layers:'bag:pand',format:'image/png',transparent:true,
+      version:'1.1.1',opacity:0.6,maxZoom:22,tileSize:256,minZoom:14
     }).addTo(_map);
     _pandWmsLayer.bringToFront();
     if(_bagWmsLayer) _bagWmsLayer.bringToFront();
     toast('BAG panden zichtbaar bij zoom \u226514');
-  } else {
-    if(_pandWmsLayer){_map.removeLayer(_pandWmsLayer);_pandWmsLayer=null}
-  }
+  } else if(_pandWmsLayer){_map.removeLayer(_pandWmsLayer);_pandWmsLayer=null}
 }
 
 function pandGetFeatureInfo(e){
@@ -632,25 +674,20 @@ function pandGetFeatureInfo(e){
   fetch(url).then(function(r){return r.json()}).then(function(d){
     if(!d.features||!d.features.length) return;
     var p = d.features[0].properties;
-    document.getElementById('infoBuurtNaam').textContent = 'BAG Pand';
+    document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">apartment</span> BAG Pand';
     var html = '';
-    if(p.bouwjaar) html += '<div class="info-row"><span>Bouwjaar</span><span class="info-val">'+p.bouwjaar+'</span></div>';
-    if(p.status) html += '<div class="info-row"><span>Status</span><span class="info-val">'+p.status+'</span></div>';
-    if(p.gebruiksdoel) html += '<div class="info-row"><span>Gebruiksdoel</span><span class="info-val">'+p.gebruiksdoel+'</span></div>';
-    if(p.aantal_verblijfsobjecten) html += '<div class="info-row"><span>Verblijfsobjecten</span><span class="info-val">'+p.aantal_verblijfsobjecten+'</span></div>';
+    if(p.bouwjaar) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">event</span> Bouwjaar</span><span class="info-val">'+p.bouwjaar+'</span></div>';
+    if(p.status) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">info</span> Status</span><span class="info-val">'+p.status+'</span></div>';
+    if(p.gebruiksdoel) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">category</span> Gebruiksdoel</span><span class="info-val">'+p.gebruiksdoel+'</span></div>';
+    if(p.aantal_verblijfsobjecten) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">door_front</span> VBO\'s</span><span class="info-val">'+p.aantal_verblijfsobjecten+'</span></div>';
     if(p.oppervlakte_min && p.oppervlakte_max){
-      if(p.oppervlakte_min === p.oppervlakte_max)
-        html += '<div class="info-row"><span>Oppervlakte</span><span class="info-val">'+p.oppervlakte_min+' m\u00b2</span></div>';
-      else
-        html += '<div class="info-row"><span>Oppervlakte</span><span class="info-val">'+p.oppervlakte_min+' \u2013 '+p.oppervlakte_max+' m\u00b2</span></div>';
+      var opp = p.oppervlakte_min === p.oppervlakte_max ? p.oppervlakte_min+' m\u00b2' : p.oppervlakte_min+' \u2013 '+p.oppervlakte_max+' m\u00b2';
+      html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">square_foot</span> Oppervlakte</span><span class="info-val">'+opp+'</span></div>';
     }
-    if(p.identificatie) html += '<div class="info-row"><span>Pand ID</span><span class="info-val" style="font-size:9px">'+p.identificatie+'</span></div>';
+    if(p.identificatie) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">tag</span> Pand ID</span><span class="info-val" style="font-size:9px">'+p.identificatie+'</span></div>';
     document.getElementById('infoContent').innerHTML = html;
     document.getElementById('infoPanel').classList.add('show');
-    // Also query verblijfsobject for address info
-    if(_bagWmsLayer){
-      bagGetFeatureInfo(e);
-    }
+    if(_bagWmsLayer) bagGetFeatureInfo(e);
   }).catch(function(){});
 }
 
@@ -679,8 +716,8 @@ function setupSearch(){
           var html = '';
           d.response.docs.forEach(function(doc){
             html += '<div class="search-item" data-id="'+doc.id+'">';
-            html += '<div style="color:var(--tx)">'+doc.weergavenaam+'</div>';
-            html += '<div style="font-size:10px;color:var(--mt)">'+doc.type+'</div>';
+            html += '<div style="color:var(--tx);font-weight:500">'+doc.weergavenaam+'</div>';
+            html += '<div style="font-size:10px;color:var(--mt);margin-top:2px"><span class="mi mi-sm" style="font-size:11px;vertical-align:-2px">label</span> '+doc.type+'</div>';
             html += '</div>';
           });
           res.innerHTML = html;
@@ -735,7 +772,7 @@ function getColor(val, breaks, colors){
 }
 function getIndicator(key){
   for(var i=0;i<INDICATORS.length;i++){if(INDICATORS[i].key===key) return INDICATORS[i]}
-  return {key:key,naam:key,eenheid:'',icon:'\ud83d\udcca'};
+  return {key:key,naam:key,eenheid:'',icon:'bar_chart'};
 }
 function formatVal(v){
   if(v===null||v===undefined) return '-';
@@ -776,7 +813,7 @@ function buildIndicatorDropdown(){
   var html = '';
   DROPDOWN_KEYS.forEach(function(k, i){
     var fm = getIndicator(k);
-    html += '<option value="'+k+'"'+(i===1?' selected':'')+'>'+fm.icon+' '+fm.naam+(fm.eenheid?' ('+fm.eenheid+')':'')+'</option>';
+    html += '<option value="'+k+'"'+(i===1?' selected':'')+'>'+fm.naam+(fm.eenheid?' ('+fm.eenheid+')':'')+'</option>';
   });
   sel.innerHTML = html;
 }
@@ -819,23 +856,24 @@ function switchTab(tab){
 
 function toggleSidebar(){
   document.getElementById('sidebar').classList.toggle('hidden');
-  setTimeout(function(){if(_map)_map.invalidateSize()},350);
+  setTimeout(function(){if(_map)_map.invalidateSize()},400);
 }
 
 function renderIndicatorDefs(){
   var el = document.getElementById('indicatorDefs');
   var html = '';
   INDICATORS.forEach(function(fm){
-    html += '<div style="padding:4px 0;border-bottom:1px solid var(--bd)">';
-    html += '<div style="font:600 11px \'DM Sans\',sans-serif;color:var(--tx)">'+fm.icon+' '+fm.naam+'</div>';
-    html += '<div style="font-size:9px;color:var(--mt)">'+fm.key+' \u00b7 '+fm.eenheid+'</div></div>';
+    html += '<div style="padding:5px 0;border-bottom:1px solid var(--glass-bd);display:flex;align-items:center;gap:6px">';
+    html += '<span class="mi mi-sm" style="color:var(--ai);flex-shrink:0">'+fm.icon+'</span>';
+    html += '<div><div style="font:600 11px \'DM Sans\',sans-serif;color:var(--tx)">'+fm.naam+'</div>';
+    html += '<div style="font-size:9px;color:var(--mt)">'+fm.key+' \u00b7 '+fm.eenheid+'</div></div></div>';
   });
   el.innerHTML = html;
 }
 
 function toast(msg){
   var el = document.getElementById('toast');
-  el.textContent = msg;
+  el.innerHTML = '<span class="mi mi-sm" style="vertical-align:-3px;margin-right:6px">notifications</span>' + msg;
   el.classList.add('show');
   clearTimeout(el._tid);
   el._tid = setTimeout(function(){el.classList.remove('show')},3000);
@@ -881,16 +919,16 @@ async function init(){
     loadBar.style.width = '90%';
     renderChoropleth('buurten');
 
-    // Dataset metadata invullen
+    // Dataset metadata
     var meta = _buurtData.metadata || {};
     document.getElementById('dsBuurten').textContent = _buurtData.features.length.toLocaleString('nl-NL') + ' features';
-    document.getElementById('dsJaar').textContent = meta.year || '—';
-    document.getElementById('dsGenerated').textContent = meta.generated ? meta.generated.substring(0,10) : '—';
+    document.getElementById('dsJaar').textContent = meta.year || '\u2014';
+    document.getElementById('dsGenerated').textContent = meta.generated ? meta.generated.substring(0,10) : '\u2014';
 
     loadBar.style.width = '100%';
     loadMsg.textContent = 'Klaar!';
     loadSub.textContent = _buurtData.features.length.toLocaleString('nl-NL') + ' buurten geladen';
-    setTimeout(function(){document.getElementById('loadingOverlay').style.display='none'},500);
+    setTimeout(function(){document.getElementById('loadingOverlay').style.display='none'},600);
 
     if(window.innerWidth <= 900){
       document.getElementById('sidebar').classList.add('hidden');
