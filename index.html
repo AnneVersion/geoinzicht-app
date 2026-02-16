@@ -489,7 +489,7 @@ function setBasemap(id){
   var opts = {maxZoom:19, attribution:'&copy; OSM &copy; CARTO | PDOK'};
   if(bm.sub) opts.subdomains = bm.sub;
   _currentBasemap = L.tileLayer(bm.url, opts).addTo(_map);
-  _currentBasemap.bringToBack();
+  fixLayerOrder();
   document.querySelectorAll('[data-bm]').forEach(function(b){
     b.classList.toggle('active', b.dataset.bm === id);
   });
@@ -513,6 +513,16 @@ var LAYER_CONFIG = {
   buurten:   {data:function(){return _buurtData},    nameField:'buurtnaam',    codeField:'buurtcode',    borderWeight:0.5, borderColor:'rgba(255,255,255,0.15)'},
   wijken:    {data:function(){return _wijkData},     nameField:'wijknaam',     codeField:'wijkcode',     borderWeight:1.5, borderColor:'rgba(255,255,255,0.3)'}
 };
+
+// Z-volgorde: basemap → gemeenten → wijken → buurten → BAG panden → BAG adressen
+function fixLayerOrder(){
+  if(_currentBasemap) _currentBasemap.bringToBack();
+  if(_gemeenteLayer) _gemeenteLayer.bringToFront();
+  if(_wijkLayer) _wijkLayer.bringToFront();
+  if(_buurtLayer) _buurtLayer.bringToFront();
+  if(_pandWmsLayer) _pandWmsLayer.bringToFront();
+  if(_bagWmsLayer) _bagWmsLayer.bringToFront();
+}
 
 function renderChoropleth(type){
   try {
@@ -595,8 +605,8 @@ function renderChoropleth(type){
   if(type === 'buurten'){ _buurtLayer = newLayer; }
   if(type === 'wijken'){ _wijkLayer = newLayer; }
 
-  // Basemap altijd achteraan
-  if(_currentBasemap) _currentBasemap.bringToBack();
+  // Z-ordering herstellen
+  fixLayerOrder();
 
   // Primaire laag bepaalt legenda/stats (de meest gedetailleerde actieve laag)
   var primaryType = _layerState.buurten ? 'buurten' : (_layerState.wijken ? 'wijken' : 'gemeenten');
@@ -661,7 +671,7 @@ function toggleBagLayer(on){
       layers:'bag:verblijfsobject',format:'image/png',transparent:true,
       version:'1.1.1',opacity:0.7,maxZoom:22,tileSize:256,minZoom:14
     }).addTo(_map);
-    _bagWmsLayer.bringToFront();
+    fixLayerOrder();
     if(_map.getZoom() < 14){
       _map.setZoom(14);
       toast('Ingezoomd naar niveau 14 \u2014 BAG adressen nu zichtbaar');
@@ -712,8 +722,7 @@ function togglePandLayer(on){
       layers:'bag:pand',format:'image/png',transparent:true,
       version:'1.1.1',opacity:0.6,maxZoom:22,tileSize:256,minZoom:14
     }).addTo(_map);
-    _pandWmsLayer.bringToFront();
-    if(_bagWmsLayer) _bagWmsLayer.bringToFront();
+    fixLayerOrder();
     if(_map.getZoom() < 14){
       _map.setZoom(14);
       toast('Ingezoomd naar niveau 14 \u2014 BAG panden nu zichtbaar');
