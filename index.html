@@ -13,84 +13,71 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-:root {
-  --bg:#0f1724;--p:#1a2332;--p2:#243044;--bd:#2d3a4d;--tx:#e2e8f0;
-  --mt:#64748b;--ac:#39ff14;--ac2:#22c55e;--up:#22c55e;--dn:#ef4444;
-  --pu:#a78bfa;--ai:#38bdf8;--wn:#fbbf24;--cyan:#06b6d4;
-  --radius:10px;
-}
+:root{--bg:#0f1724;--p:#1a2332;--p2:#243044;--bd:#2d3a4d;--tx:#e2e8f0;--mt:#64748b;--ac:#39ff14;--ac2:#22c55e;--up:#22c55e;--dn:#ef4444;--pu:#a78bfa;--ai:#38bdf8;--wn:#fbbf24;--cyan:#06b6d4;--radius:10px}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);overflow:hidden;height:100vh;height:100dvh}
-
 .app{display:flex;height:100vh;height:100dvh}
 .sidebar{width:340px;background:var(--p);border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden;z-index:100;transition:transform .3s}
 .sidebar.hidden{transform:translateX(-100%);position:absolute;height:100%}
 .map-wrap{flex:1;position:relative}
 #map{width:100%;height:100%}
-
 .header{padding:12px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px}
 .sb-logo{font-family:'Space Mono',monospace;font-size:16px;font-weight:700;background:linear-gradient(135deg,#39ff14,#22c55e);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .header-right{margin-left:auto;display:flex;gap:6px;align-items:center}
-
+.search-wrap{padding:8px 12px;border-bottom:1px solid var(--bd);position:relative}
+.search-wrap input{background:var(--p2);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:8px 10px 8px 30px;font:13px 'DM Sans',sans-serif;width:100%;outline:none}
+.search-wrap input:focus{border-color:var(--ac)}
+.search-wrap .icon{position:absolute;left:20px;top:50%;transform:translateY(-50%);color:var(--mt);font-size:12px;pointer-events:none}
+.search-results{display:none;position:absolute;left:12px;right:12px;top:44px;background:var(--p);border:1px solid var(--bd);border-radius:6px;max-height:200px;overflow-y:auto;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.search-item{padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--bd)}
+.search-item:hover{background:var(--p2)}
+.search-item:last-child{border:none}
 .tabs{display:flex;border-bottom:1px solid var(--bd)}
 .tab{flex:1;padding:10px 8px;text-align:center;font-size:11px;font-weight:600;color:var(--mt);cursor:pointer;border-bottom:2px solid transparent;transition:.2s}
 .tab.active{color:var(--ac);border-bottom-color:var(--ac)}
 .tab:hover{color:var(--tx)}
 .pane{display:none;flex:1;overflow-y:auto;padding:14px}
 .pane.active{display:block}
-
 .sh{font:700 12px 'Space Mono',monospace;color:var(--pu);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px}
+.sh:first-child{margin-top:0}
 .card{background:var(--p2);border:1px solid var(--bd);border-radius:var(--radius);padding:12px;margin-bottom:10px}
 .stat-row{display:flex;gap:10px;margin-bottom:10px}
 .stat{flex:1;background:var(--p2);border:1px solid var(--bd);border-radius:8px;padding:10px;text-align:center}
 .stat b{display:block;font:700 20px 'Space Mono',monospace;color:var(--ac)}
 .stat small{font-size:10px;color:var(--mt)}
-
-.btn{border:none;border-radius:6px;padding:8px 14px;font:600 12px 'DM Sans',sans-serif;cursor:pointer;transition:.2s}
+.btn{border:none;border-radius:6px;padding:6px 12px;font:600 11px 'DM Sans',sans-serif;cursor:pointer;transition:.2s}
 .btn-p{background:var(--ac);color:#000}.btn-p:hover{background:var(--ac2)}
 .btn-o{background:transparent;color:var(--ac);border:1px solid var(--ac)}.btn-o:hover{background:rgba(57,255,20,.1)}
 .btn-s{background:var(--p2);color:var(--tx);border:1px solid var(--bd)}.btn-s:hover{background:var(--bd)}
-
+.btn-s.active{border-color:var(--ac);color:var(--ac);background:rgba(57,255,20,.1)}
 select{background:var(--p2);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:8px 10px;font:13px 'DM Sans',sans-serif;width:100%}
 select:focus{outline:none;border-color:var(--ac)}
-
 .legend{display:flex;flex-direction:column;gap:4px;margin-top:10px}
 .legend-row{display:flex;align-items:center;gap:8px;font-size:11px}
 .legend-color{width:24px;height:14px;border-radius:3px;border:1px solid rgba(255,255,255,.1)}
-
 .progress{height:4px;background:var(--bd);border-radius:2px;overflow:hidden;margin:6px 0}
 .progress-bar{height:100%;background:var(--ac);border-radius:2px;transition:width .3s}
-
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--p2);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:10px 20px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none}
 .toast.show{opacity:1}
-
 .info-panel{position:absolute;top:10px;right:10px;background:rgba(26,35,50,.95);border:1px solid var(--bd);border-radius:var(--radius);padding:14px;z-index:500;min-width:240px;max-width:320px;backdrop-filter:blur(10px);display:none}
 .info-panel.show{display:block}
 .info-panel h3{font:700 14px 'Space Mono',monospace;color:var(--ac);margin-bottom:8px}
 .info-row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px;border-bottom:1px solid var(--bd)}
 .info-row:last-child{border:none}
 .info-val{font:700 12px 'Space Mono',monospace;color:var(--ai)}
-
-/* Sidebar toggle — hidden on desktop, only visible on mobile */
 .sidebar-toggle{position:absolute;top:10px;left:10px;z-index:600;background:var(--p);border:1px solid var(--bd);border-radius:8px;width:36px;height:36px;display:none;place-items:center;cursor:pointer;color:var(--ac);font-size:18px}
-
 .loading-overlay{position:fixed;inset:0;background:rgba(15,23,36,.95);z-index:9999;display:grid;place-items:center}
 .loading-overlay .inner{text-align:center}
 .loading-overlay .spinner{width:48px;height:48px;border:3px solid var(--bd);border-top-color:var(--ac);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
 .loading-overlay .msg{font:600 14px 'DM Sans',sans-serif;color:var(--tx)}
 .loading-overlay .sub{font-size:11px;color:var(--mt);margin-top:6px}
 @keyframes spin{to{transform:rotate(360deg)}}
-
 @media(max-width:900px){
   .sidebar{width:100%;position:absolute;height:100%;z-index:500}
   .sidebar.hidden{transform:translateX(-100%)}
   .sidebar-toggle{display:grid}
 }
-@media(max-width:600px){
-  .sidebar{width:100%}
-  .stat-row{flex-wrap:wrap}
-  .stat{min-width:calc(50% - 5px)}
-}
+@media(max-width:600px){.sidebar{width:100%}.stat-row{flex-wrap:wrap}.stat{min-width:calc(50% - 5px)}}
 </style>
 </head>
 <body>
@@ -105,7 +92,7 @@ select:focus{outline:none;border-color:var(--ac)}
 </div>
 
 <div class="app">
-  <div class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">☰</div>
+  <div class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">&#9776;</div>
 
   <div class="sidebar" id="sidebar">
     <div class="header">
@@ -117,8 +104,15 @@ select:focus{outline:none;border-color:var(--ac)}
         </div>
       </div>
       <div class="header-right">
-        <button class="btn btn-s" onclick="toggleSidebar()" style="display:none;font-size:16px;padding:4px 10px" id="closeSidebar">✕</button>
+        <button class="btn btn-s" onclick="toggleSidebar()" style="display:none;font-size:16px;padding:4px 10px" id="closeSidebar">&#10005;</button>
       </div>
+    </div>
+
+    <!-- Zoekbalk -->
+    <div class="search-wrap">
+      <span class="icon">&#128269;</span>
+      <input type="text" id="searchInput" placeholder="Zoek adres, buurt, gemeente..." autocomplete="off">
+      <div class="search-results" id="searchResults"></div>
     </div>
 
     <div class="tabs">
@@ -128,6 +122,13 @@ select:focus{outline:none;border-color:var(--ac)}
 
     <!-- KAART TAB -->
     <div class="pane active" id="p-kaart">
+      <div class="sh">Lagen</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-s active" data-layer="buurten" onclick="toggleLayer('buurten')">Buurten</button>
+        <button class="btn btn-s" data-layer="wijken" onclick="toggleLayer('wijken')">Wijken</button>
+        <button class="btn btn-s" data-layer="bag" onclick="toggleLayer('bag')">BAG Adressen</button>
+      </div>
+
       <div class="sh">Indicator</div>
       <select id="indicatorSelect" onchange="updateMap()"></select>
 
@@ -135,6 +136,9 @@ select:focus{outline:none;border-color:var(--ac)}
       <select id="gemeenteFilter" onchange="filterGemeente()">
         <option value="all">Alle gemeenten</option>
       </select>
+
+      <div class="sh">Basemap</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap" id="basemapBtns"></div>
 
       <div class="sh">Legenda</div>
       <div class="legend" id="legend"></div>
@@ -159,22 +163,28 @@ select:focus{outline:none;border-color:var(--ac)}
       <div class="sh">Over GeoInzicht</div>
       <div class="card">
         <p style="font-size:12px;line-height:1.6;color:var(--mt)">
-          Buurtdata van het CBS op de kaart. Geometrie en statistieken zijn vooraf
-          samengevoegd vanuit PDOK (CBS Wijken &amp; Buurten 2024).
+          CBS buurtdata op de kaart. Geometrie en statistieken vooraf samengevoegd
+          vanuit PDOK (CBS Wijken &amp; Buurten 2024).
         </p>
-        <p style="font-size:12px;line-height:1.6;color:var(--mt);margin-top:8px">
-          14.668 buurten &middot; 24 indicatoren &middot; Jaar 2024
+        <p style="font-size:12px;line-height:1.6;color:var(--mt);margin-top:6px">
+          14.668 buurten &middot; 3.475 wijken &middot; 24 indicatoren
         </p>
       </div>
-
       <div class="sh">Indicatoren</div>
       <div class="card" id="indicatorDefs" style="font-size:11px;color:var(--mt)"></div>
-
+      <div class="sh">Data verversen</div>
+      <div class="card">
+        <p style="font-size:11px;color:var(--mt);line-height:1.6">
+          <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:10px">python build_geojson.py --type buurten</code><br>
+          <code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:10px">python build_geojson.py --type wijken</code><br>
+          <span style="margin-top:4px;display:block">Daarna: git add, commit, push</span>
+        </p>
+      </div>
       <div class="sh">Versie</div>
       <div class="card">
-        <div style="font:700 13px 'Space Mono',monospace;color:var(--ac)">GeoInzicht v2.0</div>
+        <div style="font:700 13px 'Space Mono',monospace;color:var(--ac)">GeoInzicht v3.0</div>
         <div style="font-size:11px;color:var(--mt);margin-top:4px">
-          Statisch GeoJSON &middot; Geen server nodig<br>
+          Buurten + Wijken + BAG WMS + Zoeken<br>
           Bronnen: CBS, PDOK/Kadaster
         </div>
       </div>
@@ -196,36 +206,47 @@ select:focus{outline:none;border-color:var(--ac)}
 // ============================================================
 // CONFIG
 // ============================================================
-var DATA_URL = 'buurten_2024.geojson';
+var BUURTEN_URL = 'buurten_2024.geojson';
+var WIJKEN_URL  = 'wijken_2024.geojson';
+var PDOK_BAG_WMS = 'https://service.pdok.nl/lv/bag/wms/v2_0';
+var PDOK_SUGGEST = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/suggest?q=';
+var PDOK_LOOKUP  = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/lookup?id=';
+
+var BASEMAPS = {
+  dark:  {url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', naam:'Donker', sub:'abcd'},
+  light: {url:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', naam:'Licht', sub:'abcd'},
+  osm:   {url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', naam:'OSM', sub:'abc'},
+  sat:   {url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', naam:'Satelliet'},
+  brt:   {url:'https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png', naam:'BRT Topo'}
+};
 
 var INDICATORS = [
-  {key:'aantal_inwoners',       naam:'Aantal inwoners',         eenheid:'personen', icon:'👥'},
-  {key:'gem_woz_waarde',        naam:'Gem. WOZ-waarde',         eenheid:'x1000',    icon:'🏠'},
-  {key:'gem_inkomen_inwoner',   naam:'Gem. inkomen/inwoner',    eenheid:'x1000',    icon:'💰'},
-  {key:'koopwoningen',          naam:'Koopwoningen',            eenheid:'%',        icon:'🔑'},
-  {key:'65plus',                naam:'65-plussers',             eenheid:'%',        icon:'👴'},
-  {key:'bevolkingsdichtheid',   naam:'Bevolkingsdichtheid',     eenheid:'/km²',     icon:'📍'},
-  {key:'gem_aardgas',           naam:'Gem. aardgas',            eenheid:'m³',       icon:'🔥'},
-  {key:'gem_elektriciteit',     naam:'Gem. elektriciteit',      eenheid:'kWh',      icon:'⚡'},
-  {key:'huishoudens',           naam:'Huishoudens',             eenheid:'aantal',   icon:'🏘'},
-  {key:'woningvoorraad',        naam:'Woningvoorraad',          eenheid:'aantal',   icon:'🏗'},
-  {key:'gem_huishouden_grootte',naam:'Gem. huishoudensgrootte', eenheid:'pers.',    icon:'👨‍👩‍👧'},
-  {key:'arbeidsparticipatie',   naam:'Arbeidsparticipatie',     eenheid:'%',        icon:'💼'},
-  {key:'bedrijfsvestigingen',   naam:'Bedrijfsvestigingen',     eenheid:'aantal',   icon:'🏢'},
-  {key:'afstand_huisarts',      naam:'Afstand huisarts',        eenheid:'km',       icon:'🏥'},
-  {key:'afstand_supermarkt',    naam:'Afstand supermarkt',      eenheid:'km',       icon:'🛒'},
-  {key:'mannen',                naam:'Mannen',                  eenheid:'personen', icon:'👨'},
-  {key:'vrouwen',               naam:'Vrouwen',                 eenheid:'personen', icon:'👩'},
-  {key:'0_15',                  naam:'0-15 jaar',               eenheid:'%',        icon:'👶'},
-  {key:'15_25',                 naam:'15-25 jaar',              eenheid:'%',        icon:'🧑'},
-  {key:'25_45',                 naam:'25-45 jaar',              eenheid:'%',        icon:'👨‍💼'},
-  {key:'45_65',                 naam:'45-65 jaar',              eenheid:'%',        icon:'👨‍🦳'},
-  {key:'huurwoningen',          naam:'Huurwoningen',            eenheid:'%',        icon:'🏢'},
-  {key:'pct_eengezins',         naam:'Eengezinswoningen',       eenheid:'%',        icon:'🏡'},
-  {key:'personenautos',         naam:'Personenauto\'s',         eenheid:'aantal',   icon:'🚗'}
+  {key:'aantal_inwoners',       naam:'Aantal inwoners',         eenheid:'personen', icon:'\ud83d\udc65'},
+  {key:'gem_woz_waarde',        naam:'Gem. WOZ-waarde',         eenheid:'x1000',    icon:'\ud83c\udfe0'},
+  {key:'gem_inkomen_inwoner',   naam:'Gem. inkomen/inwoner',    eenheid:'x1000',    icon:'\ud83d\udcb0'},
+  {key:'koopwoningen',          naam:'Koopwoningen',            eenheid:'%',        icon:'\ud83d\udd11'},
+  {key:'65plus',                naam:'65-plussers',             eenheid:'%',        icon:'\ud83d\udc74'},
+  {key:'bevolkingsdichtheid',   naam:'Bevolkingsdichtheid',     eenheid:'/km\u00b2',icon:'\ud83d\udccd'},
+  {key:'gem_aardgas',           naam:'Gem. aardgas',            eenheid:'m\u00b3',  icon:'\ud83d\udd25'},
+  {key:'gem_elektriciteit',     naam:'Gem. elektriciteit',      eenheid:'kWh',      icon:'\u26a1'},
+  {key:'huishoudens',           naam:'Huishoudens',             eenheid:'aantal',   icon:'\ud83c\udfd8'},
+  {key:'woningvoorraad',        naam:'Woningvoorraad',          eenheid:'aantal',   icon:'\ud83c\udfd7'},
+  {key:'gem_huishouden_grootte',naam:'Gem. huishoudensgrootte', eenheid:'pers.',    icon:'\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67'},
+  {key:'arbeidsparticipatie',   naam:'Arbeidsparticipatie',     eenheid:'%',        icon:'\ud83d\udcbc'},
+  {key:'bedrijfsvestigingen',   naam:'Bedrijfsvestigingen',     eenheid:'aantal',   icon:'\ud83c\udfe2'},
+  {key:'afstand_huisarts',      naam:'Afstand huisarts',        eenheid:'km',       icon:'\ud83c\udfe5'},
+  {key:'afstand_supermarkt',    naam:'Afstand supermarkt',      eenheid:'km',       icon:'\ud83d\uded2'},
+  {key:'mannen',                naam:'Mannen',                  eenheid:'personen', icon:'\ud83d\udc68'},
+  {key:'vrouwen',               naam:'Vrouwen',                 eenheid:'personen', icon:'\ud83d\udc69'},
+  {key:'0_15',                  naam:'0-15 jaar',               eenheid:'%',        icon:'\ud83d\udc76'},
+  {key:'15_25',                 naam:'15-25 jaar',              eenheid:'%',        icon:'\ud83e\uddd1'},
+  {key:'25_45',                 naam:'25-45 jaar',              eenheid:'%',        icon:'\ud83d\udc68\u200d\ud83d\udcbc'},
+  {key:'45_65',                 naam:'45-65 jaar',              eenheid:'%',        icon:'\ud83d\udc68\u200d\ud83e\uddb3'},
+  {key:'huurwoningen',          naam:'Huurwoningen',            eenheid:'%',        icon:'\ud83c\udfe2'},
+  {key:'pct_eengezins',         naam:'Eengezinswoningen',       eenheid:'%',        icon:'\ud83c\udfe1'},
+  {key:'personenautos',         naam:"Personenauto's",          eenheid:'aantal',   icon:'\ud83d\ude97'}
 ];
 
-// Welke indicatoren in de dropdown
 var DROPDOWN_KEYS = [
   'aantal_inwoners','gem_woz_waarde','gem_inkomen_inwoner','koopwoningen',
   '65plus','bevolkingsdichtheid','gem_aardgas','gem_elektriciteit',
@@ -233,22 +254,23 @@ var DROPDOWN_KEYS = [
   'afstand_huisarts','afstand_supermarkt'
 ];
 
-// Indicatoren voor het info-paneel bij klik
 var INFO_KEYS = ['aantal_inwoners','gem_woz_waarde','gem_inkomen_inwoner',
   'koopwoningen','bevolkingsdichtheid','gem_aardgas'];
 
-// Lagere waarde = beter (kleuren omkeren)
 var REVERSE_KEYS = ['afstand_huisarts','afstand_supermarkt'];
-
-// Kleuren voor choropleth
 var COLORS = ['#1a2332','#1e3a5f','#1d6fa5','#22a7d3','#5ec69b','#a3d65c','#f5c842'];
 var COLORS_REVERSE = COLORS.slice().reverse();
 
 // ============================================================
 // STATE
 // ============================================================
-var _map, _geoLayer, _geoData = null;
+var _map, _currentBasemap;
+var _buurtData = null, _buurtLayer = null;
+var _wijkData = null, _wijkLayer = null;
+var _bagWmsLayer = null;
+var _searchMarker = null;
 var _gemeenten = new Set();
+var _layerState = {buurten: true, wijken: false, bag: false};
 
 // ============================================================
 // MAP
@@ -256,34 +278,72 @@ var _gemeenten = new Set();
 function initMap(){
   _map = L.map('map',{center:[52.1,5.1],zoom:8,zoomControl:false,preferCanvas:true});
   L.control.zoom({position:'bottomright'}).addTo(_map);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-    attribution:'&copy; OSM &copy; CARTO',subdomains:'abcd',maxZoom:19
-  }).addTo(_map);
+  setBasemap('dark');
+
+  // BAG click handler
+  _map.on('click', function(e){
+    if(_bagWmsLayer && _map.getZoom() >= 14){
+      bagGetFeatureInfo(e);
+    }
+  });
 }
 
-function renderGeoLayer(){
-  if(!_geoData || !_map) return;
-  if(_geoLayer) _map.removeLayer(_geoLayer);
+function setBasemap(id){
+  if(_currentBasemap) _map.removeLayer(_currentBasemap);
+  var bm = BASEMAPS[id];
+  var opts = {maxZoom:19, attribution:'&copy; OSM &copy; CARTO | PDOK'};
+  if(bm.sub) opts.subdomains = bm.sub;
+  _currentBasemap = L.tileLayer(bm.url, opts).addTo(_map);
+  _currentBasemap.bringToBack();
+  document.querySelectorAll('[data-bm]').forEach(function(b){
+    b.classList.toggle('active', b.dataset.bm === id);
+  });
+}
+
+function buildBasemapButtons(){
+  var el = document.getElementById('basemapBtns');
+  var html = '';
+  for(var id in BASEMAPS){
+    html += '<button class="btn btn-s'+(id==='dark'?' active':'')+'" data-bm="'+id+'" onclick="setBasemap(\''+id+'\')">'+BASEMAPS[id].naam+'</button>';
+  }
+  el.innerHTML = html;
+}
+
+// ============================================================
+// CHOROPLETH RENDERING (buurten of wijken)
+// ============================================================
+function renderChoropleth(type){
+  var data, layer, nameField, codeField;
+  if(type === 'buurten'){
+    data = _buurtData; nameField = 'buurtnaam'; codeField = 'buurtcode';
+  } else {
+    data = _wijkData; nameField = 'wijknaam'; codeField = 'wijkcode';
+  }
+  if(!data || !_map) return;
+
+  // Remove old layer
+  if(type === 'buurten' && _buurtLayer){ _map.removeLayer(_buurtLayer); _buurtLayer = null; }
+  if(type === 'wijken' && _wijkLayer){ _map.removeLayer(_wijkLayer); _wijkLayer = null; }
 
   var indicator = document.getElementById('indicatorSelect').value;
   var gemFilter = document.getElementById('gemeenteFilter').value;
 
-  // Verzamel waarden voor breaks
   var vals = [];
-  _geoData.features.forEach(function(f){
+  data.features.forEach(function(f){
     var p = f.properties;
     if(gemFilter !== 'all' && p.gemeentenaam !== gemFilter) return;
     var v = p[indicator];
     if(v !== undefined && v !== null && v >= 0) vals.push(v);
   });
-
-  if(!vals.length){toast('Geen data voor deze indicator');return}
+  if(!vals.length) return;
 
   vals.sort(function(a,b){return a-b});
   var breaks = quantileBreaks(vals, 7);
   var colors = REVERSE_KEYS.indexOf(indicator) >= 0 ? COLORS_REVERSE : COLORS;
+  var borderWeight = type === 'wijken' ? 1.5 : 0.5;
+  var borderColor = type === 'wijken' ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.15)';
 
-  _geoLayer = L.geoJSON(_geoData, {
+  var newLayer = L.geoJSON(data, {
     style: function(feature){
       var p = feature.properties;
       if(gemFilter !== 'all' && p.gemeentenaam !== gemFilter)
@@ -291,100 +351,248 @@ function renderGeoLayer(){
       var v = p[indicator];
       if(v === undefined || v === null || v < 0)
         return {fillColor:'#111',fillOpacity:0.1,weight:0.3,color:'#333',opacity:0.3};
-      return {fillColor:getColor(v,breaks,colors),fillOpacity:0.7,weight:0.5,color:'rgba(255,255,255,0.15)',opacity:0.5};
+      return {fillColor:getColor(v,breaks,colors),fillOpacity:0.65,weight:borderWeight,color:borderColor,opacity:0.5};
     },
     onEachFeature: function(feature, layer){
-      layer.on('mouseover', function(e){highlightFeature(e, indicator)});
-      layer.on('mouseout', resetHighlight);
-      layer.on('click', function(){showBuurtInfo(feature)});
+      layer.on('mouseover', function(e){
+        e.target.setStyle({weight:2,color:'#39ff14',fillOpacity:0.9});
+        e.target.bringToFront();
+        var p = e.target.feature.properties;
+        var fm = getIndicator(indicator);
+        var html = '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
+        var v = p[indicator];
+        if(v !== undefined && v !== null)
+          html += '<div class="info-row"><span>'+fm.naam+'</span><span class="info-val">'+formatVal(v)+' '+fm.eenheid+'</span></div>';
+        document.getElementById('infoBuurtNaam').textContent = p[nameField] || p[codeField] || '-';
+        document.getElementById('infoContent').innerHTML = html;
+        document.getElementById('infoPanel').classList.add('show');
+      });
+      layer.on('mouseout', function(e){
+        newLayer.resetStyle(e.target);
+        document.getElementById('infoPanel').classList.remove('show');
+      });
+      layer.on('click', function(){
+        var p = feature.properties;
+        document.getElementById('infoBuurtNaam').textContent = p[nameField] || p[codeField] || '-';
+        var html = '<div class="info-row"><span>Code</span><span class="info-val">'+(p[codeField]||'-')+'</span></div>';
+        html += '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
+        INFO_KEYS.forEach(function(k){
+          var fm = getIndicator(k);
+          var v = p[k];
+          if(v !== undefined && v !== null && v >= 0)
+            html += '<div class="info-row"><span>'+fm.icon+' '+fm.naam+'</span><span class="info-val">'+formatVal(v)+'</span></div>';
+        });
+        document.getElementById('infoContent').innerHTML = html;
+        document.getElementById('infoPanel').classList.add('show');
+      });
     }
   }).addTo(_map);
 
-  updateLegend(breaks, colors, indicator);
-  updateStats(vals);
+  if(type === 'buurten'){ _buurtLayer = newLayer; }
+  else { _wijkLayer = newLayer; }
+
+  // Only update legend/stats for the primary visible layer
+  if(type === 'buurten' || !_layerState.buurten){
+    updateLegend(breaks, colors);
+    updateStats(vals, type);
+  }
 }
 
+// ============================================================
+// LAYER TOGGLES
+// ============================================================
+function toggleLayer(type){
+  _layerState[type] = !_layerState[type];
+  document.querySelector('[data-layer="'+type+'"]').classList.toggle('active', _layerState[type]);
+
+  if(type === 'buurten'){
+    if(_layerState.buurten){
+      renderChoropleth('buurten');
+    } else {
+      if(_buurtLayer){_map.removeLayer(_buurtLayer);_buurtLayer=null}
+    }
+  }
+  else if(type === 'wijken'){
+    if(_layerState.wijken){
+      if(!_wijkData){
+        toast('Wijkdata laden...');
+        fetch(WIJKEN_URL).then(function(r){return r.json()}).then(function(d){
+          _wijkData = d;
+          toast(d.features.length + ' wijken geladen');
+          renderChoropleth('wijken');
+        }).catch(function(e){toast('Fout laden wijken: '+e.message);_layerState.wijken=false;document.querySelector('[data-layer="wijken"]').classList.remove('active')});
+      } else {
+        renderChoropleth('wijken');
+      }
+    } else {
+      if(_wijkLayer){_map.removeLayer(_wijkLayer);_wijkLayer=null}
+    }
+  }
+  else if(type === 'bag'){
+    toggleBagLayer(_layerState.bag);
+  }
+}
+
+// ============================================================
+// BAG WMS
+// ============================================================
+function toggleBagLayer(on){
+  if(!_map) return;
+  if(on){
+    if(_bagWmsLayer) return;
+    _bagWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, {
+      layers:'bag:verblijfsobject',
+      format:'image/png',
+      transparent:true,
+      version:'1.1.1',
+      opacity:0.7,
+      maxZoom:22,
+      tileSize:256,
+      minZoom:14
+    }).addTo(_map);
+    _bagWmsLayer.bringToFront();
+    toast('BAG adressen zichtbaar bij zoom \u226514');
+  } else {
+    if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
+  }
+}
+
+function bagGetFeatureInfo(e){
+  var size = _map.getSize();
+  var bounds = _map.getBounds();
+  var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+  var bbox = sw.lng+','+sw.lat+','+ne.lng+','+ne.lat;
+  var pt = _map.latLngToContainerPoint(e.latlng);
+  var url = PDOK_BAG_WMS+'?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo'+
+    '&FORMAT=image/png&TRANSPARENT=true'+
+    '&QUERY_LAYERS=bag:verblijfsobject&LAYERS=bag:verblijfsobject'+
+    '&INFO_FORMAT=application/json&FEATURE_COUNT=1&BUFFER=12'+
+    '&X='+Math.round(pt.x)+'&Y='+Math.round(pt.y)+
+    '&SRS=EPSG:4326&WIDTH='+size.x+'&HEIGHT='+size.y+'&BBOX='+bbox;
+  fetch(url).then(function(r){return r.json()}).then(function(d){
+    if(!d.features||!d.features.length) return;
+    var p = d.features[0].properties;
+    var straat = p.openbare_ruimte_naam || p.openbareruimtenaam || '';
+    var hnr = (p.huisnummer||'') + (p.huisletter||'') + (p.toevoeging?' '+p.toevoeging:'');
+    document.getElementById('infoBuurtNaam').textContent = (straat+' '+hnr).trim() || 'BAG Object';
+    var html = '';
+    if(p.postcode) html += '<div class="info-row"><span>Postcode</span><span class="info-val">'+p.postcode+'</span></div>';
+    if(p.woonplaats||p.woonplaatsnaam) html += '<div class="info-row"><span>Woonplaats</span><span class="info-val">'+(p.woonplaats||p.woonplaatsnaam)+'</span></div>';
+    if(p.gebruiksdoel) html += '<div class="info-row"><span>Gebruiksdoel</span><span class="info-val">'+p.gebruiksdoel+'</span></div>';
+    if(p.bouwjaar) html += '<div class="info-row"><span>Bouwjaar</span><span class="info-val">'+p.bouwjaar+'</span></div>';
+    if(p.oppervlakte) html += '<div class="info-row"><span>Oppervlakte</span><span class="info-val">'+p.oppervlakte+' m\u00b2</span></div>';
+    if(p.status) html += '<div class="info-row"><span>Status</span><span class="info-val">'+p.status+'</span></div>';
+    document.getElementById('infoContent').innerHTML = html;
+    document.getElementById('infoPanel').classList.add('show');
+  }).catch(function(){});
+}
+
+// ============================================================
+// PDOK ZOEKBALK
+// ============================================================
+var _searchTimer = null, _searchAbort = null;
+
+function setupSearch(){
+  var inp = document.getElementById('searchInput');
+  var res = document.getElementById('searchResults');
+
+  inp.addEventListener('input', function(){
+    var q = inp.value.trim();
+    if(q.length < 2){ res.style.display='none'; return; }
+    if(_searchTimer) clearTimeout(_searchTimer);
+    if(_searchAbort) try{_searchAbort.abort()}catch(x){}
+
+    _searchTimer = setTimeout(function(){
+      var ac = new AbortController();
+      _searchAbort = ac;
+      fetch(PDOK_SUGGEST + encodeURIComponent(q) + '&rows=7', {signal:ac.signal})
+        .then(function(r){return r.json()})
+        .then(function(d){
+          if(!d.response||!d.response.docs||!d.response.docs.length){res.style.display='none';return}
+          var html = '';
+          d.response.docs.forEach(function(doc){
+            html += '<div class="search-item" data-id="'+doc.id+'">';
+            html += '<div style="color:var(--tx)">'+doc.weergavenaam+'</div>';
+            html += '<div style="font-size:10px;color:var(--mt)">'+doc.type+'</div>';
+            html += '</div>';
+          });
+          res.innerHTML = html;
+          res.style.display = 'block';
+          res.querySelectorAll('.search-item').forEach(function(el){
+            el.addEventListener('click', function(){
+              selectSearchResult(el.dataset.id, el.querySelector('div').textContent);
+              res.style.display = 'none';
+              inp.value = '';
+            });
+          });
+        })
+        .catch(function(){});
+    }, 300);
+  });
+
+  document.addEventListener('click', function(e){
+    if(!inp.contains(e.target) && !res.contains(e.target)) res.style.display = 'none';
+  });
+}
+
+function selectSearchResult(id, label){
+  fetch(PDOK_LOOKUP + encodeURIComponent(id))
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(!d.response||!d.response.docs||!d.response.docs.length) return;
+      var doc = d.response.docs[0];
+      if(doc.centroide_ll){
+        var m = doc.centroide_ll.match(/POINT\(([^ ]+) ([^ ]+)\)/);
+        if(m){
+          var lng = parseFloat(m[1]), lat = parseFloat(m[2]);
+          if(_searchMarker){_map.removeLayer(_searchMarker)}
+          _searchMarker = L.marker([lat, lng]).addTo(_map).bindPopup('<b>'+(label||doc.weergavenaam)+'</b>').openPopup();
+          _map.setView([lat, lng], 16);
+        }
+      }
+    })
+    .catch(function(){});
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
 function quantileBreaks(sorted, n){
   var breaks = [];
   for(var i=1;i<n;i++) breaks.push(sorted[Math.floor(i*sorted.length/n)]);
   return breaks;
 }
-
 function getColor(val, breaks, colors){
   for(var i=0;i<breaks.length;i++){if(val<=breaks[i]) return colors[i]}
   return colors[colors.length-1];
 }
-
 function getIndicator(key){
   for(var i=0;i<INDICATORS.length;i++){if(INDICATORS[i].key===key) return INDICATORS[i]}
-  return {key:key,naam:key,eenheid:'',icon:'📊'};
+  return {key:key,naam:key,eenheid:'',icon:'\ud83d\udcca'};
 }
-
-// ============================================================
-// INTERACTION
-// ============================================================
-function highlightFeature(e, indicator){
-  var layer = e.target;
-  layer.setStyle({weight:2, color:'#39ff14', fillOpacity:0.9});
-  layer.bringToFront();
-  var p = layer.feature.properties;
-  var fm = getIndicator(indicator);
-  var html = '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
-  var v = p[indicator];
-  if(v !== undefined && v !== null){
-    html += '<div class="info-row"><span>'+fm.naam+'</span><span class="info-val">'+formatVal(v)+' '+fm.eenheid+'</span></div>';
-  }
-  document.getElementById('infoBuurtNaam').textContent = p.buurtnaam || p.buurtcode || '-';
-  document.getElementById('infoContent').innerHTML = html;
-  document.getElementById('infoPanel').classList.add('show');
-}
-
-function resetHighlight(e){
-  if(_geoLayer) _geoLayer.resetStyle(e.target);
-  document.getElementById('infoPanel').classList.remove('show');
-}
-
-function showBuurtInfo(feature){
-  var p = feature.properties;
-  var panel = document.getElementById('infoPanel');
-  document.getElementById('infoBuurtNaam').textContent = p.buurtnaam || p.buurtcode || '-';
-  var html = '<div class="info-row"><span>Code</span><span class="info-val">'+(p.buurtcode||'-')+'</span></div>';
-  html += '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
-  INFO_KEYS.forEach(function(k){
-    var fm = getIndicator(k);
-    var v = p[k];
-    if(v !== undefined && v !== null && v >= 0){
-      html += '<div class="info-row"><span>'+fm.icon+' '+fm.naam+'</span><span class="info-val">'+formatVal(v)+'</span></div>';
-    }
-  });
-  document.getElementById('infoContent').innerHTML = html;
-  panel.classList.add('show');
-}
-
 function formatVal(v){
-  if(v === null || v === undefined) return '-';
-  if(v >= 10000) return (v/1000).toFixed(0)+'k';
-  if(v >= 100) return Math.round(v).toLocaleString('nl-NL');
-  if(v >= 10) return v.toFixed(0);
+  if(v===null||v===undefined) return '-';
+  if(v>=10000) return (v/1000).toFixed(0)+'k';
+  if(v>=100) return Math.round(v).toLocaleString('nl-NL');
+  if(v>=10) return v.toFixed(0);
   return v.toFixed(1);
 }
 
 // ============================================================
 // LEGEND & STATS
 // ============================================================
-function updateLegend(breaks, colors, indicator){
+function updateLegend(breaks, colors){
   var el = document.getElementById('legend');
   var html = '';
   var labels = ['< '+formatVal(breaks[0])];
-  for(var i=0;i<breaks.length-1;i++) labels.push(formatVal(breaks[i])+' – '+formatVal(breaks[i+1]));
+  for(var i=0;i<breaks.length-1;i++) labels.push(formatVal(breaks[i])+' \u2013 '+formatVal(breaks[i+1]));
   labels.push('> '+formatVal(breaks[breaks.length-1]));
-  for(var i=0;i<colors.length;i++){
+  for(var i=0;i<colors.length;i++)
     html += '<div class="legend-row"><div class="legend-color" style="background:'+colors[i]+'"></div><span>'+(labels[i]||'')+'</span></div>';
-  }
   el.innerHTML = html;
 }
 
-function updateStats(vals){
+function updateStats(vals, type){
   if(!vals.length) return;
   document.getElementById('sMin').textContent = formatVal(vals[0]);
   document.getElementById('sMax').textContent = formatVal(vals[vals.length-1]);
@@ -406,17 +614,19 @@ function buildIndicatorDropdown(){
   sel.innerHTML = html;
 }
 
-function updateMap(){renderGeoLayer()}
+function updateMap(){
+  if(_layerState.buurten && _buurtData) renderChoropleth('buurten');
+  if(_layerState.wijken && _wijkData) renderChoropleth('wijken');
+}
 
 function filterGemeente(){
-  renderGeoLayer();
+  updateMap();
   var gem = document.getElementById('gemeenteFilter').value;
-  if(gem !== 'all' && _geoData){
+  if(gem !== 'all' && _buurtData){
     var bounds = [];
-    _geoData.features.forEach(function(f){
+    _buurtData.features.forEach(function(f){
       if(f.properties.gemeentenaam === gem && f.geometry){
-        var layer = L.geoJSON(f);
-        bounds.push(layer.getBounds());
+        bounds.push(L.geoJSON(f).getBounds());
       }
     });
     if(bounds.length){
@@ -441,8 +651,7 @@ function switchTab(tab){
 }
 
 function toggleSidebar(){
-  var sb = document.getElementById('sidebar');
-  sb.classList.toggle('hidden');
+  document.getElementById('sidebar').classList.toggle('hidden');
   setTimeout(function(){if(_map)_map.invalidateSize()},350);
 }
 
@@ -452,14 +661,11 @@ function renderIndicatorDefs(){
   INDICATORS.forEach(function(fm){
     html += '<div style="padding:4px 0;border-bottom:1px solid var(--bd)">';
     html += '<div style="font:600 11px \'DM Sans\',sans-serif;color:var(--tx)">'+fm.icon+' '+fm.naam+'</div>';
-    html += '<div style="font-size:9px;color:var(--mt)">'+fm.key+' · '+fm.eenheid+'</div></div>';
+    html += '<div style="font-size:9px;color:var(--mt)">'+fm.key+' \u00b7 '+fm.eenheid+'</div></div>';
   });
   el.innerHTML = html;
 }
 
-// ============================================================
-// TOAST
-// ============================================================
 function toast(msg){
   var el = document.getElementById('toast');
   el.textContent = msg;
@@ -469,7 +675,7 @@ function toast(msg){
 }
 
 // ============================================================
-// STARTUP — Laad het statische GeoJSON bestand
+// STARTUP
 // ============================================================
 async function init(){
   var loadMsg = document.getElementById('loadMsg');
@@ -481,51 +687,43 @@ async function init(){
     loadBar.style.width = '10%';
     initMap();
     buildIndicatorDropdown();
+    buildBasemapButtons();
     renderIndicatorDefs();
+    setupSearch();
 
     loadMsg.textContent = 'Buurtdata laden...';
-    loadSub.textContent = '14.668 buurten ophalen (~3 MB)';
+    loadSub.textContent = '14.668 buurten ophalen';
     loadBar.style.width = '20%';
 
-    var resp = await fetch(DATA_URL);
-    if(!resp.ok) throw new Error('Kon buurtdata niet laden: ' + resp.status);
+    var resp = await fetch(BUURTEN_URL);
+    if(!resp.ok) throw new Error('Buurtdata fout: ' + resp.status);
 
     loadMsg.textContent = 'Data verwerken...';
     loadBar.style.width = '60%';
-
-    _geoData = await resp.json();
+    _buurtData = await resp.json();
 
     loadMsg.textContent = 'Gemeenten indexeren...';
     loadBar.style.width = '80%';
-
-    // Extract gemeenten
-    var buurtCount = 0;
-    _geoData.features.forEach(function(f){
-      var p = f.properties;
-      if(p.gemeentenaam) _gemeenten.add(p.gemeentenaam);
-      buurtCount++;
+    _buurtData.features.forEach(function(f){
+      if(f.properties.gemeentenaam) _gemeenten.add(f.properties.gemeentenaam);
     });
-
     buildGemeenteFilter();
-    document.getElementById('sBuurten').textContent = buurtCount.toLocaleString('nl-NL');
+    document.getElementById('sBuurten').textContent = _buurtData.features.length.toLocaleString('nl-NL');
 
     loadMsg.textContent = 'Kaart renderen...';
     loadBar.style.width = '90%';
-    renderGeoLayer();
+    renderChoropleth('buurten');
 
     loadBar.style.width = '100%';
     loadMsg.textContent = 'Klaar!';
-    loadSub.textContent = buurtCount.toLocaleString('nl-NL') + ' buurten geladen';
+    loadSub.textContent = _buurtData.features.length.toLocaleString('nl-NL') + ' buurten geladen';
     setTimeout(function(){document.getElementById('loadingOverlay').style.display='none'},500);
 
-    // Op mobiel: sidebar verbergen, toggle tonen
     if(window.innerWidth <= 900){
       document.getElementById('sidebar').classList.add('hidden');
       document.getElementById('closeSidebar').style.display = 'block';
     }
-
-    toast(buurtCount.toLocaleString('nl-NL') + ' buurten geladen');
-
+    toast(_buurtData.features.length.toLocaleString('nl-NL') + ' buurten geladen');
   } catch(e){
     console.error('Init error:', e);
     loadMsg.textContent = 'Fout bij opstarten';

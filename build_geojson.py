@@ -1,13 +1,18 @@
 """
 Build static GeoJSON for GeoInzicht webapp.
 ==============================================
-Downloads buurt geometrie + CBS kerncijfers from PDOK WFS
+Downloads buurt/wijk geometrie + CBS kerncijfers from PDOK WFS
 (which already includes CBS statistics as attributes),
 selects only the fields the app needs, and writes a compact GeoJSON file.
 
 Usage:
-    python build_geojson.py
-    python build_geojson.py --year 2024 --output data/buurten.geojson
+    python build_geojson.py --type buurten --year 2024
+    python build_geojson.py --type wijken --year 2024 --tolerance 0.0005
+
+Data verversen:
+    python build_geojson.py --type buurten --year 2024
+    python build_geojson.py --type wijken  --year 2024 --tolerance 0.0005
+    git add *.geojson && git commit -m "Data update" && git push
 
 Dependencies:
     pip install requests shapely
@@ -16,6 +21,8 @@ Dependencies:
 import argparse
 import json
 import logging
+import os
+import re
 import sys
 import time
 
@@ -31,6 +38,7 @@ PDOK_WFS = "https://service.pdok.nl/cbs/wijkenbuurten/{year}/wfs/v1_0"
 PAGE_SIZE = 1000  # PDOK max per request
 
 # Mapping: app field key -> PDOK property name (camelCase in PDOK)
+# Dezelfde indicatoren zijn beschikbaar voor buurten EN wijken
 PDOK_FIELDS = {
     "aantal_inwoners":        "aantalInwoners",
     "mannen":                 "mannen",
@@ -58,7 +66,14 @@ PDOK_FIELDS = {
     "personenautos":          "personenautosTotaal",
 }
 
-ADMIN_FIELDS = ["buurtcode", "buurtnaam", "gemeentecode", "gemeentenaam"]
+# Admin-velden per type
+ADMIN_FIELDS = {
+    "buurten": ["buurtcode", "buurtnaam", "gemeentecode", "gemeentenaam"],
+    "wijken":  ["wijkcode", "wijknaam", "gemeentecode", "gemeentenaam"],
+}
+
+# ID-veld per type (voor skip-check)
+ID_FIELD = {"buurten": "buurtcode", "wijken": "wijkcode"}
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -72,11 +87,11 @@ logging.basicConfig(
 log = logging.getLogger("build")
 
 
-def discover_fields(base_url):
+def discover_fields(base_url, type_name):
     """Fetch 1 feature to discover available property names."""
     params = {
         "service": "WFS", "version": "2.0.0", "request": "GetFeature",
-        "typeNames": "buurten", "outputFormat": "application/json",
+        "typeNames": type_name, "outputFormat": "application/json",
         "count": 1, "srsName": "EPSG:4326",
     }
     resp = requests.get(base_url, params=params, timeout=30)
@@ -88,7 +103,7 @@ def discover_fields(base_url):
 
 
 def resolve_fields(available):
-    """Match app field keys to actual PDOK property names (case-insensitive + partial)."""
+    """Match app field keys to actual PDOK property names."""
     avail_lower = {f.lower(): f for f in available}
     resolved = {}
     for app_key, pdok_name in PDOK_FIELDS.items():
@@ -97,7 +112,6 @@ def resolve_fields(available):
         elif pdok_name.lower() in avail_lower:
             resolved[app_key] = avail_lower[pdok_name.lower()]
         else:
-            # Partial match
             for af in available:
                 if pdok_name.lower() in af.lower():
                     resolved[app_key] = af
@@ -105,12 +119,11 @@ def resolve_fields(available):
     return resolved
 
 
-def count_total(base_url):
+def count_total(base_url, type_name):
     """Get total number of features via resultType=hits."""
-    import re
     params = {
         "service": "WFS", "version": "2.0.0", "request": "GetFeature",
-        "typeNames": "buurten", "resultType": "hits",
+        "typeNames": type_name, "resultType": "hits",
     }
     resp = requests.get(base_url, params=params, timeout=30)
     resp.raise_for_status()
@@ -118,8 +131,8 @@ def count_total(base_url):
     return int(m.group(1)) if m else -1
 
 
-def download_features(base_url, prop_names, expected_total=-1):
-    """Download all buurt features from PDOK WFS with pagination."""
+def download_features(base_url, type_name, prop_names, expected_total=-1):
+    """Download all features from PDOK WFS with pagination."""
     all_features = []
     start = 0
     prop_str = ",".join(prop_names + ["geom"])
@@ -127,7 +140,7 @@ def download_features(base_url, prop_names, expected_total=-1):
     while True:
         params = {
             "service": "WFS", "version": "2.0.0", "request": "GetFeature",
-            "typeNames": "buurten", "outputFormat": "application/json",
+            "typeNames": type_name, "outputFormat": "application/json",
             "srsName": "EPSG:4326", "count": PAGE_SIZE, "startIndex": start,
             "propertyName": prop_str,
         }
@@ -140,8 +153,6 @@ def download_features(base_url, prop_names, expected_total=-1):
         all_features.extend(features)
         if len(features) == 0:
             break
-        # Check numberReturned or numberMatched from response
-        nr = data.get("numberReturned", len(features))
         nm = data.get("numberMatched", expected_total)
         if nm > 0 and len(all_features) >= nm:
             break
@@ -181,7 +192,6 @@ def simplify_geometry(geom_dict, tolerance):
         if simplified.is_empty:
             return geom_dict
         result = mapping(simplified)
-        # Round coordinates
         result["coordinates"] = round_coords(result["coordinates"], 5)
         return result
     except Exception as e:
@@ -192,23 +202,33 @@ def simplify_geometry(geom_dict, tolerance):
 
 def main():
     parser = argparse.ArgumentParser(description="Build static GeoJSON for GeoInzicht")
+    parser.add_argument("--type", choices=["buurten", "wijken"], default="buurten",
+                        help="Type: buurten of wijken (default: buurten)")
     parser.add_argument("--year", type=int, default=2024)
-    parser.add_argument("--tolerance", type=float, default=0.0003,
-                        help="Simplificatie-tolerantie in graden (~33m). Default: 0.0003")
+    parser.add_argument("--tolerance", type=float, default=None,
+                        help="Simplificatie-tolerantie in graden. "
+                             "Default: 0.0003 voor buurten, 0.0005 voor wijken")
     parser.add_argument("--output", type=str, default=None)
     args = parser.parse_args()
 
-    output = args.output or f"buurten_{args.year}.geojson"
+    # Defaults per type
+    if args.tolerance is None:
+        args.tolerance = 0.0003 if args.type == "buurten" else 0.0005
+    output = args.output or f"{args.type}_{args.year}.geojson"
     base_url = PDOK_WFS.format(year=args.year)
+    type_name = args.type  # 'buurten' of 'wijken' — exact de PDOK laagnaam
+    admin_fields = ADMIN_FIELDS[args.type]
+    id_field = ID_FIELD[args.type]
 
     log.info("=" * 50)
     log.info("  GeoInzicht GeoJSON Builder")
-    log.info(f"  Jaar: {args.year}  Output: {output}")
+    log.info(f"  Type: {args.type}  Jaar: {args.year}")
+    log.info(f"  Tolerantie: {args.tolerance}  Output: {output}")
     log.info("=" * 50)
 
     # 1. Discover fields
-    log.info("Stap 1: PDOK velden ontdekken...")
-    available = discover_fields(base_url)
+    log.info(f"Stap 1: PDOK velden ontdekken ({type_name})...")
+    available = discover_fields(base_url, type_name)
     log.info(f"  {len(available)} velden beschikbaar")
 
     # 2. Resolve mapping
@@ -220,13 +240,13 @@ def main():
 
     # 3. Count and Download
     log.info("Stap 3: Features tellen...")
-    total = count_total(base_url)
-    log.info(f"  {total} buurten verwacht")
+    total = count_total(base_url, type_name)
+    log.info(f"  {total} {type_name} verwacht")
 
-    request_props = list(set(ADMIN_FIELDS + list(field_map.values())))
+    request_props = list(set(admin_fields + list(field_map.values())))
     log.info(f"  Downloaden ({len(request_props)} properties)...")
     t0 = time.time()
-    raw = download_features(base_url, request_props, total)
+    raw = download_features(base_url, type_name, request_props, total)
     log.info(f"  {len(raw)} features in {time.time()-t0:.1f}s")
 
     # 4. Clean, simplify and compact
@@ -235,11 +255,11 @@ def main():
     for i, f in enumerate(raw):
         props = f.get("properties", {})
         geom = f.get("geometry")
-        if not props.get("buurtcode") or not geom:
+        if not props.get(id_field) or not geom:
             continue
 
         clean = {}
-        for af in ADMIN_FIELDS:
+        for af in admin_fields:
             if props.get(af) is not None:
                 clean[af] = props[af]
 
@@ -250,7 +270,6 @@ def main():
                     v = round(v, 2)
                 clean[app_key] = v
 
-        # Simplify geometry
         geom = simplify_geometry(geom, args.tolerance)
 
         features.append({
@@ -262,13 +281,14 @@ def main():
         if (i + 1) % 3000 == 0:
             log.info(f"  {i+1}/{len(raw)} verwerkt...")
 
-    log.info(f"  {len(features)} buurten opgeschoond")
+    log.info(f"  {len(features)} {type_name} opgeschoond")
 
     # 5. Write
     log.info("Stap 5: Schrijven...")
     geojson = {
         "type": "FeatureCollection",
         "metadata": {
+            "type": args.type,
             "year": args.year,
             "generated": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "count": len(features),
@@ -279,7 +299,6 @@ def main():
     with open(output, "w", encoding="utf-8") as fh:
         json.dump(geojson, fh, ensure_ascii=False, separators=(",", ":"))
 
-    import os
     size_mb = os.path.getsize(output) / (1024 * 1024)
     log.info(f"  {output}: {size_mb:.1f} MB")
     log.info(f"  Geschat gzipped: ~{size_mb * 0.25:.1f} MB")
