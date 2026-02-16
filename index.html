@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="GeoInzicht">
 <link rel="manifest" href="manifest.json">
 <title>GeoInzicht — CBS Buurtdata</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0f1a'/%3E%3Cpath d='M32 8C18.7 8 8 18.7 8 32s10.7 24 24 24 24-10.7 24-24S45.3 8 32 8z' fill='none' stroke='%2339ff14' stroke-width='2' opacity='.5'/%3E%3Cpath d='M22 22c2-3 5-5 10-5s8 3 10 6c-2 1-4 3-5 5-2-1-4-2-5-2s-3 1-5 2c-1-2-3-4-5-6z M18 32c0-2 1-4 2-6 2 2 4 4 5 6-1 2-2 4-2 6-2-1-4-3-5-6z M32 42c-3 0-6-1-8-3 1-2 3-4 5-5 1 1 2 1 3 1s2 0 3-1c2 1 4 3 5 5-2 2-5 3-8 3z' fill='%2339ff14' opacity='.6'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -185,10 +186,12 @@ select option{background:var(--bg);color:var(--tx)}
 
 <div class="loading-overlay" id="loadingOverlay">
   <div class="inner">
-    <div class="spinner"></div>
-    <div class="msg" id="loadMsg">GeoInzicht laden...</div>
-    <div class="sub" id="loadSub">Buurtdata ophalen</div>
-    <div class="progress" style="width:220px;margin-top:14px"><div class="progress-bar" id="loadProgress" style="width:0%"></div></div>
+    <img src="logo.svg" alt="Data Consultants" style="width:160px;height:160px;margin:0 auto 20px;display:block;border-radius:50%;filter:drop-shadow(0 0 30px rgba(57,255,20,.3))">
+    <div class="sb-logo" style="font-size:24px;text-align:center;margin-bottom:4px">GeoInzicht</div>
+    <div style="font:600 11px 'Space Mono',monospace;color:var(--mt);text-align:center;letter-spacing:2px;margin-bottom:20px">DATA CONSULTANTS</div>
+    <div class="msg" id="loadMsg">Laden...</div>
+    <div class="sub" id="loadSub">Gemeentedata ophalen</div>
+    <div class="progress" style="width:260px;margin-top:14px"><div class="progress-bar" id="loadProgress" style="width:0%"></div></div>
   </div>
 </div>
 
@@ -198,9 +201,7 @@ select option{background:var(--bg);color:var(--tx)}
   <div class="sidebar" id="sidebar">
     <div class="header">
       <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,rgba(57,255,20,.2),rgba(6,182,212,.2));display:grid;place-items:center;border:1px solid rgba(57,255,20,.3)">
-          <span class="mi mi-lg" style="color:var(--ac)">public</span>
-        </div>
+        <img src="logo.svg" alt="DC" style="width:38px;height:38px;border-radius:12px;border:1px solid rgba(57,255,20,.3);filter:drop-shadow(0 0 8px rgba(57,255,20,.2))">
         <div>
           <div class="sb-logo">GeoInzicht</div>
           <span style="font-size:9px;color:var(--mt);letter-spacing:.5px">CBS buurtdata op de kaart</span>
@@ -227,7 +228,8 @@ select option{background:var(--bg);color:var(--tx)}
     <div class="pane active" id="p-kaart">
       <div class="sh"><span class="mi">layers</span> Lagen</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-s active" data-layer="buurten" onclick="toggleLayer('buurten')"><span class="mi mi-sm">grid_on</span> Buurten</button>
+        <button class="btn btn-s active" data-layer="gemeenten" onclick="toggleLayer('gemeenten')"><span class="mi mi-sm">domain</span> Gemeenten</button>
+        <button class="btn btn-s" data-layer="buurten" onclick="toggleLayer('buurten')"><span class="mi mi-sm">grid_on</span> Buurten</button>
         <button class="btn btn-s" data-layer="wijken" onclick="toggleLayer('wijken')"><span class="mi mi-sm">grid_view</span> Wijken</button>
         <button class="btn btn-s" data-layer="bag" onclick="toggleLayer('bag')"><span class="mi mi-sm">location_on</span> BAG Adressen</button>
         <button class="btn btn-s" data-layer="panden" onclick="toggleLayer('panden')"><span class="mi mi-sm">apartment</span> BAG Panden</button>
@@ -249,7 +251,7 @@ select option{background:var(--bg);color:var(--tx)}
 
       <div class="sh" style="margin-top:12px"><span class="mi">analytics</span> Overzicht</div>
       <div class="stat-row">
-        <div class="stat"><b id="sBuurten">0</b><small>Buurten</small></div>
+        <div class="stat"><b id="sBuurten">0</b><small>Gebieden</small></div>
         <div class="stat"><b id="sGemeenten">0</b><small>Gemeenten</small></div>
       </div>
 
@@ -269,6 +271,10 @@ select option{background:var(--bg);color:var(--tx)}
       <div class="sh"><span class="mi">database</span> Datasets</div>
       <div class="card" id="datasetInfo">
         <div style="font-size:11px;color:var(--mt);line-height:1.9">
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--glass-bd);padding:5px 0">
+            <span style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">domain</span> Gemeenten</span>
+            <span style="font-family:'Space Mono',monospace;color:var(--ac);font-size:10px" id="dsGemeenten">&#8212;</span>
+          </div>
           <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--glass-bd);padding:5px 0">
             <span style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">grid_on</span> Buurten</span>
             <span style="font-family:'Space Mono',monospace;color:var(--ac);font-size:10px" id="dsBuurten">&#8212;</span>
@@ -399,9 +405,10 @@ select option{background:var(--bg);color:var(--tx)}
 // ============================================================
 // CONFIG
 // ============================================================
-var BUURTEN_URL = 'buurten_2022.geojson';
-var WIJKEN_URL  = 'wijken_2022.geojson';
-var PDOK_BAG_WMS = 'https://service.pdok.nl/lv/bag/wms/v2_0';
+var GEMEENTEN_URL = 'gemeenten_2022.geojson';
+var BUURTEN_URL   = 'buurten_2022.geojson';
+var WIJKEN_URL    = 'wijken_2022.geojson';
+var PDOK_BAG_WMS  = 'https://service.pdok.nl/lv/bag/wms/v2_0';
 var PDOK_SUGGEST = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/suggest?q=';
 var PDOK_LOOKUP  = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/lookup?id=';
 
@@ -451,13 +458,14 @@ var COLORS_REVERSE = COLORS.slice().reverse();
 // STATE
 // ============================================================
 var _map, _currentBasemap;
+var _gemeenteData = null, _gemeenteLayer = null;
 var _buurtData = null, _buurtLayer = null;
 var _wijkData = null, _wijkLayer = null;
 var _bagWmsLayer = null;
 var _pandWmsLayer = null;
 var _searchMarker = null;
-var _gemeenten = new Set();
-var _layerState = {buurten: true, wijken: false, bag: false, panden: false};
+var _gemeenteNamen = new Set();
+var _layerState = {gemeenten: true, buurten: false, wijken: false, bag: false, panden: false};
 
 // ============================================================
 // MAP
@@ -500,15 +508,20 @@ function buildBasemapButtons(){
 // ============================================================
 // CHOROPLETH RENDERING
 // ============================================================
+var LAYER_CONFIG = {
+  gemeenten: {data:function(){return _gemeenteData}, nameField:'gemeentenaam', codeField:'gemeentecode', borderWeight:2, borderColor:'rgba(255,255,255,0.4)'},
+  buurten:   {data:function(){return _buurtData},    nameField:'buurtnaam',    codeField:'buurtcode',    borderWeight:0.5, borderColor:'rgba(255,255,255,0.15)'},
+  wijken:    {data:function(){return _wijkData},     nameField:'wijknaam',     codeField:'wijkcode',     borderWeight:1.5, borderColor:'rgba(255,255,255,0.3)'}
+};
+
 function renderChoropleth(type){
-  var data, nameField, codeField;
-  if(type === 'buurten'){
-    data = _buurtData; nameField = 'buurtnaam'; codeField = 'buurtcode';
-  } else {
-    data = _wijkData; nameField = 'wijknaam'; codeField = 'wijkcode';
-  }
+  var cfg = LAYER_CONFIG[type];
+  if(!cfg) return;
+  var data = cfg.data();
   if(!data || !_map) return;
 
+  // Verwijder oude laag
+  if(type === 'gemeenten' && _gemeenteLayer){ _map.removeLayer(_gemeenteLayer); _gemeenteLayer = null; }
   if(type === 'buurten' && _buurtLayer){ _map.removeLayer(_buurtLayer); _buurtLayer = null; }
   if(type === 'wijken' && _wijkLayer){ _map.removeLayer(_wijkLayer); _wijkLayer = null; }
 
@@ -527,8 +540,6 @@ function renderChoropleth(type){
   vals.sort(function(a,b){return a-b});
   var breaks = quantileBreaks(vals, 7);
   var colors = REVERSE_KEYS.indexOf(indicator) >= 0 ? COLORS_REVERSE : COLORS;
-  var borderWeight = type === 'wijken' ? 1.5 : 0.5;
-  var borderColor = type === 'wijken' ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.15)';
 
   var newLayer = L.geoJSON(data, {
     style: function(feature){
@@ -538,15 +549,16 @@ function renderChoropleth(type){
       var v = p[indicator];
       if(v === undefined || v === null || v < 0)
         return {fillColor:'#111',fillOpacity:0.1,weight:0.3,color:'#333',opacity:0.3};
-      return {fillColor:getColor(v,breaks,colors),fillOpacity:0.65,weight:borderWeight,color:borderColor,opacity:0.5};
+      return {fillColor:getColor(v,breaks,colors),fillOpacity:0.65,weight:cfg.borderWeight,color:cfg.borderColor,opacity:0.5};
     },
     onEachFeature: function(feature, layer){
       layer.on('mouseover', function(e){
-        e.target.setStyle({weight:2,color:'#39ff14',fillOpacity:0.9});
+        e.target.setStyle({weight:2.5,color:'#39ff14',fillOpacity:0.9});
         e.target.bringToFront();
         var p = e.target.feature.properties;
-        document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">place</span> '+(p[nameField] || p[codeField] || '-');
-        var html = '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
+        document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">place</span> '+(p[cfg.nameField] || p[cfg.codeField] || '-');
+        var html = '';
+        if(type !== 'gemeenten') html += '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
         _activeIndicators.forEach(function(k){
           var fm = getIndicator(k);
           var v = p[k];
@@ -562,9 +574,9 @@ function renderChoropleth(type){
       });
       layer.on('click', function(){
         var p = feature.properties;
-        document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">place</span> '+(p[nameField] || p[codeField] || '-');
-        var html = '<div class="info-row"><span>Code</span><span class="info-val">'+(p[codeField]||'-')+'</span></div>';
-        html += '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
+        document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">place</span> '+(p[cfg.nameField] || p[cfg.codeField] || '-');
+        var html = '<div class="info-row"><span>Code</span><span class="info-val">'+(p[cfg.codeField]||'-')+'</span></div>';
+        if(type !== 'gemeenten') html += '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
         _activeIndicators.forEach(function(k){
           var fm = getIndicator(k);
           var v = p[k];
@@ -577,10 +589,13 @@ function renderChoropleth(type){
     }
   }).addTo(_map);
 
+  if(type === 'gemeenten'){ _gemeenteLayer = newLayer; }
   if(type === 'buurten'){ _buurtLayer = newLayer; }
-  else { _wijkLayer = newLayer; }
+  if(type === 'wijken'){ _wijkLayer = newLayer; }
 
-  if(type === 'buurten' || !_layerState.buurten){
+  // Primaire laag bepaalt legenda/stats (de meest gedetailleerde actieve laag)
+  var primaryType = _layerState.buurten ? 'buurten' : (_layerState.wijken ? 'wijken' : 'gemeenten');
+  if(type === primaryType){
     updateLegend(breaks, colors);
     updateStats(vals, type);
   }
@@ -593,22 +608,37 @@ function toggleLayer(type){
   _layerState[type] = !_layerState[type];
   document.querySelector('[data-layer="'+type+'"]').classList.toggle('active', _layerState[type]);
 
-  if(type === 'buurten'){
-    if(_layerState.buurten) renderChoropleth('buurten');
-    else if(_buurtLayer){_map.removeLayer(_buurtLayer);_buurtLayer=null}
+  if(type === 'gemeenten'){
+    if(_layerState.gemeenten) renderChoropleth('gemeenten');
+    else if(_gemeenteLayer){_map.removeLayer(_gemeenteLayer);_gemeenteLayer=null}
+  }
+  else if(type === 'buurten'){
+    if(_layerState.buurten){
+      if(!_buurtData){
+        toast('Buurtdata laden (14.4 MB)...');
+        fetch(BUURTEN_URL).then(function(r){return r.json()}).then(function(d){
+          _buurtData = d;
+          toast(d.features.length.toLocaleString('nl-NL') + ' buurten geladen');
+          document.getElementById('dsBuurten').textContent = d.features.length.toLocaleString('nl-NL') + ' features';
+          renderChoropleth('buurten');
+          updateActiveStats();
+        }).catch(function(e){toast('Fout laden buurten: '+e.message);_layerState.buurten=false;document.querySelector('[data-layer="buurten"]').classList.remove('active')});
+      } else renderChoropleth('buurten');
+    } else if(_buurtLayer){_map.removeLayer(_buurtLayer);_buurtLayer=null;updateMap()}
   }
   else if(type === 'wijken'){
     if(_layerState.wijken){
       if(!_wijkData){
-        toast('Wijkdata laden...');
+        toast('Wijkdata laden (4.4 MB)...');
         fetch(WIJKEN_URL).then(function(r){return r.json()}).then(function(d){
           _wijkData = d;
-          toast(d.features.length + ' wijken geladen');
+          toast(d.features.length.toLocaleString('nl-NL') + ' wijken geladen');
           document.getElementById('dsWijken').textContent = d.features.length.toLocaleString('nl-NL') + ' features';
           renderChoropleth('wijken');
+          updateActiveStats();
         }).catch(function(e){toast('Fout laden wijken: '+e.message);_layerState.wijken=false;document.querySelector('[data-layer="wijken"]').classList.remove('active')});
       } else renderChoropleth('wijken');
-    } else if(_wijkLayer){_map.removeLayer(_wijkLayer);_wijkLayer=null}
+    } else if(_wijkLayer){_map.removeLayer(_wijkLayer);_wijkLayer=null;updateMap()}
   }
   else if(type === 'bag') toggleBagLayer(_layerState.bag);
   else if(type === 'panden') togglePandLayer(_layerState.panden);
@@ -626,7 +656,12 @@ function toggleBagLayer(on){
       version:'1.1.1',opacity:0.7,maxZoom:22,tileSize:256,minZoom:14
     }).addTo(_map);
     _bagWmsLayer.bringToFront();
-    toast('BAG adressen zichtbaar bij zoom \u226514');
+    if(_map.getZoom() < 14){
+      _map.setZoom(14);
+      toast('Ingezoomd naar niveau 14 \u2014 BAG adressen nu zichtbaar');
+    } else {
+      toast('BAG adressen actief');
+    }
   } else if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
 }
 
@@ -673,7 +708,12 @@ function togglePandLayer(on){
     }).addTo(_map);
     _pandWmsLayer.bringToFront();
     if(_bagWmsLayer) _bagWmsLayer.bringToFront();
-    toast('BAG panden zichtbaar bij zoom \u226514');
+    if(_map.getZoom() < 14){
+      _map.setZoom(14);
+      toast('Ingezoomd naar niveau 14 \u2014 BAG panden nu zichtbaar');
+    } else {
+      toast('BAG panden actief');
+    }
   } else if(_pandWmsLayer){_map.removeLayer(_pandWmsLayer);_pandWmsLayer=null}
 }
 
@@ -862,8 +902,16 @@ function setPrimaryIndicator(key){
   updateActiveStats();
 }
 
+function getActiveData(){
+  // Meest gedetailleerde actieve laag
+  if(_layerState.buurten && _buurtData) return _buurtData;
+  if(_layerState.wijken && _wijkData) return _wijkData;
+  if(_layerState.gemeenten && _gemeenteData) return _gemeenteData;
+  return _gemeenteData || _buurtData;
+}
+
 function computeStats(key){
-  var data = _buurtData;
+  var data = getActiveData();
   if(!data) return null;
   var gemFilter = document.getElementById('gemeenteFilter').value;
   var vals = [];
@@ -912,6 +960,7 @@ function updateActiveStats(){
 }
 
 function updateMap(){
+  if(_layerState.gemeenten && _gemeenteData) renderChoropleth('gemeenten');
   if(_layerState.buurten && _buurtData) renderChoropleth('buurten');
   if(_layerState.wijken && _wijkData) renderChoropleth('wijken');
   updateActiveStats();
@@ -938,7 +987,7 @@ function filterGemeente(){
 
 function buildGemeenteFilter(){
   var sel = document.getElementById('gemeenteFilter');
-  var sorted = Array.from(_gemeenten).sort();
+  var sorted = Array.from(_gemeenteNamen).sort();
   sel.innerHTML = '<option value="all">Alle gemeenten ('+sorted.length+')</option>';
   sorted.forEach(function(g){sel.innerHTML += '<option value="'+g+'">'+g+'</option>'});
   document.getElementById('sGemeenten').textContent = sorted.length;
@@ -991,46 +1040,46 @@ async function init(){
     renderIndicatorDefs();
     setupSearch();
 
-    loadMsg.textContent = 'Buurtdata laden...';
-    loadSub.textContent = 'CBS buurtdata ophalen';
-    loadBar.style.width = '20%';
+    // Stap 1: Gemeenten laden (0.9 MB — snel)
+    loadMsg.textContent = 'Gemeentedata laden...';
+    loadSub.textContent = 'CBS gemeentedata ophalen (0.9 MB)';
+    loadBar.style.width = '30%';
 
-    var resp = await fetch(BUURTEN_URL);
-    if(!resp.ok) throw new Error('Buurtdata fout: ' + resp.status);
+    var resp = await fetch(GEMEENTEN_URL);
+    if(!resp.ok) throw new Error('Gemeentedata fout: ' + resp.status);
 
-    loadMsg.textContent = 'Data verwerken...';
+    loadMsg.textContent = 'Gemeenten verwerken...';
     loadBar.style.width = '60%';
-    _buurtData = await resp.json();
+    _gemeenteData = await resp.json();
 
-    loadMsg.textContent = 'Gemeenten indexeren...';
-    loadBar.style.width = '80%';
-    _buurtData.features.forEach(function(f){
-      if(f.properties.gemeentenaam) _gemeenten.add(f.properties.gemeentenaam);
+    // Gemeenten indexeren voor filter
+    _gemeenteData.features.forEach(function(f){
+      if(f.properties.gemeentenaam) _gemeenteNamen.add(f.properties.gemeentenaam);
     });
     buildGemeenteFilter();
-    document.getElementById('sBuurten').textContent = _buurtData.features.length.toLocaleString('nl-NL');
+    document.getElementById('sBuurten').textContent = _gemeenteData.features.length.toLocaleString('nl-NL');
 
     loadMsg.textContent = 'Kaart renderen...';
     loadBar.style.width = '90%';
-    renderChoropleth('buurten');
+    renderChoropleth('gemeenten');
     updateActiveStats();
 
     // Dataset metadata
-    var meta = _buurtData.metadata || {};
-    document.getElementById('dsBuurten').textContent = _buurtData.features.length.toLocaleString('nl-NL') + ' features';
+    var meta = _gemeenteData.metadata || {};
+    document.getElementById('dsGemeenten').textContent = _gemeenteData.features.length.toLocaleString('nl-NL') + ' features';
     document.getElementById('dsJaar').textContent = meta.year || '\u2014';
     document.getElementById('dsGenerated').textContent = meta.generated ? meta.generated.substring(0,10) : '\u2014';
 
     loadBar.style.width = '100%';
     loadMsg.textContent = 'Klaar!';
-    loadSub.textContent = _buurtData.features.length.toLocaleString('nl-NL') + ' buurten geladen';
+    loadSub.textContent = _gemeenteData.features.length.toLocaleString('nl-NL') + ' gemeenten geladen';
     setTimeout(function(){document.getElementById('loadingOverlay').style.display='none'},600);
 
     if(window.innerWidth <= 900){
       document.getElementById('sidebar').classList.add('hidden');
       document.getElementById('closeSidebar').style.display = 'block';
     }
-    toast(_buurtData.features.length.toLocaleString('nl-NL') + ' buurten geladen');
+    toast(_gemeenteData.features.length.toLocaleString('nl-NL') + ' gemeenten geladen');
   } catch(e){
     console.error('Init error:', e);
     loadMsg.textContent = 'Fout bij opstarten';

@@ -74,12 +74,13 @@ PDOK_FIELDS = {
 
 # Admin-velden per type
 ADMIN_FIELDS = {
-    "buurten": ["buurtcode", "buurtnaam", "gemeentecode", "gemeentenaam"],
-    "wijken":  ["wijkcode", "wijknaam", "gemeentecode", "gemeentenaam"],
+    "buurten":   ["buurtcode", "buurtnaam", "gemeentecode", "gemeentenaam"],
+    "wijken":    ["wijkcode", "wijknaam", "gemeentecode", "gemeentenaam"],
+    "gemeenten": ["gemeentecode", "gemeentenaam"],
 }
 
 # ID-veld per type (voor skip-check)
-ID_FIELD = {"buurten": "buurtcode", "wijken": "wijkcode"}
+ID_FIELD = {"buurten": "buurtcode", "wijken": "wijkcode", "gemeenten": "gemeentecode"}
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -208,8 +209,8 @@ def simplify_geometry(geom_dict, tolerance):
 
 def main():
     parser = argparse.ArgumentParser(description="Build static GeoJSON for GeoInzicht")
-    parser.add_argument("--type", choices=["buurten", "wijken"], default="buurten",
-                        help="Type: buurten of wijken (default: buurten)")
+    parser.add_argument("--type", choices=["buurten", "wijken", "gemeenten"], default="buurten",
+                        help="Type: buurten, wijken of gemeenten (default: buurten)")
     parser.add_argument("--year", type=int, default=2022)
     parser.add_argument("--tolerance", type=float, default=None,
                         help="Simplificatie-tolerantie in graden. "
@@ -219,7 +220,7 @@ def main():
 
     # Defaults per type
     if args.tolerance is None:
-        args.tolerance = 0.0003 if args.type == "buurten" else 0.0005
+        args.tolerance = {"buurten": 0.0003, "wijken": 0.0005, "gemeenten": 0.001}.get(args.type, 0.0003)
     output = args.output or f"{args.type}_{args.year}.geojson"
     base_url = PDOK_WFS.format(year=args.year)
     type_name = args.type  # 'buurten' of 'wijken' — exact de PDOK laagnaam

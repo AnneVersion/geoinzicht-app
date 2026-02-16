@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">
+  <defs>
+    <!-- 3D sphere shading like original logo -->
+    <radialGradient id="sphere3d" cx="38%" cy="32%" r="65%">
+      <stop offset="0%" stop-color="#1a5c2a" stop-opacity="0.7"/>
+      <stop offset="35%" stop-color="#0f3d1a" stop-opacity="0.55"/>
+      <stop offset="65%" stop-color="#092810" stop-opacity="0.45"/>
+      <stop offset="85%" stop-color="#041a08" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#020d04" stop-opacity="0.2"/>
+    </radialGradient>
+    <!-- Specular highlight (top-left, like original) -->
+    <radialGradient id="specular" cx="35%" cy="28%" r="35%">
+      <stop offset="0%" stop-color="#39ff14" stop-opacity="0.12"/>
+      <stop offset="40%" stop-color="#39ff14" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+    <!-- Edge darkening (atmosphere) -->
+    <radialGradient id="atmosphere" cx="50%" cy="50%" r="50%">
+      <stop offset="75%" stop-color="transparent"/>
+      <stop offset="90%" stop-color="#39ff14" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#39ff14" stop-opacity="0.18"/>
+    </radialGradient>
+    <!-- Black hole core -->
+    <radialGradient id="bhCore" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#000" stop-opacity="1"/>
+      <stop offset="35%" stop-color="#000" stop-opacity="0.9"/>
+      <stop offset="55%" stop-color="#020408" stop-opacity="0.5"/>
+      <stop offset="75%" stop-color="#39ff14" stop-opacity="0.03"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+    <!-- Accretion glow -->
+    <radialGradient id="accGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="45%" stop-color="transparent"/>
+      <stop offset="60%" stop-color="#39ff14" stop-opacity="0.06"/>
+      <stop offset="70%" stop-color="#39ff14" stop-opacity="0.12"/>
+      <stop offset="80%" stop-color="#39ff14" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+    <!-- Land fill: lighter green, solid -->
+    <radialGradient id="landFill" cx="38%" cy="32%" r="65%">
+      <stop offset="0%" stop-color="#2aff4e" stop-opacity="0.35"/>
+      <stop offset="50%" stop-color="#1a8c2e" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#0d4a18" stop-opacity="0.18"/>
+    </radialGradient>
+    <!-- Glow filters -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="b2"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="18" result="b3"/>
+      <feMerge><feMergeNode in="b3"/><feMergeNode in="b2"/><feMergeNode in="b1"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="gs" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="b1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b2"/>
+      <feMerge><feMergeNode in="b2"/><feMergeNode in="b1"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bh" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="20"/>
+    </filter>
+    <clipPath id="gc"><circle cx="500" cy="500" r="380"/></clipPath>
+  </defs>
+
+  <!-- DEEP SPACE -->
+  <rect width="1000" height="1000" fill="#020408"/>
+
+  <!-- ===== BLACK HOLE (center of globe, seen through ocean) ===== -->
+  <circle cx="500" cy="500" r="160" fill="url(#bhCore)"/>
+  <circle cx="500" cy="500" r="220" fill="url(#accGlow)"/>
+  <circle cx="500" cy="500" r="40" fill="#39ff14" opacity="0.04" filter="url(#bh)"/>
+  <!-- Accretion disks -->
+  <ellipse cx="500" cy="500" rx="150" ry="42" fill="none" stroke="#39ff14" stroke-width="0.8" opacity="0.12" stroke-dasharray="3 5">
+    <animate attributeName="stroke-dashoffset" from="0" to="32" dur="3s" repeatCount="indefinite"/>
+    <animateTransform attributeName="transform" type="rotate" from="0 500 500" to="360 500 500" dur="22s" repeatCount="indefinite"/>
+  </ellipse>
+  <ellipse cx="500" cy="500" rx="120" ry="50" fill="none" stroke="#39ff14" stroke-width="0.6" opacity="0.08" stroke-dasharray="2 7" transform="rotate(50 500 500)">
+    <animate attributeName="stroke-dashoffset" from="0" to="36" dur="4s" repeatCount="indefinite"/>
+    <animateTransform attributeName="transform" type="rotate" from="50 500 500" to="410 500 500" dur="28s" repeatCount="indefinite"/>
+  </ellipse>
+
+  <!-- Binary streams from black hole through transparent ocean outward -->
+  <g font-family="'Courier New',monospace" fill="#39ff14" font-size="9">
+    <text x="498" y="500"><animate attributeName="y" values="500;40" dur="7s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.20;0.01" dur="7s" repeatCount="indefinite"/>10110</text>
+    <text x="502" y="500"><animate attributeName="y" values="500;960" dur="8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.20;0.01" dur="8s" repeatCount="indefinite"/>01001</text>
+    <text x="500" y="498"><animate attributeName="x" values="500;40" dur="9s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.16;0.01" dur="9s" repeatCount="indefinite"/>11010</text>
+    <text x="500" y="502"><animate attributeName="x" values="500;960" dur="7.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.16;0.01" dur="7.5s" repeatCount="indefinite"/>00101</text>
+    <text x="500" y="500"><animate attributeName="x" values="500;140" dur="8s" repeatCount="indefinite"/><animate attributeName="y" values="500;140" dur="8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.14;0.01" dur="8s" repeatCount="indefinite"/>10011</text>
+    <text x="500" y="500"><animate attributeName="x" values="500;860" dur="7s" repeatCount="indefinite"/><animate attributeName="y" values="500;140" dur="7s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.14;0.01" dur="7s" repeatCount="indefinite"/>01110</text>
+    <text x="500" y="500"><animate attributeName="x" values="500;140" dur="9s" repeatCount="indefinite"/><animate attributeName="y" values="500;860" dur="9s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.12;0.01" dur="9s" repeatCount="indefinite"/>10100</text>
+    <text x="500" y="500"><animate attributeName="x" values="500;860" dur="8.5s" repeatCount="indefinite"/><animate attributeName="y" values="500;860" dur="8.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.12;0.01" dur="8.5s" repeatCount="indefinite"/>01011</text>
+    <text x="500" y="500"><animate attributeName="x" values="500;280" dur="6.5s" repeatCount="indefinite"/><animate attributeName="y" values="500;80" dur="6.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.11;0.01" dur="6.5s" repeatCount="indefinite"/>11001</text>
+    <text x="500" y="500"><animate attributeName="x" values="500;720" dur="7.2s" repeatCount="indefinite"/><animate attributeName="y" values="500;920" dur="7.2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.10;0.01" dur="7.2s" repeatCount="indefinite"/>00110</text>
+    <text x="500" y="500"><animate attributeName="x" values="500;80" dur="8.3s" repeatCount="indefinite"/><animate attributeName="y" values="500;600" dur="8.3s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.10;0.01" dur="8.3s" repeatCount="indefinite"/>10101</text>
+    <text x="500" y="500"><animate attributeName="x" values="500;920" dur="6.8s" repeatCount="indefinite"/><animate attributeName="y" values="500;350" dur="6.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.10;0.01" dur="6.8s" repeatCount="indefinite"/>01010</text>
+  </g>
+
+  <!-- ===== 3D GLOBE (like original logo style) ===== -->
+  <!-- Base sphere with 3D shading -->
+  <circle cx="500" cy="500" r="380" fill="url(#sphere3d)"/>
+  <!-- Specular highlight top-left -->
+  <circle cx="500" cy="500" r="380" fill="url(#specular)"/>
+  <!-- Atmosphere edge glow -->
+  <circle cx="500" cy="500" r="380" fill="url(#atmosphere)"/>
+
+  <!-- Subtle grid (like original) -->
+  <g clip-path="url(#gc)" opacity="0.06" stroke="#39ff14" fill="none" stroke-width="0.5">
+    <ellipse cx="500" cy="270" rx="350" ry="46"/>
+    <ellipse cx="500" cy="380" rx="375" ry="64"/>
+    <ellipse cx="500" cy="500" rx="380" ry="72"/>
+    <ellipse cx="500" cy="620" rx="375" ry="64"/>
+    <ellipse cx="500" cy="730" rx="350" ry="46"/>
+    <ellipse cx="500" cy="500" rx="100" ry="380"/>
+    <ellipse cx="500" cy="500" rx="220" ry="380"/>
+    <ellipse cx="500" cy="500" rx="330" ry="380"/>
+  </g>
+
+  <!-- Globe outline -->
+  <circle cx="500" cy="500" r="380" fill="none" stroke="#39ff14" stroke-width="1" opacity="0.18" filter="url(#gs)"/>
+
+  <!-- ===== SOLID CONTINENTS (like original: lighter, opaque, with glow) ===== -->
+  <g clip-path="url(#gc)" fill="url(#landFill)" stroke="#39ff14" stroke-width="0.6" stroke-opacity="0.4">
+    <!-- Europe -->
+    <path d="M389.4,377.9 L396.3,371.6 L403.2,365.3 L416.7,352.6 L429.8,339.9 L441.4,334.0 L452.7,327.9 L458.7,321.5 L464.4,315.1 L470.1,308.8 L475.5,302.5 L476.0,296.0 L481.2,289.8 L486.2,283.6 L491.0,277.4 L491.2,271.2 L495.7,265.1 L495.8,259.1 L500.0,253.1 L504.0,247.2 L507.8,241.4 L507.5,235.6 L514.6,229.9 L522.0,229.6 L528.3,223.8 L536.5,228.9 L541.3,234.3 L550.1,239.5 L555.3,244.9 L560.8,250.4 L566.4,255.9 L572.2,261.4 L579.9,273.1 L587.9,285.0 L596.1,297.0 L599.8,309.9 L596.7,317.0 L594.9,330.8 L591.3,338.0 L587.4,345.3 L583.3,352.6 L579.0,359.9 L568.8,367.7 L558.2,375.5 L547.3,383.1 L535.1,376.6 L523.1,369.9 L511.4,363.2 L500.0,356.4 L489.1,342.6 L478.6,335.6 L469.0,321.9 L459.4,314.9 L450.3,307.8 L440.4,307.2 L429.4,312.9 L423.1,319.0 L411.7,324.7 L403.5,337.4 L395.3,350.4 L386.8,363.4 L389.4,377.9Z"/>
+    <!-- Scandinavia -->
+    <path d="M481.1,235.4 L485.4,229.9 L492.9,224.4 L500.0,219.0 L506.4,208.2 L511.9,197.7 L516.4,187.6 L520.0,177.8 L524.9,177.5 L529.9,177.2 L539.0,181.3 L548.6,185.2 L549.1,175.3 L542.3,171.3 L535.4,172.0 L528.4,172.6 L521.4,173.0 L515.0,178.0 L510.5,182.9 L505.7,192.8 L500.0,203.0 L493.3,213.5 L485.8,224.3 L481.1,235.4Z"/>
+    <!-- UK -->
+    <path d="M430.1,286.9 L436.1,281.0 L441.8,275.2 L447.4,269.4 L451.8,269.7 L457.1,263.9 L458.2,257.8 L455.2,251.7 L452.4,245.5 L449.9,239.5 L446.2,239.2 L440.8,244.6 L435.3,250.0 L437.6,256.3 L436.1,262.3 L428.7,274.0 L430.1,286.9Z"/>
+    <!-- Ireland -->
+    <path d="M411.6,272.1 L417.7,266.5 L423.7,261.0 L429.6,255.5 L425.6,255.1 L419.6,260.5 L413.6,266.0 L411.6,272.1Z"/>
+    <!-- Africa -->
+    <path d="M315.8,521.5 L317.7,507.0 L320.8,485.3 L330.5,464.6 L340.5,444.0 L356.5,424.3 L378.2,405.3 L392.4,392.6 L411.0,387.3 L429.4,381.7 L441.0,382.5 L459.1,376.3 L470.8,376.8 L488.3,377.1 L500.0,377.2 L505.9,384.2 L518.0,391.1 L530.7,405.1 L549.6,411.5 L562.5,418.0 L575.6,424.3 L596.0,437.2 L610.4,450.5 L624.9,463.6 L639.6,476.5 L654.2,489.3 L670.6,516.4 L686.5,543.1 L701.6,569.5 L715.8,595.3 L728.7,613.6 L740.9,624.5 L746.5,636.7 L739.6,658.3 L725.3,687.2 L709.9,715.0 L693.7,741.4 L676.8,766.5 L660.9,784.8 L644.9,802.0 L630.3,813.5 L616.0,824.3 L601.8,834.6 L590.1,835.7 L578.3,836.7 L567.2,833.2 L556.3,824.9 L544.8,816.0 L532.6,806.7 L526.8,791.4 L520.7,769.8 L514.1,746.8 L507.2,722.5 L500.0,697.2 L485.4,670.7 L470.7,643.3 L456.2,622.0 L441.8,607.3 L427.5,599.4 L413.3,591.4 L399.6,575.9 L386.4,560.2 L373.5,544.3 L360.6,535.5 L347.3,533.8 L334.2,531.9 L321.4,529.8 L315.8,521.5Z"/>
+    <!-- NorthAmerica -->
+    <path d="M122.1,316.7 L126.2,309.0 L131.2,301.5 L137.2,294.0 L129.4,310.3 L122.5,327.0 L129.2,314.7 L144.0,295.1 L161.0,276.1 L180.0,257.8 L190.9,250.8 L202.5,243.8 L214.6,236.8 L227.3,230.0 L219.5,243.6 L212.7,257.8 L235.9,239.6 L260.3,222.1 L274.5,215.0 L298.3,197.5 L305.3,185.1 L312.5,172.4 L321.4,160.5 L331.8,149.6 L343.3,138.8 L356.4,129.1 L370.7,120.8 L386.0,113.7 L388.2,110.4 L404.5,105.2 L399.7,100.8 L400.6,96.1 L407.7,91.5 L421.3,87.5Z"/>
+    <!-- SouthAmerica -->
+    <path d="M86.4,431.5 L84.3,450.0 L83.3,468.7 L84.1,489.9 L87.4,497.4 L94.0,500.2 L101.5,516.8 L111.1,533.1 L122.7,549.2 L129.2,560.5 L136.3,571.8 L144.0,589.8 L152.7,607.7 L163.5,638.5 L176.3,668.6 L190.7,697.5 L206.7,725.3 L214.9,748.3 L210.8,756.0 L207.8,763.4 L198.5,766.9 L197.9,773.7 L192.6,776.6 L189.6,779.3 L193.1,785.4 L114.4,666.4 L90.2,591.9 L82.6,546.2 L81.0,472.5 L84.1,445.1 L86.4,431.5Z"/>
+    <!-- Asia -->
+    <path d="M606.8,336.2 L613.2,321.6 L623.3,306.5 L631.9,291.6 L643.1,276.0 L652.0,260.5 L658.7,245.4 L666.1,229.6 L670.5,214.2 L672.0,199.4 L670.8,185.2 L666.9,171.9 L660.5,159.4 L652.0,148.0 L641.5,137.7 L629.3,128.5 L629.8,124.6 L643.1,124.8 L654.9,124.7 L677.8,129.0 L697.3,133.6 L718.3,141.9 L728.3,147.5 L917.7,458.7 L915.7,450.0 L909.8,427.7 L901.5,405.6 L890.8,383.8 L883.5,375.3 L875.3,366.8 L872.3,371.2 L874.3,388.9 L875.4,406.7 L875.4,424.8 L874.3,442.9 L872.3,461.2 L862.9,451.7 L848.5,428.4 L832.3,405.1 L814.5,381.9 L798.0,374.0 L780.7,365.9 L770.3,385.9 L762.2,404.4 L743.4,395.1 L719.3,386.9 L699.7,376.9 L675.4,353.0 L651.0,343.5 L631.9,332.7 L606.8,336.2Z"/>
+    <!-- India -->
+    <path d="M814.5,381.9 L826.9,391.5 L838.8,401.1 L850.0,410.5 L864.9,433.6 L877.8,456.7 L888.7,479.9 L890.8,493.7 L885.6,498.4 L877.9,489.0 L866.3,465.6 L852.7,442.2 L837.2,418.7 L820.1,395.4 L814.5,381.9Z"/>
+    <!-- Arabia -->
+    <path d="M653.7,415.4 L662.6,428.7 L680.1,455.3 L697.3,481.9 L713.9,508.3 L727.9,520.1 L739.5,517.3 L748.6,500.0 L756.8,482.7 L760.6,451.1 L766.5,433.9 L771.5,416.7 L762.2,404.4 L743.4,395.1 L719.3,386.9 L699.7,376.9 L680.1,366.6 L663.5,384.5 L653.7,415.4Z"/>
+    <!-- Greenland -->
+    <path d="M309.7,188.6 L325.9,183.2 L343.9,178.6 L372.7,165.7 L400.6,153.2 L424.5,140.3 L447.5,128.7 L455.2,122.0 L464.5,116.3 L450.4,119.8 L435.6,123.0 L407.9,131.7 L379.7,141.3 L352.2,152.5 L329.3,168.9 L309.7,188.6Z"/>
+    <!-- Madagascar -->
+    <path d="M729.7,698.5 L737.3,720.5 L743.0,741.4 L741.5,762.5 L732.4,774.8 L723.7,772.1 L717.8,758.3 L723.4,735.2 L727.9,711.0 L729.7,698.5Z"/>
+    <!-- Iceland -->
+    <path d="M397.0,197.5 L405.9,193.8 L419.8,191.0 L425.0,197.3 L425.1,202.8 L416.4,207.0 L404.7,204.8 L397.0,197.5Z"/>
+    <!-- SriLanka -->
+    <path d="M888.7,479.9 L893.3,491.4 L896.5,496.0 L894.9,505.3 L891.7,500.7 L888.7,479.9Z"/>
+  </g>
+
+  <!-- ===== DATA NETWORK ON GLOBE (like original triangulated mesh) ===== -->
+  <!-- Network lines first -->
+  <g clip-path="url(#gc)" stroke="#39ff14" stroke-width="0.6" opacity="0.15">
+    <line x1="477" y1="275" x2="454" y2="279"/>
+    <line x1="454" y1="279" x2="463" y2="296"/>
+    <line x1="477" y1="275" x2="463" y2="296"/>
+    <line x1="477" y1="275" x2="515" y2="274"/>
+    <line x1="515" y1="274" x2="609" y2="245"/>
+    <line x1="515" y1="274" x2="463" y2="296"/>
+    <line x1="609" y1="245" x2="632" y2="419"/>
+    <line x1="632" y1="419" x2="770" y2="423"/>
+    <line x1="770" y1="423" x2="853" y2="433"/>
+    <line x1="770" y1="423" x2="809" y2="216"/>
+    <line x1="632" y1="419" x2="689" y2="637"/>
+    <line x1="452" y1="597" x2="689" y2="637"/>
+    <line x1="452" y1="597" x2="616" y2="797"/>
+    <line x1="689" y1="637" x2="616" y2="797"/>
+    <line x1="183" y1="254" x2="454" y2="279"/>
+    <line x1="183" y1="254" x2="178" y2="730"/>
+    <line x1="477" y1="275" x2="609" y2="245"/>
+    <line x1="853" y1="433" x2="809" y2="216"/>
+    <line x1="632" y1="419" x2="452" y2="597"/>
+    <!-- More triangulation -->
+    <line x1="463" y1="296" x2="632" y2="419"/>
+    <line x1="515" y1="274" x2="809" y2="216"/>
+    <line x1="178" y1="730" x2="452" y2="597"/>
+    <line x1="178" y1="730" x2="616" y2="797"/>
+  </g>
+
+  <!-- Data points (glowing nodes like original) -->
+  <g filter="url(#glow)">
+    <circle cx="477" cy="275" r="5" fill="#39ff14" opacity="0.95"><animate attributeName="opacity" values="0.95;0.4;0.95" dur="2.0s" repeatCount="indefinite"/></circle>
+    <circle cx="454" cy="279" r="4.5" fill="#39ff14" opacity="0.9"><animate attributeName="opacity" values="0.9;0.35;0.9" dur="2.3s" repeatCount="indefinite"/></circle>
+    <circle cx="463" cy="296" r="3.5" fill="#39ff14" opacity="0.85"><animate attributeName="opacity" values="0.85;0.3;0.85" dur="2.6s" repeatCount="indefinite"/></circle>
+    <circle cx="515" cy="274" r="4" fill="#39ff14" opacity="0.9"><animate attributeName="opacity" values="0.9;0.35;0.9" dur="1.8s" repeatCount="indefinite"/></circle>
+    <circle cx="609" cy="245" r="4" fill="#39ff14" opacity="0.85"><animate attributeName="opacity" values="0.85;0.3;0.85" dur="3.0s" repeatCount="indefinite"/></circle>
+    <circle cx="632" cy="419" r="4" fill="#39ff14" opacity="0.85"><animate attributeName="opacity" values="0.85;0.3;0.85" dur="2.1s" repeatCount="indefinite"/></circle>
+    <circle cx="452" cy="597" r="3.5" fill="#39ff14" opacity="0.8"><animate attributeName="opacity" values="0.8;0.3;0.8" dur="2.7s" repeatCount="indefinite"/></circle>
+    <circle cx="689" cy="637" r="3.5" fill="#39ff14" opacity="0.8"><animate attributeName="opacity" values="0.8;0.25;0.8" dur="3.2s" repeatCount="indefinite"/></circle>
+    <circle cx="183" cy="254" r="5" fill="#39ff14" opacity="0.95"><animate attributeName="opacity" values="0.95;0.4;0.95" dur="1.5s" repeatCount="indefinite"/></circle>
+    <circle cx="178" cy="730" r="3.5" fill="#39ff14" opacity="0.8"><animate attributeName="opacity" values="0.8;0.25;0.8" dur="2.9s" repeatCount="indefinite"/></circle>
+    <circle cx="853" cy="433" r="3.5" fill="#39ff14" opacity="0.85"><animate attributeName="opacity" values="0.85;0.3;0.85" dur="3.1s" repeatCount="indefinite"/></circle>
+    <circle cx="770" cy="423" r="3.5" fill="#39ff14" opacity="0.85"><animate attributeName="opacity" values="0.85;0.25;0.85" dur="2.5s" repeatCount="indefinite"/></circle>
+    <circle cx="809" cy="216" r="4.5" fill="#39ff14" opacity="0.9"><animate attributeName="opacity" values="0.9;0.35;0.9" dur="1.7s" repeatCount="indefinite"/></circle>
+    <circle cx="616" cy="797" r="3.5" fill="#39ff14" opacity="0.75"><animate attributeName="opacity" values="0.75;0.2;0.75" dur="2.4s" repeatCount="indefinite"/></circle>
+  </g>
+
+  <!-- ===== ORBIT RING (like original - one prominent ring) ===== -->
+  <g transform="translate(500,500) rotate(-8)">
+    <ellipse rx="440" ry="110" fill="none" stroke="#39ff14" stroke-width="1.2" opacity="0.18" filter="url(#gs)"/>
+    <!-- Flying binary on orbit -->
+    <text font-family="'Courier New',monospace" font-size="20" fill="#39ff14" filter="url(#gs)" font-weight="bold"><animateMotion dur="12s" repeatCount="indefinite" path="M440,0 A440,110 0 1 1 -440,0 A440,110 0 1 1 440,0"/>1</text>
+    <text font-family="'Courier New',monospace" font-size="16" fill="#39ff14" filter="url(#gs)" opacity="0.8"><animateMotion dur="12s" repeatCount="indefinite" begin="-1.5s" path="M440,0 A440,110 0 1 1 -440,0 A440,110 0 1 1 440,0"/>0</text>
+    <text font-family="'Courier New',monospace" font-size="13" fill="#39ff14" filter="url(#gs)" opacity="0.6"><animateMotion dur="12s" repeatCount="indefinite" begin="-3s" path="M440,0 A440,110 0 1 1 -440,0 A440,110 0 1 1 440,0"/>1</text>
+    <text font-family="'Courier New',monospace" font-size="18" fill="#39ff14" filter="url(#gs)" opacity="0.85"><animateMotion dur="12s" repeatCount="indefinite" begin="-4.5s" path="M440,0 A440,110 0 1 1 -440,0 A440,110 0 1 1 440,0"/>0</text>
+    <text font-family="'Courier New',monospace" font-size="14" fill="#39ff14" filter="url(#gs)" opacity="0.65"><animateMotion dur="12s" repeatCount="indefinite" begin="-6s" path="M440,0 A440,110 0 1 1 -440,0 A440,110 0 1 1 440,0"/>1</text>
+    <text font-family="'Courier New',monospace" font-size="17" fill="#39ff14" filter="url(#gs)" opacity="0.75"><animateMotion dur="12s" repeatCount="indefinite" begin="-7.5s" path="M440,0 A440,110 0 1 1 -440,0 A440,110 0 1 1 440,0"/>0</text>
+    <text font-family="'Courier New',monospace" font-size="12" fill="#39ff14" filter="url(#gs)" opacity="0.5"><animateMotion dur="12s" repeatCount="indefinite" begin="-9s" path="M440,0 A440,110 0 1 1 -440,0 A440,110 0 1 1 440,0"/>1</text>
+    <text font-family="'Courier New',monospace" font-size="15" fill="#39ff14" filter="url(#gs)" opacity="0.7"><animateMotion dur="12s" repeatCount="indefinite" begin="-10.5s" path="M440,0 A440,110 0 1 1 -440,0 A440,110 0 1 1 440,0"/>0</text>
+  </g>
+
+  <!-- Second orbit (subtler, reverse) -->
+  <g transform="translate(500,500) rotate(35)">
+    <ellipse rx="420" ry="150" fill="none" stroke="#39ff14" stroke-width="0.5" opacity="0.08"/>
+    <text font-family="'Courier New',monospace" font-size="14" fill="#39ff14" filter="url(#gs)" opacity="0.5"><animateMotion dur="15s" repeatCount="indefinite" path="M420,0 A420,150 0 1 0 -420,0 A420,150 0 1 0 420,0"/>0</text>
+    <text font-family="'Courier New',monospace" font-size="17" fill="#39ff14" filter="url(#gs)" opacity="0.65"><animateMotion dur="15s" repeatCount="indefinite" begin="-5s" path="M420,0 A420,150 0 1 0 -420,0 A420,150 0 1 0 420,0"/>1</text>
+    <text font-family="'Courier New',monospace" font-size="12" fill="#39ff14" filter="url(#gs)" opacity="0.4"><animateMotion dur="15s" repeatCount="indefinite" begin="-10s" path="M420,0 A420,150 0 1 0 -420,0 A420,150 0 1 0 420,0"/>0</text>
+  </g>
+</svg>
