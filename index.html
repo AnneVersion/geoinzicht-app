@@ -119,7 +119,7 @@ select option{background:var(--bg);color:var(--tx)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* Info panel */
-.info-panel{position:absolute;top:12px;right:12px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border:1px solid var(--glass-bd);border-radius:var(--radius);padding:16px;z-index:500;min-width:250px;max-width:340px;display:none;box-shadow:var(--shadow);animation:slideIn .3s cubic-bezier(.4,0,.2,1)}
+.info-panel{position:absolute;top:12px;right:12px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border:1px solid var(--glass-bd);border-radius:var(--radius);padding:16px;z-index:500;min-width:280px;max-width:380px;max-height:calc(100vh - 40px);overflow-y:auto;display:none;box-shadow:var(--shadow);animation:slideIn .3s cubic-bezier(.4,0,.2,1)}
 @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 .info-panel.show{display:block}
 .info-panel h3{font:700 14px 'Space Mono',monospace;color:var(--ac);margin-bottom:10px;display:flex;align-items:center;gap:6px}
@@ -127,6 +127,13 @@ select option{background:var(--bg);color:var(--tx)}
 .info-row:hover{background:rgba(255,255,255,.02);padding-left:4px}
 .info-row:last-child{border:none}
 .info-val{font:700 12px 'Space Mono',monospace;color:var(--ai)}
+.info-compare{font-size:10px;color:var(--mt);margin-top:2px;display:flex;align-items:center;gap:4px}
+.info-compare .up{color:var(--up)}
+.info-compare .dn{color:var(--dn)}
+.info-bar{height:4px;background:rgba(45,58,77,.5);border-radius:2px;margin-top:3px;position:relative;overflow:visible}
+.info-bar-fill{height:100%;border-radius:2px;transition:width .3s}
+.info-bar-marker{position:absolute;top:-3px;width:2px;height:10px;background:var(--ac);border-radius:1px;transform:translateX(-1px)}
+.info-dist{font:400 9px 'Space Mono',monospace;color:var(--mt);padding:2px 5px;border-radius:3px;background:rgba(45,58,77,.3);display:inline-block;margin-top:2px}
 
 /* Sidebar toggle */
 .sidebar-toggle{position:absolute;top:12px;left:12px;z-index:600;background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--glass-bd);border-radius:10px;width:40px;height:40px;display:none;place-items:center;cursor:pointer;color:var(--ac);font-size:20px;transition:all .3s;box-shadow:var(--shadow)}
@@ -167,15 +174,7 @@ select option{background:var(--bg);color:var(--tx)}
 .ind-item .ind-badge{font:700 8px 'Space Mono',monospace;padding:2px 5px;border-radius:4px;background:rgba(57,255,20,.15);color:var(--ac);display:none;letter-spacing:.5px;flex-shrink:0}
 .ind-item.primary .ind-badge{display:block}
 
-/* Active stats per indicator */
-.ind-stats-card{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--glass-bd);border-radius:10px;padding:12px;margin-top:8px;animation:fadeIn .3s ease}
-.ind-stats-header{display:flex;align-items:center;gap:6px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--glass-bd)}
-.ind-stats-header .mi{font-size:15px;color:var(--ac)}
-.ind-stats-header span{font:600 11px 'DM Sans',sans-serif;color:var(--tx)}
-.ind-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.ind-stat-cell{text-align:center;padding:6px 4px;background:rgba(10,15,26,.3);border-radius:6px;border:1px solid rgba(55,65,90,.2)}
-.ind-stat-cell b{display:block;font:700 13px 'Space Mono',monospace;color:var(--ai)}
-.ind-stat-cell small{font-size:9px;color:var(--mt);letter-spacing:.3px}
+/* (stats zijn nu in de tooltip i.p.v. sidebar) */
 
 /* Leaflet overrides */
 .leaflet-control-zoom a{background:var(--glass) !important;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:var(--tx) !important;border-color:var(--glass-bd) !important;transition:all .2s !important}
@@ -254,8 +253,6 @@ select option{background:var(--bg);color:var(--tx)}
         <div class="stat"><b id="sBuurten">0</b><small>Gebieden</small></div>
         <div class="stat"><b id="sGemeenten">0</b><small>Gemeenten</small></div>
       </div>
-
-      <div id="activeStatsContainer"></div>
     </div>
 
     <!-- INFO TAB -->
@@ -466,6 +463,7 @@ var _pandWmsLayer = null;
 var _searchMarker = null;
 var _gemeenteNamen = new Set();
 var _layerState = {gemeenten: true, buurten: false, wijken: false, bag: false, panden: false};
+var _nationalStats = {}; // Cache: {key: {min, max, avg, median, stddev, count, skewness, distType}}
 
 // ============================================================
 // MAP
@@ -567,36 +565,14 @@ function renderChoropleth(type){
       layer.on('mouseover', function(e){
         e.target.setStyle({weight:2.5,color:'#39ff14',fillOpacity:0.9});
         e.target.bringToFront();
-        var p = e.target.feature.properties;
-        document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">place</span> '+(p[cfg.nameField] || p[cfg.codeField] || '-');
-        var html = '';
-        if(type !== 'gemeenten') html += '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
-        _activeIndicators.forEach(function(k){
-          var fm = getIndicator(k);
-          var v = p[k];
-          if(v !== undefined && v !== null)
-            html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">'+fm.icon+'</span> '+fm.naam+'</span><span class="info-val">'+formatVal(v)+' <span style="color:var(--mt);font-weight:400">'+fm.eenheid+'</span></span></div>';
-        });
-        document.getElementById('infoContent').innerHTML = html;
-        document.getElementById('infoPanel').classList.add('show');
+        showFeatureInfo(e.target.feature.properties, cfg, type, false);
       });
       layer.on('mouseout', function(e){
         newLayer.resetStyle(e.target);
         document.getElementById('infoPanel').classList.remove('show');
       });
       layer.on('click', function(){
-        var p = feature.properties;
-        document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">place</span> '+(p[cfg.nameField] || p[cfg.codeField] || '-');
-        var html = '<div class="info-row"><span>Code</span><span class="info-val">'+(p[cfg.codeField]||'-')+'</span></div>';
-        if(type !== 'gemeenten') html += '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
-        _activeIndicators.forEach(function(k){
-          var fm = getIndicator(k);
-          var v = p[k];
-          if(v !== undefined && v !== null && v >= 0)
-            html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">'+fm.icon+'</span> '+fm.naam+'</span><span class="info-val">'+formatVal(v)+' <span style="color:var(--mt);font-weight:400">'+fm.eenheid+'</span></span></div>';
-        });
-        document.getElementById('infoContent').innerHTML = html;
-        document.getElementById('infoPanel').classList.add('show');
+        showFeatureInfo(feature.properties, cfg, type, true);
       });
     }
   }).addTo(_map);
@@ -832,6 +808,25 @@ function selectSearchResult(id, label){
 }
 
 // ============================================================
+// FEATURE INFO PANEL (hover + click)
+// ============================================================
+function showFeatureInfo(p, cfg, type, isClick){
+  var name = p[cfg.nameField] || p[cfg.codeField] || '-';
+  document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">place</span> '+name;
+  var html = '';
+  if(isClick) html += '<div class="info-row"><span>Code</span><span class="info-val">'+(p[cfg.codeField]||'-')+'</span></div>';
+  if(type !== 'gemeenten') html += '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
+  html += '<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--glass-bd)">';
+  _activeIndicators.forEach(function(k){
+    var v = p[k];
+    if(v !== undefined && v !== null) html += buildCompareHtml(k, v);
+  });
+  html += '</div>';
+  document.getElementById('infoContent').innerHTML = html;
+  document.getElementById('infoPanel').classList.add('show');
+}
+
+// ============================================================
 // HELPERS
 // ============================================================
 function quantileBreaks(sorted, n){
@@ -925,53 +920,88 @@ function getActiveData(){
   return _gemeenteData || _buurtData;
 }
 
-function computeStats(key){
+// Bereken landelijke stats per indicator voor de actieve data
+function computeNationalStats(){
   var data = getActiveData();
-  if(!data) return null;
-  var gemFilter = document.getElementById('gemeenteFilter').value;
-  var vals = [];
-  data.features.forEach(function(f){
-    var p = f.properties;
-    if(gemFilter !== 'all' && p.gemeentenaam !== gemFilter) return;
-    var v = p[key];
-    if(v !== undefined && v !== null && v >= 0) vals.push(v);
+  if(!data){_nationalStats={};return}
+  _nationalStats = {};
+  INDICATORS.forEach(function(fm){
+    var vals = [];
+    data.features.forEach(function(f){
+      var v = f.properties[fm.key];
+      if(v !== undefined && v !== null && v >= 0) vals.push(v);
+    });
+    if(!vals.length) return;
+    vals.sort(function(a,b){return a-b});
+    var n = vals.length;
+    var sum = vals.reduce(function(a,b){return a+b},0);
+    var mean = sum / n;
+    var median = vals[Math.floor(n/2)];
+    var variance = vals.reduce(function(a,b){return a+(b-mean)*(b-mean)},0)/n;
+    var stddev = Math.sqrt(variance);
+    // Skewness (Pearson)
+    var skewSum = vals.reduce(function(a,b){var d=(b-mean)/stddev;return a+d*d*d},0);
+    var skewness = stddev > 0 ? skewSum/n : 0;
+    var distType = 'normaal';
+    if(Math.abs(skewness) < 0.5) distType = 'normaal';
+    else if(skewness > 0) distType = 'rechts scheef';
+    else distType = 'links scheef';
+    // Percentilen voor bar
+    var p10 = vals[Math.floor(n*0.1)], p90 = vals[Math.floor(n*0.9)];
+    _nationalStats[fm.key] = {min:vals[0],max:vals[n-1],avg:mean,median:median,stddev:stddev,count:n,skewness:skewness,distType:distType,p10:p10,p90:p90};
   });
-  if(!vals.length) return null;
-  vals.sort(function(a,b){return a-b});
-  var sum = vals.reduce(function(a,b){return a+b},0);
-  var mean = sum / vals.length;
-  var median = vals[Math.floor(vals.length/2)];
-  var variance = vals.reduce(function(a,b){return a + (b-mean)*(b-mean)},0) / vals.length;
-  var stddev = Math.sqrt(variance);
-  return {min:vals[0], max:vals[vals.length-1], avg:mean, median:median, stddev:stddev, count:vals.length};
+}
+
+// Bouw vergelijking HTML voor een indicator waarde vs landelijk
+function buildCompareHtml(key, val){
+  var ns = _nationalStats[key];
+  if(!ns || val === undefined || val === null || val < 0) return '';
+  var fm = getIndicator(key);
+  var pctDiff = ns.avg > 0 ? ((val - ns.avg) / ns.avg * 100) : 0;
+  var zScore = ns.stddev > 0 ? ((val - ns.avg) / ns.stddev) : 0;
+  var pctSign = pctDiff >= 0 ? '+' : '';
+  var diffClass = pctDiff >= 0 ? 'up' : 'dn';
+  // Positie op de balk (0-100%)
+  var range = ns.max - ns.min;
+  var pos = range > 0 ? Math.min(100, Math.max(0, (val - ns.min) / range * 100)) : 50;
+  var avgPos = range > 0 ? Math.min(100, Math.max(0, (ns.avg - ns.min) / range * 100)) : 50;
+
+  var html = '<div style="margin-bottom:8px">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:baseline">';
+  html += '<span style="font-size:11px;display:flex;align-items:center;gap:3px"><span class="mi" style="font-size:14px;color:var(--ai)">'+fm.icon+'</span> '+fm.naam+'</span>';
+  html += '<span style="font:700 13px \'Space Mono\',monospace;color:var(--ai)">'+formatVal(val)+' <span style="color:var(--mt);font-weight:400;font-size:9px">'+fm.eenheid+'</span></span>';
+  html += '</div>';
+  // Vergelijking
+  html += '<div class="info-compare">';
+  html += '<span class="'+diffClass+'">'+pctSign+pctDiff.toFixed(1)+'%</span> t.o.v. landelijk';
+  html += ' <span style="color:var(--mt)">\u00b7</span> ';
+  html += '<span style="color:var(--mt)">z='+zScore.toFixed(1)+'</span>';
+  html += '</div>';
+  // Mini bar
+  html += '<div class="info-bar">';
+  html += '<div class="info-bar-fill" style="width:'+pos+'%;background:'+getBarColor(zScore)+'"></div>';
+  html += '<div class="info-bar-marker" style="left:'+avgPos+'%" title="Landelijk gem: '+formatVal(ns.avg)+'"></div>';
+  html += '</div>';
+  // Stats regel
+  html += '<div style="display:flex;justify-content:space-between;margin-top:2px">';
+  html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt)">'+formatVal(ns.min)+'</span>';
+  html += '<span class="info-dist">\u03c3='+formatVal(ns.stddev)+' \u00b7 '+ns.distType+'</span>';
+  html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt)">'+formatVal(ns.max)+'</span>';
+  html += '</div>';
+  html += '</div>';
+  return html;
+}
+
+function getBarColor(z){
+  if(z > 1.5) return 'var(--up)';
+  if(z > 0.5) return 'var(--ac2)';
+  if(z > -0.5) return 'var(--ai)';
+  if(z > -1.5) return 'var(--wn)';
+  return 'var(--dn)';
 }
 
 function updateActiveStats(){
-  var container = document.getElementById('activeStatsContainer');
-  if(!getActiveData() || !_activeIndicators.length){container.innerHTML='';return}
-  var html = '';
-  _activeIndicators.forEach(function(key, i){
-    var fm = getIndicator(key);
-    var stats = computeStats(key);
-    if(!stats) return;
-    var isPrimary = i === 0;
-    html += '<div class="ind-stats-card" style="'+(isPrimary?'border-color:rgba(57,255,20,.3)':'')+'">';
-    html += '<div class="ind-stats-header">';
-    html += '<span class="mi">'+fm.icon+'</span>';
-    html += '<span>'+fm.naam+' <span style="color:var(--mt);font-weight:400">('+fm.eenheid+')</span></span>';
-    if(isPrimary) html += '<span style="margin-left:auto;font:700 8px \'Space Mono\',monospace;color:var(--ac);background:rgba(57,255,20,.12);padding:2px 6px;border-radius:4px">KAART</span>';
-    else html += '<span style="margin-left:auto;cursor:pointer;font:600 9px \'DM Sans\',sans-serif;color:var(--ai);opacity:.7" onclick="event.stopPropagation();setPrimaryIndicator(\''+key+'\')" title="Maak primair (kaartkleur)">&#9650; primair</span>';
-    html += '</div>';
-    html += '<div class="ind-stats-grid">';
-    html += '<div class="ind-stat-cell"><b>'+formatVal(stats.min)+'</b><small>Min</small></div>';
-    html += '<div class="ind-stat-cell"><b>'+formatVal(stats.max)+'</b><small>Max</small></div>';
-    html += '<div class="ind-stat-cell"><b>'+formatVal(stats.avg)+'</b><small>Gem.</small></div>';
-    html += '<div class="ind-stat-cell"><b>'+formatVal(stats.median)+'</b><small>Mediaan</small></div>';
-    html += '<div class="ind-stat-cell"><b>'+formatVal(stats.stddev)+'</b><small>Std Dev</small></div>';
-    html += '<div class="ind-stat-cell"><b>'+stats.count.toLocaleString('nl-NL')+'</b><small>N</small></div>';
-    html += '</div></div>';
-  });
-  container.innerHTML = html;
+  computeNationalStats();
 }
 
 function updateMap(){
