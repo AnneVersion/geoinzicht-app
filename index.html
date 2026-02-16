@@ -147,6 +147,35 @@ select option{background:var(--bg);color:var(--tx)}
 }
 @media(max-width:600px){.sidebar{width:100%}.stat-row{flex-wrap:wrap}.stat{min-width:calc(50% - 5px)}}
 
+/* Indicator list */
+.indicator-list{display:flex;flex-direction:column;gap:3px;max-height:320px;overflow-y:auto;padding-right:4px}
+.indicator-list::-webkit-scrollbar{width:3px}
+.indicator-list::-webkit-scrollbar-thumb{background:var(--glass-bd);border-radius:3px}
+.ind-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;cursor:pointer;transition:all .2s ease;border:1px solid transparent;font-size:12px;user-select:none;-webkit-user-select:none}
+.ind-item:hover{background:rgba(255,255,255,.03);border-color:var(--glass-bd)}
+.ind-item.active{background:rgba(57,255,20,.06);border-color:rgba(57,255,20,.2)}
+.ind-item.primary{background:rgba(57,255,20,.1);border-color:rgba(57,255,20,.4);box-shadow:0 0 12px rgba(57,255,20,.08)}
+.ind-item .ind-icon{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;background:var(--glass);border:1px solid var(--glass-bd);flex-shrink:0;transition:all .2s}
+.ind-item.active .ind-icon{background:rgba(57,255,20,.1);border-color:rgba(57,255,20,.3);color:var(--ac)}
+.ind-item.primary .ind-icon{background:rgba(57,255,20,.2);border-color:rgba(57,255,20,.5);color:var(--ac)}
+.ind-item .ind-icon .mi{font-size:15px;color:var(--mt);transition:color .2s}
+.ind-item.active .ind-icon .mi,.ind-item.primary .ind-icon .mi{color:var(--ac)}
+.ind-item .ind-name{font-weight:500;color:var(--mt);transition:color .2s;flex:1}
+.ind-item.active .ind-name,.ind-item.primary .ind-name{color:var(--tx)}
+.ind-item .ind-unit{font:400 9px 'Space Mono',monospace;color:var(--mt);opacity:.6}
+.ind-item .ind-badge{font:700 8px 'Space Mono',monospace;padding:2px 5px;border-radius:4px;background:rgba(57,255,20,.15);color:var(--ac);display:none;letter-spacing:.5px;flex-shrink:0}
+.ind-item.primary .ind-badge{display:block}
+
+/* Active stats per indicator */
+.ind-stats-card{background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--glass-bd);border-radius:10px;padding:12px;margin-top:8px;animation:fadeIn .3s ease}
+.ind-stats-header{display:flex;align-items:center;gap:6px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--glass-bd)}
+.ind-stats-header .mi{font-size:15px;color:var(--ac)}
+.ind-stats-header span{font:600 11px 'DM Sans',sans-serif;color:var(--tx)}
+.ind-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.ind-stat-cell{text-align:center;padding:6px 4px;background:rgba(10,15,26,.3);border-radius:6px;border:1px solid rgba(55,65,90,.2)}
+.ind-stat-cell b{display:block;font:700 13px 'Space Mono',monospace;color:var(--ai)}
+.ind-stat-cell small{font-size:9px;color:var(--mt);letter-spacing:.3px}
+
 /* Leaflet overrides */
 .leaflet-control-zoom a{background:var(--glass) !important;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:var(--tx) !important;border-color:var(--glass-bd) !important;transition:all .2s !important}
 .leaflet-control-zoom a:hover{background:rgba(57,255,20,.15) !important;color:var(--ac) !important}
@@ -204,9 +233,6 @@ select option{background:var(--bg);color:var(--tx)}
         <button class="btn btn-s" data-layer="panden" onclick="toggleLayer('panden')"><span class="mi mi-sm">apartment</span> BAG Panden</button>
       </div>
 
-      <div class="sh"><span class="mi">bar_chart</span> Indicator</div>
-      <select id="indicatorSelect" onchange="updateMap()"></select>
-
       <div class="sh"><span class="mi">filter_alt</span> Filter gemeente</div>
       <select id="gemeenteFilter" onchange="filterGemeente()">
         <option value="all">Alle gemeenten</option>
@@ -215,22 +241,19 @@ select option{background:var(--bg);color:var(--tx)}
       <div class="sh"><span class="mi">palette</span> Basemap</div>
       <div style="display:flex;gap:5px;flex-wrap:wrap" id="basemapBtns"></div>
 
+      <div class="sh"><span class="mi">bar_chart</span> Indicatoren <span style="font:400 9px 'DM Sans',sans-serif;color:var(--mt);text-transform:none;letter-spacing:0">(klik om aan/uit te zetten)</span></div>
+      <div class="indicator-list" id="indicatorList"></div>
+
       <div class="sh"><span class="mi">gradient</span> Legenda</div>
       <div class="legend" id="legend"></div>
 
-      <div class="sh" style="margin-top:18px"><span class="mi">analytics</span> Statistieken</div>
+      <div class="sh" style="margin-top:12px"><span class="mi">analytics</span> Overzicht</div>
       <div class="stat-row">
         <div class="stat"><b id="sBuurten">0</b><small>Buurten</small></div>
         <div class="stat"><b id="sGemeenten">0</b><small>Gemeenten</small></div>
       </div>
-      <div class="stat-row">
-        <div class="stat"><b id="sMin">-</b><small>Minimum</small></div>
-        <div class="stat"><b id="sMax">-</b><small>Maximum</small></div>
-      </div>
-      <div class="stat-row">
-        <div class="stat"><b id="sAvg">-</b><small>Gemiddeld</small></div>
-        <div class="stat"><b id="sMedian">-</b><small>Mediaan</small></div>
-      </div>
+
+      <div id="activeStatsContainer"></div>
     </div>
 
     <!-- INFO TAB -->
@@ -417,15 +440,8 @@ var INDICATORS = [
   {key:'personenautos',         naam:"Personenauto's",          eenheid:'aantal',   icon:'directions_car'}
 ];
 
-var DROPDOWN_KEYS = [
-  'aantal_inwoners','gem_woz_waarde','gem_inkomen_inwoner','koopwoningen',
-  '65plus','bevolkingsdichtheid','gem_aardgas','gem_elektriciteit',
-  'huishoudens','woningvoorraad','arbeidsparticipatie','bedrijfsvestigingen',
-  'afstand_huisarts','afstand_supermarkt'
-];
-
-var INFO_KEYS = ['aantal_inwoners','gem_woz_waarde','gem_inkomen_inwoner',
-  'koopwoningen','bevolkingsdichtheid','gem_aardgas'];
+// Actieve indicatoren (toggle aan/uit), eerste = primair (kaartkleur)
+var _activeIndicators = ['gem_woz_waarde','aantal_inwoners','gem_inkomen_inwoner'];
 
 var REVERSE_KEYS = ['afstand_huisarts','afstand_supermarkt'];
 var COLORS = ['#1a2332','#1e3a5f','#1d6fa5','#22a7d3','#5ec69b','#a3d65c','#f5c842'];
@@ -496,7 +512,7 @@ function renderChoropleth(type){
   if(type === 'buurten' && _buurtLayer){ _map.removeLayer(_buurtLayer); _buurtLayer = null; }
   if(type === 'wijken' && _wijkLayer){ _map.removeLayer(_wijkLayer); _wijkLayer = null; }
 
-  var indicator = document.getElementById('indicatorSelect').value;
+  var indicator = _activeIndicators.length > 0 ? _activeIndicators[0] : 'aantal_inwoners';
   var gemFilter = document.getElementById('gemeenteFilter').value;
 
   var vals = [];
@@ -529,12 +545,14 @@ function renderChoropleth(type){
         e.target.setStyle({weight:2,color:'#39ff14',fillOpacity:0.9});
         e.target.bringToFront();
         var p = e.target.feature.properties;
-        var fm = getIndicator(indicator);
-        var html = '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
-        var v = p[indicator];
-        if(v !== undefined && v !== null)
-          html += '<div class="info-row"><span>'+fm.naam+'</span><span class="info-val">'+formatVal(v)+' '+fm.eenheid+'</span></div>';
         document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">place</span> '+(p[nameField] || p[codeField] || '-');
+        var html = '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
+        _activeIndicators.forEach(function(k){
+          var fm = getIndicator(k);
+          var v = p[k];
+          if(v !== undefined && v !== null)
+            html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">'+fm.icon+'</span> '+fm.naam+'</span><span class="info-val">'+formatVal(v)+' <span style="color:var(--mt);font-weight:400">'+fm.eenheid+'</span></span></div>';
+        });
         document.getElementById('infoContent').innerHTML = html;
         document.getElementById('infoPanel').classList.add('show');
       });
@@ -547,11 +565,11 @@ function renderChoropleth(type){
         document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">place</span> '+(p[nameField] || p[codeField] || '-');
         var html = '<div class="info-row"><span>Code</span><span class="info-val">'+(p[codeField]||'-')+'</span></div>';
         html += '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
-        INFO_KEYS.forEach(function(k){
+        _activeIndicators.forEach(function(k){
           var fm = getIndicator(k);
           var v = p[k];
           if(v !== undefined && v !== null && v >= 0)
-            html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">'+fm.icon+'</span> '+fm.naam+'</span><span class="info-val">'+formatVal(v)+'</span></div>';
+            html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">'+fm.icon+'</span> '+fm.naam+'</span><span class="info-val">'+formatVal(v)+' <span style="color:var(--mt);font-weight:400">'+fm.eenheid+'</span></span></div>';
         });
         document.getElementById('infoContent').innerHTML = html;
         document.getElementById('infoPanel').classList.add('show');
@@ -797,34 +815,111 @@ function updateLegend(breaks, colors){
 }
 
 function updateStats(vals, type){
-  if(!vals.length) return;
-  document.getElementById('sMin').textContent = formatVal(vals[0]);
-  document.getElementById('sMax').textContent = formatVal(vals[vals.length-1]);
-  var sum = vals.reduce(function(a,b){return a+b},0);
-  document.getElementById('sAvg').textContent = formatVal(sum/vals.length);
-  document.getElementById('sMedian').textContent = formatVal(vals[Math.floor(vals.length/2)]);
+  // Stats worden nu per indicator getoond via updateActiveStats()
 }
 
 // ============================================================
 // UI CONTROLS
 // ============================================================
-function buildIndicatorDropdown(){
-  var sel = document.getElementById('indicatorSelect');
+function buildIndicatorList(){
+  var el = document.getElementById('indicatorList');
   var html = '';
-  DROPDOWN_KEYS.forEach(function(k, i){
-    var fm = getIndicator(k);
-    html += '<option value="'+k+'"'+(i===1?' selected':'')+'>'+fm.naam+(fm.eenheid?' ('+fm.eenheid+')':'')+'</option>';
+  INDICATORS.forEach(function(fm){
+    var isActive = _activeIndicators.indexOf(fm.key) >= 0;
+    var isPrimary = _activeIndicators[0] === fm.key;
+    var cls = isPrimary ? 'ind-item primary' : (isActive ? 'ind-item active' : 'ind-item');
+    html += '<div class="'+cls+'" data-ind="'+fm.key+'" onclick="toggleIndicator(\''+fm.key+'\')">';
+    html += '<div class="ind-icon"><span class="mi">'+fm.icon+'</span></div>';
+    html += '<span class="ind-name">'+fm.naam+'</span>';
+    html += '<span class="ind-unit">'+fm.eenheid+'</span>';
+    html += '<span class="ind-badge">KAART</span>';
+    html += '</div>';
   });
-  sel.innerHTML = html;
+  el.innerHTML = html;
+}
+
+function toggleIndicator(key){
+  var idx = _activeIndicators.indexOf(key);
+  if(idx >= 0){
+    // Minimaal 1 indicator actief houden
+    if(_activeIndicators.length <= 1){toast('Minimaal 1 indicator actief');return}
+    _activeIndicators.splice(idx, 1);
+  } else {
+    _activeIndicators.push(key);
+  }
+  buildIndicatorList();
+  updateMap();
+  updateActiveStats();
+}
+
+function setPrimaryIndicator(key){
+  var idx = _activeIndicators.indexOf(key);
+  if(idx < 0) return;
+  _activeIndicators.splice(idx, 1);
+  _activeIndicators.unshift(key);
+  buildIndicatorList();
+  updateMap();
+  updateActiveStats();
+}
+
+function computeStats(key){
+  var data = _buurtData;
+  if(!data) return null;
+  var gemFilter = document.getElementById('gemeenteFilter').value;
+  var vals = [];
+  data.features.forEach(function(f){
+    var p = f.properties;
+    if(gemFilter !== 'all' && p.gemeentenaam !== gemFilter) return;
+    var v = p[key];
+    if(v !== undefined && v !== null && v >= 0) vals.push(v);
+  });
+  if(!vals.length) return null;
+  vals.sort(function(a,b){return a-b});
+  var sum = vals.reduce(function(a,b){return a+b},0);
+  var mean = sum / vals.length;
+  var median = vals[Math.floor(vals.length/2)];
+  var variance = vals.reduce(function(a,b){return a + (b-mean)*(b-mean)},0) / vals.length;
+  var stddev = Math.sqrt(variance);
+  return {min:vals[0], max:vals[vals.length-1], avg:mean, median:median, stddev:stddev, count:vals.length};
+}
+
+function updateActiveStats(){
+  var container = document.getElementById('activeStatsContainer');
+  if(!_buurtData || !_activeIndicators.length){container.innerHTML='';return}
+  var html = '';
+  _activeIndicators.forEach(function(key, i){
+    var fm = getIndicator(key);
+    var stats = computeStats(key);
+    if(!stats) return;
+    var isPrimary = i === 0;
+    html += '<div class="ind-stats-card" style="'+(isPrimary?'border-color:rgba(57,255,20,.3)':'')+'">';
+    html += '<div class="ind-stats-header">';
+    html += '<span class="mi">'+fm.icon+'</span>';
+    html += '<span>'+fm.naam+' <span style="color:var(--mt);font-weight:400">('+fm.eenheid+')</span></span>';
+    if(isPrimary) html += '<span style="margin-left:auto;font:700 8px \'Space Mono\',monospace;color:var(--ac);background:rgba(57,255,20,.12);padding:2px 6px;border-radius:4px">KAART</span>';
+    else html += '<span style="margin-left:auto;cursor:pointer;font:600 9px \'DM Sans\',sans-serif;color:var(--ai);opacity:.7" onclick="event.stopPropagation();setPrimaryIndicator(\''+key+'\')" title="Maak primair (kaartkleur)">&#9650; primair</span>';
+    html += '</div>';
+    html += '<div class="ind-stats-grid">';
+    html += '<div class="ind-stat-cell"><b>'+formatVal(stats.min)+'</b><small>Min</small></div>';
+    html += '<div class="ind-stat-cell"><b>'+formatVal(stats.max)+'</b><small>Max</small></div>';
+    html += '<div class="ind-stat-cell"><b>'+formatVal(stats.avg)+'</b><small>Gem.</small></div>';
+    html += '<div class="ind-stat-cell"><b>'+formatVal(stats.median)+'</b><small>Mediaan</small></div>';
+    html += '<div class="ind-stat-cell"><b>'+formatVal(stats.stddev)+'</b><small>Std Dev</small></div>';
+    html += '<div class="ind-stat-cell"><b>'+stats.count.toLocaleString('nl-NL')+'</b><small>N</small></div>';
+    html += '</div></div>';
+  });
+  container.innerHTML = html;
 }
 
 function updateMap(){
   if(_layerState.buurten && _buurtData) renderChoropleth('buurten');
   if(_layerState.wijken && _wijkData) renderChoropleth('wijken');
+  updateActiveStats();
 }
 
 function filterGemeente(){
   updateMap();
+  updateActiveStats();
   var gem = document.getElementById('gemeenteFilter').value;
   if(gem !== 'all' && _buurtData){
     var bounds = [];
@@ -891,7 +986,7 @@ async function init(){
     loadMsg.textContent = 'Kaart initialiseren...';
     loadBar.style.width = '10%';
     initMap();
-    buildIndicatorDropdown();
+    buildIndicatorList();
     buildBasemapButtons();
     renderIndicatorDefs();
     setupSearch();
@@ -918,6 +1013,7 @@ async function init(){
     loadMsg.textContent = 'Kaart renderen...';
     loadBar.style.width = '90%';
     renderChoropleth('buurten');
+    updateActiveStats();
 
     // Dataset metadata
     var meta = _buurtData.metadata || {};
