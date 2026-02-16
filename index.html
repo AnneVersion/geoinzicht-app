@@ -476,7 +476,7 @@ function initMap(){
   setBasemap('dark');
 
   _map.on('click', function(e){
-    if(_map.getZoom() >= 14){
+    if(_map.getZoom() >= 17){
       if(_pandWmsLayer) pandGetFeatureInfo(e);
       else if(_bagWmsLayer) bagGetFeatureInfo(e);
     }
@@ -668,13 +668,13 @@ function toggleBagLayer(on){
   if(on){
     if(_bagWmsLayer) return;
     _bagWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, {
-      layers:'bag:verblijfsobject',format:'image/png',transparent:true,
-      version:'1.1.1',opacity:0.7,maxZoom:22,tileSize:256,minZoom:14
+      layers:'verblijfsobject',format:'image/png',transparent:true,
+      version:'1.1.1',opacity:0.7,maxZoom:22,tileSize:256,minZoom:17
     }).addTo(_map);
     fixLayerOrder();
-    if(_map.getZoom() < 14){
-      _map.setZoom(14);
-      toast('Ingezoomd naar niveau 14 \u2014 BAG adressen nu zichtbaar');
+    if(_map.getZoom() < 17){
+      _map.setZoom(17);
+      toast('Ingezoomd naar niveau 17 \u2014 BAG adressen nu zichtbaar');
     } else {
       toast('BAG adressen actief');
     }
@@ -689,7 +689,7 @@ function bagGetFeatureInfo(e){
   var pt = _map.latLngToContainerPoint(e.latlng);
   var url = PDOK_BAG_WMS+'?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo'+
     '&FORMAT=image/png&TRANSPARENT=true'+
-    '&QUERY_LAYERS=bag:verblijfsobject&LAYERS=bag:verblijfsobject'+
+    '&QUERY_LAYERS=verblijfsobject&LAYERS=verblijfsobject'+
     '&INFO_FORMAT=application/json&FEATURE_COUNT=1&BUFFER=12'+
     '&X='+Math.round(pt.x)+'&Y='+Math.round(pt.y)+
     '&SRS=EPSG:4326&WIDTH='+size.x+'&HEIGHT='+size.y+'&BBOX='+bbox;
@@ -719,13 +719,13 @@ function togglePandLayer(on){
   if(on){
     if(_pandWmsLayer) return;
     _pandWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, {
-      layers:'bag:pand',format:'image/png',transparent:true,
-      version:'1.1.1',opacity:0.6,maxZoom:22,tileSize:256,minZoom:14
+      layers:'pand',format:'image/png',transparent:true,
+      version:'1.1.1',opacity:0.6,maxZoom:22,tileSize:256,minZoom:17
     }).addTo(_map);
     fixLayerOrder();
-    if(_map.getZoom() < 14){
-      _map.setZoom(14);
-      toast('Ingezoomd naar niveau 14 \u2014 BAG panden nu zichtbaar');
+    if(_map.getZoom() < 17){
+      _map.setZoom(17);
+      toast('Ingezoomd naar niveau 17 \u2014 BAG panden nu zichtbaar');
     } else {
       toast('BAG panden actief');
     }
@@ -740,7 +740,7 @@ function pandGetFeatureInfo(e){
   var pt = _map.latLngToContainerPoint(e.latlng);
   var url = PDOK_BAG_WMS+'?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo'+
     '&FORMAT=image/png&TRANSPARENT=true'+
-    '&QUERY_LAYERS=bag:pand&LAYERS=bag:pand'+
+    '&QUERY_LAYERS=pand&LAYERS=pand'+
     '&INFO_FORMAT=application/json&FEATURE_COUNT=1&BUFFER=12'+
     '&X='+Math.round(pt.x)+'&Y='+Math.round(pt.y)+
     '&SRS=EPSG:4326&WIDTH='+size.x+'&HEIGHT='+size.y+'&BBOX='+bbox;
