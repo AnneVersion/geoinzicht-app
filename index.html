@@ -247,6 +247,11 @@ select option{background:var(--bg);color:var(--tx)}
 /* Leaflet overrides */
 .leaflet-control-zoom a{background:var(--glass) !important;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:var(--tx) !important;border-color:var(--glass-bd) !important;transition:all .2s !important}
 .leaflet-control-zoom a:hover{background:rgba(57,255,20,.15) !important;color:var(--ac) !important}
+
+/* Upload markers */
+.upload-marker{background:transparent !important;border:none !important}
+.upload-tooltip{background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--glass-bd);color:var(--tx);font:500 11px 'DM Sans',sans-serif;padding:4px 8px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.3);white-space:nowrap}
+.upload-tooltip::before{border:none !important}
 </style>
 </head>
 <body>
@@ -288,8 +293,9 @@ select option{background:var(--bg);color:var(--tx)}
 
     <div class="tabs">
       <div class="tab active" data-tab="kaart" onclick="switchTab('kaart')"><span class="mi mi-sm" style="vertical-align:-3px">map</span> Kaart</div>
+      <div class="tab" data-tab="upload" onclick="switchTab('upload')"><span class="mi mi-sm" style="vertical-align:-3px">upload_file</span> Upload</div>
       <div class="tab" data-tab="info" onclick="switchTab('info')"><span class="mi mi-sm" style="vertical-align:-3px">info</span> Info</div>
-      <div class="tab" data-tab="log" id="tabLog" style="display:none" onclick="switchTab('log');renderLogView()"><span class="mi mi-sm" style="vertical-align:-3px">admin_panel_settings</span> Admin</div>
+      <div class="tab" data-tab="log" id="tabLog" style="display:none" onclick="switchTab('log');renderLogView()"><span class="mi mi-sm" style="vertical-align:-3px">admin_panel_settings</span> Log</div>
     </div>
 
     <!-- KAART TAB -->
@@ -593,6 +599,66 @@ select option{background:var(--bg);color:var(--tx)}
             <div style="display:flex;align-items:center;gap:4px;padding:2px 0"><span class="mi mi-sm" style="color:var(--ai)">domain</span> <b style="color:var(--tx)">Kadaster</b> &#8212; BAG verblijfsobjecten &amp; panden</div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- UPLOAD TAB -->
+    <div class="pane" id="p-upload">
+      <div class="sh"><span class="mi">upload_file</span> Eigen Data Uploaden</div>
+      <div class="card">
+        <div style="font-size:11px;color:var(--mt);margin-bottom:10px;line-height:1.6">
+          Upload een <b>CSV</b> of <b>Excel</b> bestand met locatiedata. Vereiste kolommen: <b>lat</b> + <b>lng</b> (of <b>latitude</b>/<b>longitude</b>), of <b>adres</b>/<b>postcode</b>.<br>
+          Extra kolommen worden als popup-info getoond.
+        </div>
+        <div id="uploadDropZone" style="border:2px dashed var(--br);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(57,255,20,.02)"
+             ondragover="event.preventDefault();this.style.borderColor='#39ff14';this.style.background='rgba(57,255,20,.08)'"
+             ondragleave="this.style.borderColor='var(--br)';this.style.background='rgba(57,255,20,.02)'"
+             ondrop="event.preventDefault();this.style.borderColor='var(--br)';this.style.background='rgba(57,255,20,.02)';handleUploadDrop(event)"
+             onclick="document.getElementById('uploadFileInput').click()">
+          <span class="mi" style="font-size:32px;color:var(--ac);display:block;margin-bottom:6px">cloud_upload</span>
+          <div style="font:600 12px 'DM Sans',sans-serif;color:var(--tx)">Sleep bestand hierheen</div>
+          <div style="font-size:10px;color:var(--mt);margin-top:4px">of klik om te selecteren &middot; .csv .xlsx .xls</div>
+        </div>
+        <input type="file" id="uploadFileInput" accept=".csv,.xlsx,.xls,.tsv" style="display:none" onchange="handleUploadFile(this.files[0])">
+      </div>
+
+      <!-- Upload icoon keuze -->
+      <div id="uploadIconSection" style="display:none">
+        <div class="sh"><span class="mi">palette</span> Icoon &amp; Kleur</div>
+        <div class="card">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <label style="font-size:10px;color:var(--mt);width:50px">Icoon:</label>
+            <div id="iconPicker" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <label style="font-size:10px;color:var(--mt);width:50px">Kleur:</label>
+            <div id="colorPicker" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <label style="font-size:10px;color:var(--mt);width:50px">Label:</label>
+            <select id="uploadLabelCol" style="flex:1;background:var(--s2);border:1px solid var(--br);border-radius:6px;padding:4px 8px;color:var(--tx);font-size:10px">
+              <option value="">Geen label</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upload preview -->
+      <div id="uploadPreview" style="display:none">
+        <div class="sh"><span class="mi">table_view</span> Preview <span id="uploadRowCount" style="font-size:10px;color:var(--mt);font-weight:400"></span></div>
+        <div class="card" style="padding:0;overflow-x:auto;max-height:200px">
+          <table id="uploadPreviewTable" style="font-size:9px;width:100%"></table>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="btn btn-p" onclick="addUploadToMap()" style="flex:1;font-size:11px"><span class="mi mi-sm">add_location</span> Toon op kaart</button>
+          <button class="btn btn-s" onclick="clearUploadData()" style="font-size:11px"><span class="mi mi-sm">delete</span> Wissen</button>
+        </div>
+      </div>
+
+      <!-- Actieve uploads -->
+      <div id="uploadActiveSection" style="display:none">
+        <div class="sh"><span class="mi">layers</span> Actieve Uploads</div>
+        <div id="uploadLayerList" class="card" style="font-size:10px"></div>
       </div>
     </div>
 
@@ -998,7 +1064,7 @@ function renderChoropleth(type){
         if(_layerState.bag || _layerState.panden) return;
         e.target.setStyle({weight:2.5,color:'#39ff14',fillOpacity:0.9});
         e.target.bringToFront();
-        showFeatureInfo(e.target.feature.properties, cfg, type, false);
+        showFeatureInfo(e.target.feature.properties, cfg, type, false, e.target.feature);
       });
       layer.on('mouseout', function(e){
         if(_layerState.bag || _layerState.panden) return;
@@ -1010,7 +1076,7 @@ function renderChoropleth(type){
         toggleMapSelection(feature.properties, type, layer, newLayer);
         // Toon info en pin het panel vast
         _infoPinned = true;
-        showFeatureInfo(feature.properties, cfg, type, true);
+        showFeatureInfo(feature.properties, cfg, type, true, feature);
       });
     }
   }).addTo(_map);
@@ -1312,7 +1378,81 @@ function clearBagCache(){
 
 function updateBagCacheUI(){
   var el = document.getElementById('bagCacheText');
-  if(el) el.textContent = 'Cache: '+_bagMemCount.toLocaleString('nl-NL')+' adressen';
+  if(!el) return;
+  var txt = 'Cache: '+_bagMemCount.toLocaleString('nl-NL')+' adressen';
+  // Toon totaal beschikbaar als we dat weten vanuit de index
+  if(_bagIndex && Object.keys(_bagIndex).length > 0){
+    var totalAvail = 0;
+    for(var k in _bagIndex) totalAvail += (_bagIndex[k].count || 0);
+    if(totalAvail > 0){
+      var pct = Math.round(_bagMemCount / totalAvail * 100);
+      txt = 'Cache: '+_bagMemCount.toLocaleString('nl-NL')+'/'+totalAvail.toLocaleString('nl-NL')+' ('+pct+'%)';
+    }
+  }
+  el.textContent = txt;
+}
+
+// ---------------------------------------------------------------------------
+// BAG telling per gebied — snel tellen hoeveel adressen geladen/gecached zijn
+// ---------------------------------------------------------------------------
+function getBagStatsForFeature(feature, type){
+  // Returns {total: number|null, loaded: number, avgBouwjaar: number|null, avgOpp: number|null}
+  var result = {total: null, loaded: 0, avgBouwjaar: null, avgOpp: null};
+  if(!feature || !feature.geometry || _bagMemCount === 0) return result;
+
+  // Voor gemeenten: probeer totaal uit _bagIndex
+  if(type === 'gemeenten' && _bagIndex){
+    var code = feature.properties.gemeentecode || '';
+    if(_bagIndex[code]) result.total = _bagIndex[code].count;
+  }
+
+  // Tel geladen adressen in dit gebied via bbox pre-filter + punt-in-polygoon
+  var geom = feature.geometry;
+  var coords = geom.coordinates;
+  var minLat=90,maxLat=-90,minLng=180,maxLng=-180;
+  function scanC(c){
+    if(typeof c[0]==='number'){ if(c[1]<minLat)minLat=c[1]; if(c[1]>maxLat)maxLat=c[1]; if(c[0]<minLng)minLng=c[0]; if(c[0]>maxLng)maxLng=c[0]; return; }
+    for(var i=0;i<c.length;i++) scanC(c[i]);
+  }
+  scanC(coords);
+
+  // Maak latlngs voor punt-in-polygoon
+  var latlngs = [];
+  try{
+    var tl = L.geoJSON(feature);
+    tl.eachLayer(function(sub){
+      if(sub.getLatLngs){
+        var ll = sub.getLatLngs();
+        latlngs = ll[0] || ll;
+        if(Array.isArray(latlngs[0])) latlngs = latlngs[0];
+      }
+    });
+  }catch(e){ return result; }
+  if(!latlngs.length) return result;
+
+  var count = 0;
+  var bouwjaarSum = 0, bouwjaarN = 0;
+  var oppSum = 0, oppN = 0;
+
+  for(var id in _bagMem){
+    var f = _bagMem[id];
+    var c = f.geometry && f.geometry.coordinates;
+    if(!c) continue;
+    // Bbox pre-filter (snel)
+    if(c[1] < minLat || c[1] > maxLat || c[0] < minLng || c[0] > maxLng) continue;
+    // Punt-in-polygoon
+    if(pointInPolygon(c[1], c[0], latlngs)){
+      count++;
+      var fp = f.properties || {};
+      if(fp.bouwjaar && fp.bouwjaar > 1000){ bouwjaarSum += fp.bouwjaar; bouwjaarN++; }
+      if(fp.oppervlakte && fp.oppervlakte > 0){ oppSum += fp.oppervlakte; oppN++; }
+    }
+  }
+
+  result.loaded = count;
+  result.avgBouwjaar = bouwjaarN > 0 ? Math.round(bouwjaarSum / bouwjaarN) : null;
+  result.avgOpp = oppN > 0 ? Math.round(oppSum / oppN) : null;
+  return result;
 }
 
 // Laad BAG vectordata via WFS — alle adressen in viewport
@@ -2864,7 +3004,7 @@ function selectSearchResult(id, label){
 // ============================================================
 // FEATURE INFO PANEL (hover + click)
 // ============================================================
-function showFeatureInfo(p, cfg, type, isClick){
+function showFeatureInfo(p, cfg, type, isClick, geoFeature){
   // Zorg dat nationalStats altijd berekend is (nodig voor AI interpretatie)
   if(!_nationalStats || Object.keys(_nationalStats).length === 0) computeNationalStats();
 
@@ -2902,6 +3042,39 @@ function showFeatureInfo(p, cfg, type, isClick){
     var ha = Math.round(p.woningvoorraad * p.huurwoningen / 100);
     kernRows.push({icon:'real_estate_agent', label:'Huurwoningen', val:ha.toLocaleString('nl-NL')+' ('+p.huurwoningen+'%)', color:'var(--wn)'});
   }
+
+  // BAG adressen: totaal vs geladen/gecached
+  // Bij klik: volledige telling met punt-in-polygoon
+  // Bij hover: snelle info uit _bagIndex (alleen bij gemeenten)
+  if(geoFeature){
+    var gemCode = p.gemeentecode || '';
+    if(isClick && _bagMemCount > 0){
+      // Klik: volledige BAG telling met punt-in-polygoon
+      var bagStats = getBagStatsForFeature(geoFeature, type);
+      if(bagStats.loaded > 0 || bagStats.total){
+        var bagValParts = [];
+        if(bagStats.total){
+          var bagPct = Math.round(bagStats.loaded / bagStats.total * 100);
+          bagValParts.push(bagStats.loaded.toLocaleString('nl-NL') + '/' + bagStats.total.toLocaleString('nl-NL'));
+          bagValParts.push(bagPct + '%');
+        } else {
+          bagValParts.push(bagStats.loaded.toLocaleString('nl-NL') + ' geladen');
+        }
+        kernRows.push({icon:'location_on', label:'BAG Adressen', val:bagValParts.join(' · '), color:'var(--ai)'});
+        if(bagStats.avgBouwjaar){
+          kernRows.push({icon:'calendar_month', label:'\u00a0\u00a0\u00d8 Bouwjaar', val:String(bagStats.avgBouwjaar), color:'var(--ai)'});
+        }
+        if(bagStats.avgOpp){
+          kernRows.push({icon:'straighten', label:'\u00a0\u00a0\u00d8 Oppervlakte', val:bagStats.avgOpp + ' m\u00b2', color:'var(--ai)'});
+        }
+      }
+    } else if(!isClick && type === 'gemeenten' && _bagIndex && gemCode && _bagIndex[gemCode]){
+      // Hover: alleen totaal uit index (geen scan)
+      var idxInfo = _bagIndex[gemCode];
+      kernRows.push({icon:'location_on', label:'BAG Adressen', val:idxInfo.count.toLocaleString('nl-NL')+' totaal', color:'var(--ai)'});
+    }
+  }
+
   kernRows.forEach(function(r){
     html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
     html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:'+r.color+';vertical-align:-2px">'+r.icon+'</span> '+r.label+'</span>';
@@ -5101,6 +5274,382 @@ async function exportAdminCSV(){
     URL.revokeObjectURL(url);
     toast('Admin CSV geëxporteerd');
   } catch(e){ toast('Export fout: '+e.message); }
+}
+
+// ============================================================
+// GEBRUIKERS DATA UPLOAD (CSV/Excel naar kaart)
+// ============================================================
+var _uploadData = null;      // Geparsede rijen [{lat,lng,...}]
+var _uploadColumns = [];     // Kolomnamen
+var _uploadLayers = [];      // Array van {name, layer, icon, color, count}
+var _uploadSelectedIcon = 'location_on';
+var _uploadSelectedColor = '#e11d48';
+
+var UPLOAD_ICONS = [
+  {id:'location_on', label:'Pin'},
+  {id:'home', label:'Huis'},
+  {id:'store', label:'Winkel'},
+  {id:'business', label:'Bedrijf'},
+  {id:'school', label:'School'},
+  {id:'local_hospital', label:'Ziekenhuis'},
+  {id:'restaurant', label:'Restaurant'},
+  {id:'directions_car', label:'Auto'},
+  {id:'park', label:'Park'},
+  {id:'warning', label:'Waarschuwing'},
+  {id:'star', label:'Ster'},
+  {id:'flag', label:'Vlag'},
+  {id:'person', label:'Persoon'},
+  {id:'bolt', label:'Bliksem'}
+];
+
+var UPLOAD_COLORS = [
+  '#e11d48','#dc2626','#ea580c','#d97706','#65a30d','#16a34a',
+  '#0891b2','#2563eb','#7c3aed','#c026d3','#475569','#0f172a'
+];
+
+function initUploadUI(){
+  // Icoon picker
+  var iconEl = document.getElementById('iconPicker');
+  if(iconEl){
+    iconEl.innerHTML = UPLOAD_ICONS.map(function(ic){
+      var sel = ic.id === _uploadSelectedIcon ? 'border-color:#39ff14;background:rgba(57,255,20,.15)' : '';
+      return '<div onclick="selectUploadIcon(\''+ic.id+'\')" title="'+ic.label+'" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;border:1.5px solid var(--br);cursor:pointer;'+sel+'"><span class="mi" style="font-size:16px;color:'+_uploadSelectedColor+'">'+ic.id+'</span></div>';
+    }).join('');
+  }
+  // Kleur picker
+  var colorEl = document.getElementById('colorPicker');
+  if(colorEl){
+    colorEl.innerHTML = UPLOAD_COLORS.map(function(c){
+      var sel = c === _uploadSelectedColor ? 'border:2px solid #39ff14;transform:scale(1.2)' : 'border:2px solid transparent';
+      return '<div onclick="selectUploadColor(\''+c+'\')" style="width:20px;height:20px;border-radius:50%;background:'+c+';cursor:pointer;'+sel+'" title="'+c+'"></div>';
+    }).join('');
+  }
+}
+
+function selectUploadIcon(id){
+  _uploadSelectedIcon = id;
+  initUploadUI();
+}
+
+function selectUploadColor(c){
+  _uploadSelectedColor = c;
+  initUploadUI();
+}
+
+function handleUploadDrop(e){
+  var files = e.dataTransfer.files;
+  if(files.length > 0) handleUploadFile(files[0]);
+}
+
+function handleUploadFile(file){
+  if(!file) return;
+  var ext = file.name.split('.').pop().toLowerCase();
+
+  if(ext === 'csv' || ext === 'tsv'){
+    var reader = new FileReader();
+    reader.onload = function(e){ parseCSV(e.target.result, file.name, ext === 'tsv' ? '\t' : null); };
+    reader.readAsText(file);
+  } else if(ext === 'xlsx' || ext === 'xls'){
+    // Gebruik SheetJS (XLSX) library — lazy load
+    loadSheetJS(function(){
+      var reader = new FileReader();
+      reader.onload = function(e){
+        try {
+          var wb = XLSX.read(e.target.result, {type:'array'});
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          var csv = XLSX.utils.sheet_to_csv(ws);
+          parseCSV(csv, file.name);
+        } catch(err){
+          toast('Excel leesfout: ' + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  } else {
+    toast('Niet ondersteund formaat. Gebruik .csv, .xlsx of .xls');
+  }
+}
+
+function loadSheetJS(callback){
+  if(typeof XLSX !== 'undefined'){ callback(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
+  s.onload = callback;
+  s.onerror = function(){ toast('Fout bij laden Excel-lezer'); };
+  document.head.appendChild(s);
+}
+
+function parseCSV(text, fileName, separator){
+  var lines = text.trim().split('\n');
+  if(lines.length < 2){ toast('Bestand is leeg of heeft geen data'); return; }
+
+  // Detecteer separator als niet opgegeven
+  if(!separator){
+    var firstLine = lines[0];
+    if(firstLine.split(';').length > firstLine.split(',').length) separator = ';';
+    else if(firstLine.split('\t').length > firstLine.split(',').length) separator = '\t';
+    else separator = ',';
+  }
+
+  // Parse header
+  var headers = parseCSVLine(lines[0], separator);
+  _uploadColumns = headers;
+
+  // Parse rijen
+  var rows = [];
+  for(var i = 1; i < lines.length; i++){
+    if(!lines[i].trim()) continue;
+    var vals = parseCSVLine(lines[i], separator);
+    var row = {};
+    headers.forEach(function(h, j){ row[h] = vals[j] || ''; });
+    rows.push(row);
+  }
+
+  // Detecteer lat/lng kolommen
+  var latCol = findColumn(headers, ['lat','latitude','breedtegraad','y','lat_wgs84']);
+  var lngCol = findColumn(headers, ['lng','lon','longitude','lengtegraad','x','lng_wgs84','long']);
+
+  if(!latCol || !lngCol){
+    toast('Geen lat/lng kolommen gevonden. Voeg "lat" en "lng" kolommen toe.');
+    return;
+  }
+
+  // Parse coördinaten
+  var validRows = [];
+  rows.forEach(function(r){
+    var lat = parseFloat(String(r[latCol]).replace(',','.'));
+    var lng = parseFloat(String(r[lngCol]).replace(',','.'));
+    if(!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180){
+      r._lat = lat;
+      r._lng = lng;
+      validRows.push(r);
+    }
+  });
+
+  if(validRows.length === 0){
+    toast('Geen geldige coördinaten gevonden in bestand');
+    return;
+  }
+
+  _uploadData = validRows;
+
+  // Toon UI
+  document.getElementById('uploadIconSection').style.display = '';
+  document.getElementById('uploadPreview').style.display = '';
+  document.getElementById('uploadRowCount').textContent = validRows.length + ' van ' + rows.length + ' rijen met coördinaten';
+
+  // Label dropdown vullen
+  var labelSel = document.getElementById('uploadLabelCol');
+  labelSel.innerHTML = '<option value="">Geen label</option>';
+  headers.forEach(function(h){
+    if(h === latCol || h === lngCol) return;
+    labelSel.innerHTML += '<option value="'+escapeHtml(h)+'">'+escapeHtml(h)+'</option>';
+  });
+  // Auto-select eerste niet-coord kolom
+  var firstNonCoord = headers.filter(function(h){return h!==latCol && h!==lngCol})[0];
+  if(firstNonCoord) labelSel.value = firstNonCoord;
+
+  // Preview tabel
+  var previewTable = document.getElementById('uploadPreviewTable');
+  var thHtml = '<thead><tr>' + headers.map(function(h){return '<th style="padding:4px 6px;font-size:9px;white-space:nowrap">'+escapeHtml(h)+'</th>'}).join('') + '</tr></thead>';
+  var tbHtml = '<tbody>';
+  validRows.slice(0,10).forEach(function(r){
+    tbHtml += '<tr>' + headers.map(function(h){
+      var v = String(r[h]||'').substring(0,30);
+      return '<td style="padding:3px 6px;font-size:9px;white-space:nowrap">'+escapeHtml(v)+'</td>';
+    }).join('') + '</tr>';
+  });
+  if(validRows.length > 10) tbHtml += '<tr><td colspan="'+headers.length+'" style="padding:4px;text-align:center;color:var(--mt);font-size:9px">... en '+(validRows.length-10)+' meer</td></tr>';
+  tbHtml += '</tbody>';
+  previewTable.innerHTML = thHtml + tbHtml;
+
+  initUploadUI();
+  toast(validRows.length + ' locaties geladen uit ' + fileName);
+  logEvent('upload_csv', fileName + ': ' + validRows.length + ' rijen');
+}
+
+function parseCSVLine(line, sep){
+  // Eenvoudige CSV parser die quoted velden ondersteunt
+  var result = [];
+  var current = '';
+  var inQuotes = false;
+  for(var i = 0; i < line.length; i++){
+    var c = line[i];
+    if(c === '"'){
+      if(inQuotes && i+1 < line.length && line[i+1] === '"'){ current += '"'; i++; }
+      else inQuotes = !inQuotes;
+    } else if(c === sep && !inQuotes){
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += c;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+function findColumn(headers, candidates){
+  for(var i=0;i<candidates.length;i++){
+    for(var j=0;j<headers.length;j++){
+      if(headers[j].toLowerCase().trim() === candidates[i]) return headers[j];
+    }
+  }
+  return null;
+}
+
+function addUploadToMap(){
+  if(!_uploadData || !_uploadData.length){ toast('Geen data om te tonen'); return; }
+
+  var labelCol = document.getElementById('uploadLabelCol').value;
+  var icon = _uploadSelectedIcon;
+  var color = _uploadSelectedColor;
+  var layerName = 'Upload ' + (_uploadLayers.length + 1);
+
+  // Maak markers met custom iconen
+  var markers = L.layerGroup();
+  var bounds = [];
+
+  _uploadData.forEach(function(r){
+    var lat = r._lat, lng = r._lng;
+    bounds.push([lat,lng]);
+
+    // Custom div icon met Material Symbol
+    var markerIcon = L.divIcon({
+      className: 'upload-marker',
+      html: '<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:'+color+';border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.4);border:2px solid #fff"><span class="mi" style="font-size:16px;color:#fff;transform:rotate(45deg);font-variation-settings:\'FILL\' 1">'+icon+'</span></div>',
+      iconSize: [32,32],
+      iconAnchor: [16,32],
+      popupAnchor: [0,-32]
+    });
+
+    var marker = L.marker([lat,lng], {icon:markerIcon});
+
+    // Popup met alle data
+    var popupHtml = '<div style="font-family:DM Sans,sans-serif;font-size:11px;max-width:250px">';
+    if(labelCol && r[labelCol]){
+      popupHtml += '<div style="font:700 13px \'DM Sans\',sans-serif;color:#0f172a;margin-bottom:6px">'+escapeHtml(String(r[labelCol]))+'</div>';
+    }
+    _uploadColumns.forEach(function(col){
+      if(col === '_lat' || col === '_lng') return;
+      var val = r[col];
+      if(val === undefined || val === null || val === '') return;
+      popupHtml += '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;border-bottom:1px solid #f1f5f9">';
+      popupHtml += '<span style="color:#64748b;font-size:10px">'+escapeHtml(col)+'</span>';
+      popupHtml += '<span style="font:500 10px \'Space Mono\',monospace;color:#0f172a;text-align:right">'+escapeHtml(String(val).substring(0,50))+'</span>';
+      popupHtml += '</div>';
+    });
+    popupHtml += '</div>';
+    marker.bindPopup(popupHtml, {maxWidth:300});
+
+    // Tooltip met label
+    if(labelCol && r[labelCol]){
+      marker.bindTooltip(String(r[labelCol]).substring(0,30), {
+        permanent: false,
+        direction: 'top',
+        offset: [0,-34],
+        className: 'upload-tooltip'
+      });
+    }
+
+    markers.addLayer(marker);
+  });
+
+  markers.addTo(_map);
+
+  // Zoom naar data
+  if(bounds.length > 0){
+    try{ _map.fitBounds(bounds, {padding:[40,40], maxZoom:14}); }catch(e){}
+  }
+
+  // Sla layer op
+  var layerInfo = {
+    name: layerName,
+    layer: markers,
+    icon: icon,
+    color: color,
+    count: _uploadData.length,
+    columns: _uploadColumns.slice()
+  };
+  _uploadLayers.push(layerInfo);
+
+  // Update actieve uploads lijst
+  updateUploadLayerList();
+
+  toast(layerInfo.count + ' markers op kaart geplaatst');
+  logEvent('upload_kaart', layerName + ': ' + layerInfo.count + ' markers');
+
+  // Reset upload state
+  _uploadData = null;
+  _uploadColumns = [];
+  document.getElementById('uploadPreview').style.display = 'none';
+  document.getElementById('uploadIconSection').style.display = 'none';
+  document.getElementById('uploadFileInput').value = '';
+}
+
+function updateUploadLayerList(){
+  var section = document.getElementById('uploadActiveSection');
+  var list = document.getElementById('uploadLayerList');
+  if(!section || !list) return;
+
+  if(_uploadLayers.length === 0){
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+
+  list.innerHTML = _uploadLayers.map(function(ul, idx){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+      '<div style="width:24px;height:24px;background:'+ul.color+';border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span class="mi" style="font-size:14px;color:#fff">'+ul.icon+'</span></div>' +
+      '<div style="flex:1">' +
+        '<div style="font:600 11px \'DM Sans\',sans-serif;color:var(--tx)">'+escapeHtml(ul.name)+'</div>' +
+        '<div style="font-size:9px;color:var(--mt)">'+ul.count+' locaties</div>' +
+      '</div>' +
+      '<button class="btn btn-s" onclick="toggleUploadLayer('+idx+')" style="font-size:9px;padding:2px 6px" title="Toon/verberg">' +
+        '<span class="mi mi-sm" style="font-size:11px">'+(_map.hasLayer(ul.layer)?'visibility':'visibility_off')+'</span></button>' +
+      '<button class="btn btn-s" onclick="zoomToUploadLayer('+idx+')" style="font-size:9px;padding:2px 6px" title="Zoom naar">' +
+        '<span class="mi mi-sm" style="font-size:11px">zoom_in</span></button>' +
+      '<button class="btn btn-s" onclick="removeUploadLayer('+idx+')" style="font-size:9px;padding:2px 6px;border-color:var(--dn);color:var(--dn)" title="Verwijder">' +
+        '<span class="mi mi-sm" style="font-size:11px">close</span></button>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleUploadLayer(idx){
+  var ul = _uploadLayers[idx];
+  if(!ul) return;
+  if(_map.hasLayer(ul.layer)){
+    _map.removeLayer(ul.layer);
+  } else {
+    ul.layer.addTo(_map);
+  }
+  updateUploadLayerList();
+}
+
+function zoomToUploadLayer(idx){
+  var ul = _uploadLayers[idx];
+  if(!ul || !ul.layer) return;
+  try {
+    var bounds = ul.layer.getBounds();
+    _map.fitBounds(bounds, {padding:[40,40], maxZoom:14});
+  } catch(e){}
+}
+
+function removeUploadLayer(idx){
+  var ul = _uploadLayers[idx];
+  if(!ul) return;
+  if(_map.hasLayer(ul.layer)) _map.removeLayer(ul.layer);
+  _uploadLayers.splice(idx, 1);
+  updateUploadLayerList();
+  toast('Upload laag verwijderd');
+}
+
+function clearUploadData(){
+  _uploadData = null;
+  _uploadColumns = [];
+  document.getElementById('uploadPreview').style.display = 'none';
+  document.getElementById('uploadIconSection').style.display = 'none';
+  document.getElementById('uploadFileInput').value = '';
 }
 
 // ============================================================
