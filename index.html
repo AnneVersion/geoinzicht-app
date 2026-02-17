@@ -418,7 +418,7 @@ select option{background:var(--bg);color:var(--tx)}
 
       <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v6.2</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v6.3</div>
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
@@ -438,7 +438,13 @@ select option{background:var(--bg);color:var(--tx)}
   <div class="map-wrap">
     <div id="map"></div>
     <div class="info-panel" id="infoPanel">
-      <h3 id="infoBuurtNaam"><span class="mi mi-sm">place</span> -</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <h3 id="infoBuurtNaam" style="margin:0;flex:1"><span class="mi mi-sm">place</span> -</h3>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="btn-s" onclick="printInfoPanel()" title="Exporteer als rapport" style="padding:4px 10px;font-size:10px;cursor:pointer;border:1px solid var(--glass-bd);background:var(--glass);color:var(--tx);border-radius:6px;display:flex;align-items:center;gap:3px"><span class="mi" style="font-size:14px">print</span>Rapport</button>
+          <button class="btn-s" onclick="document.getElementById('infoPanel').classList.remove('show')" title="Sluiten" style="padding:4px 8px;cursor:pointer;border:1px solid var(--glass-bd);background:var(--glass);color:var(--mt);border-radius:6px"><span class="mi" style="font-size:14px">close</span></button>
+        </div>
+      </div>
       <div id="infoContent"></div>
     </div>
   </div>
@@ -742,9 +748,17 @@ function matchesBagFilter(status){
 function createBagWmsLayer(){
   _bagWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, {
     layers:'verblijfsobject',format:'image/png',transparent:true,
-    version:'1.1.1',opacity:0.4,maxZoom:22,tileSize:256,minZoom:15
+    version:'1.1.1',opacity:0.4,maxZoom:22,tileSize:256,minZoom:13
   }).addTo(_map);
   fixLayerOrder();
+}
+
+// Dynamische WMS opacity: fade uit bij lage zoom
+function updateBagWmsOpacity(){
+  if(!_map) return;
+  var z = _map.getZoom();
+  if(_bagWmsLayer) _bagWmsLayer.setOpacity(z >= 16 ? 0.4 : (z >= 14 ? 0.2 : (z >= 13 ? 0.1 : 0)));
+  if(_pandWmsLayer) _pandWmsLayer.setOpacity(z >= 16 ? 0.6 : (z >= 14 ? 0.3 : (z >= 13 ? 0.15 : 0)));
 }
 
 // BAG cache key prefix
@@ -826,7 +840,6 @@ function loadBagVectors(){
       _bagVectorData = cached;
       renderBagVectors();
       updateBagStatusCountsFromData();
-      toast(cached.length+' adressen uit cache (zoom in voor meer)');
     } else if(_bagVectorLayer){
       _map.removeLayer(_bagVectorLayer);_bagVectorLayer=null;
     }
@@ -880,9 +893,18 @@ function renderBagVectors(){
   if(!_bagVectorData || !_bagVectorData.length) return;
   var filtered = _bagVectorData.filter(function(f){return matchesBagFilter(f.properties.status)});
   var zoom = _map.getZoom();
-  // Adaptive marker grootte
-  var radius = zoom >= 18 ? 6 : (zoom >= 17 ? 5 : (zoom >= 16 ? 4 : 2.5));
-  var weight = zoom >= 17 ? 0.8 : 0.3;
+  // Performance limiet bij lage zoom: sampling
+  var maxMarkers = zoom >= 16 ? Infinity : (zoom >= 14 ? 5000 : (zoom >= 12 ? 2000 : 800));
+  if(filtered.length > maxMarkers){
+    var step = Math.ceil(filtered.length / maxMarkers);
+    var sampled = [];
+    for(var i = 0; i < filtered.length; i += step) sampled.push(filtered[i]);
+    filtered = sampled;
+  }
+  // Adaptive marker grootte: continu van zoom 9 tot 20
+  var radius = Math.max(0.5, Math.min(6, (zoom - 9) * 0.6));
+  var weight = zoom >= 17 ? 0.8 : (zoom >= 14 ? 0.3 : 0);
+  var fillOp = zoom >= 16 ? 0.85 : (zoom >= 13 ? 0.7 : 0.5);
   _bagVectorLayer = L.geoJSON({type:'FeatureCollection',features:filtered},{
     pointToLayer: function(feature, latlng){
       return L.circleMarker(latlng, {
@@ -890,7 +912,7 @@ function renderBagVectors(){
         fillColor: bagStatusToColor(feature.properties.status),
         color: '#fff',
         weight: weight,
-        fillOpacity: 0.85
+        fillOpacity: fillOp
       });
     },
     onEachFeature: function(feature, layer){
@@ -1118,8 +1140,8 @@ function toggleBagLayer(on){
       document.querySelector('[data-layer="panden"]').classList.add('active');
       togglePandLayer(true);
     }
-    if(_map.getZoom() < 17){
-      _map.setZoom(17);
+    if(_map.getZoom() < 16){
+      toast('BAG adressen actief \u2014 zoom in voor individuele adressen');
     }
     // WFS vectordata laden voor het viewport
     loadBagVectors();
@@ -1139,6 +1161,7 @@ function toggleBagLayer(on){
 
 function onBagMoveEnd(){
   if(_layerState.bag) loadBagVectors();
+  updateBagWmsOpacity();
 }
 
 // bagStatusColor via bagStatusToColor() hierboven
@@ -1340,13 +1363,12 @@ function togglePandLayer(on){
     if(_pandWmsLayer) return;
     _pandWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, {
       layers:'pand',format:'image/png',transparent:true,
-      version:'1.1.1',opacity:0.6,maxZoom:22,tileSize:256,minZoom:15
+      version:'1.1.1',opacity:0.6,maxZoom:22,tileSize:256,minZoom:13
     }).addTo(_map);
     fixLayerOrder();
     dimChoroplethLayers(true);
-    if(_map.getZoom() < 17){
-      _map.setZoom(17);
-      toast('Ingezoomd naar niveau 17 \u2014 BAG panden nu zichtbaar');
+    if(_map.getZoom() < 16){
+      toast('BAG panden actief \u2014 zoom in voor details');
     } else {
       toast('BAG panden actief');
     }
@@ -1797,6 +1819,105 @@ function toast(msg){
   el.classList.add('show');
   clearTimeout(el._tid);
   el._tid = setTimeout(function(){el.classList.remove('show')},3000);
+}
+
+// ============================================================
+// RAPPORT EXPORT (PRINT/PDF)
+// ============================================================
+function printInfoPanel(){
+  var locationName = document.getElementById('infoBuurtNaam').textContent || 'GeoInzicht Rapport';
+  var content = document.getElementById('infoContent').innerHTML;
+  if(!content || !content.trim()){
+    toast('Geen data om te exporteren \u2014 klik eerst op een locatie');
+    return;
+  }
+  // Resolve CSS variabelen naar hardcoded kleuren voor print (licht thema)
+  var colorMap = {
+    'var(--ac)':'#16a34a','var(--ac2)':'#22c55e','var(--ai)':'#0284c7',
+    'var(--tx)':'#1e293b','var(--mt)':'#64748b','var(--up)':'#16a34a',
+    'var(--dn)':'#dc2626','var(--wn)':'#d97706','var(--cyan)':'#0891b2',
+    'var(--bg)':'#ffffff','var(--p)':'#ffffff','var(--glass-bd)':'#e2e8f0',
+    'var(--glass)':'rgba(241,245,249,0.85)','var(--bd)':'#cbd5e1'
+  };
+  var pc = content;
+  for(var cv in colorMap) pc = pc.split(cv).join(colorMap[cv]);
+  // Donkere achtergronden omzetten naar licht
+  pc = pc.replace(/rgba\(15,20,35,[^)]+\)/g,'rgba(241,245,249,0.85)');
+  pc = pc.replace(/rgba\(10,15,26,[^)]+\)/g,'rgba(248,250,252,0.9)');
+  pc = pc.replace(/rgba\(45,58,77,[^)]+\)/g,'#e2e8f0');
+  pc = pc.replace(/rgba\(57,255,20,0\.0[0-9]+\)/g,'rgba(22,163,74,0.08)');
+  pc = pc.replace(/rgba\(56,189,248,0\.0[0-9]+\)/g,'rgba(2,132,199,0.06)');
+  pc = pc.replace(/rgba\(100,116,139,0\.0[0-9]+\)/g,'rgba(100,116,139,0.06)');
+  pc = pc.replace(/rgba\(251,191,36,0\.0[0-9]+\)/g,'rgba(217,119,6,0.06)');
+  pc = pc.replace(/rgba\(255,255,255,0\.0[0-9]+\)/g,'rgba(241,245,249,0.4)');
+  // SVG labels donkerder voor print
+  pc = pc.replace(/fill="rgba\(226,232,240,[\d.]+\)"/g,'fill="rgba(30,41,59,0.7)"');
+  pc = pc.replace(/stroke="rgba\(226,232,240,[\d.]+\)"/g,'stroke="rgba(100,116,139,0.3)"');
+
+  var now = new Date();
+  var dateStr = now.toLocaleDateString('nl-NL',{year:'numeric',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  var html = '<!DOCTYPE html><html lang="nl"><head>';
+  html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">';
+  html += '<title>GeoInzicht Rapport \u2014 '+locationName+'</title>';
+  html += '<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">';
+  html += '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">';
+  html += '<style>';
+  // Material icons
+  html += '.mi{font-family:"Material Symbols Rounded";font-weight:normal;font-style:normal;font-size:18px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;word-wrap:normal;direction:ltr;-webkit-font-smoothing:antialiased;font-variation-settings:"FILL" 1,"wght" 400,"GRAD" 0,"opsz" 24}';
+  html += '.mi-sm{font-size:14px}';
+  // Print-optimized base
+  html += '*{box-sizing:border-box}';
+  html += 'body{font-family:"DM Sans",sans-serif;color:#1e293b;background:#fff;margin:0;padding:20px 28px;max-width:820px;margin:0 auto;line-height:1.5;font-size:11px}';
+  html += 'h1{font:700 22px "Space Mono",monospace;color:#0f172a;margin:0}';
+  html += 'h3{font:700 13px "Space Mono",monospace;color:#0f172a;margin:12px 0 6px}';
+  // Info rows
+  html += '.info-row{display:flex;justify-content:space-between;padding:4px 0;font-size:11px;border-bottom:1px solid #e2e8f0}';
+  html += '.info-row:last-child{border:none}';
+  html += '.info-val{font:700 11px "Space Mono",monospace;color:#0284c7}';
+  // Bars
+  html += '.info-bar{height:5px;background:#e2e8f0;border-radius:3px;margin-top:3px;position:relative;overflow:visible}';
+  html += '.info-bar-fill{height:100%;border-radius:3px}';
+  html += '.info-bar-marker{position:absolute;top:-2px;width:2px;height:9px;background:#334155;border-radius:1px;transform:translateX(-1px)}';
+  html += '.up{color:#16a34a}.dn{color:#dc2626}';
+  // SVG
+  html += 'svg{display:block;margin:4px 0;max-width:100%}';
+  // Header/footer
+  html += '.rh{border-bottom:3px solid #16a34a;padding-bottom:14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-end}';
+  html += '.rf{border-top:2px solid #e2e8f0;padding-top:10px;margin-top:20px;font-size:8px;color:#94a3b8;display:flex;justify-content:space-between}';
+  // Print
+  html += '@media print{body{padding:8px 12px;font-size:10px}@page{margin:1.2cm;size:A4}svg{page-break-inside:avoid}.rh{page-break-after:avoid}}';
+  // Geen animaties in rapport
+  html += '@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}';
+  html += '</style></head><body>';
+
+  // Header
+  html += '<div class="rh">';
+  html += '<div><h1 style="background:linear-gradient(135deg,#16a34a,#0284c7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">GeoInzicht</h1>';
+  html += '<div style="font:600 9px Space Mono,monospace;color:#94a3b8;letter-spacing:2px;margin-top:2px">STATISTISCH RAPPORT</div></div>';
+  html += '<div style="text-align:right;font-size:10px;color:#64748b">';
+  html += '<div style="font-weight:600;color:#0f172a;font-size:12px">'+locationName+'</div>';
+  html += '<div>'+dateStr+'</div>';
+  html += '<div>GeoInzicht v6.3</div></div></div>';
+
+  // Content
+  html += '<div>'+pc+'</div>';
+
+  // Footer
+  html += '<div class="rf">';
+  html += '<div><b>Databronnen:</b> CBS Kerncijfers wijken en buurten 2022 | BAG Basisregistratie Adressen en Gebouwen (Kadaster) | PDOK Locatieserver</div>';
+  html += '<div style="white-space:nowrap">GeoInzicht v6.3 \u2014 Data Consultants</div></div>';
+
+  html += '<script>window.onload=function(){setTimeout(function(){window.print()},500)}<\/script>';
+  html += '</body></html>';
+
+  var w = window.open('','_blank');
+  if(w){
+    w.document.write(html);
+    w.document.close();
+  } else {
+    toast('Pop-up geblokkeerd \u2014 sta pop-ups toe voor deze site');
+  }
 }
 
 // ============================================================
