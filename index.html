@@ -1231,28 +1231,10 @@ function buildBagCompareHtml(p, latlng){
   }
   // Methode 2: als buurtlaag niet actief maar buurtdata wel geladen, zoek in data
   if(!buurtFeature && _buurtData){
-    for(var i = 0; i < _buurtData.features.length; i++){
-      var bf = _buurtData.features[i];
-      if(!bf.geometry) continue;
-      try {
-        var tempLayer = L.geoJSON(bf);
-        var found = false;
-        tempLayer.eachLayer(function(sub){
-          if(!found && sub.getBounds && sub.getBounds().contains(latlng)){
-            // Precise check met pointInPolygon
-            var rings = sub.getLatLngs();
-            var checkRing = rings;
-            if(Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined) checkRing = rings[0];
-            else if(Array.isArray(rings[0]) && Array.isArray(rings[0][0])) checkRing = rings[0][0];
-            if(pointInPolygon(latlng.lat, latlng.lng, checkRing)){
-              buurtFeature = bf;
-              buurtLayerObj = sub;
-              found = true;
-            }
-          }
-        });
-        if(found) break;
-      } catch(e){}
+    buurtFeature = findFeatureInData(_buurtData, latlng);
+    if(buurtFeature){
+      // Maak een tijdelijke Leaflet layer voor getBagFeaturesInBuurt
+      try { var tempL = L.geoJSON(buurtFeature); tempL.eachLayer(function(s){ buurtLayerObj = s; }); } catch(e){}
     }
   }
 
@@ -1529,18 +1511,56 @@ function findFeatureAtPoint(layer, latlng){
   return found;
 }
 
+// Zoek een GeoJSON feature die een punt bevat, direct in een dataset (geen Leaflet laag nodig)
+function findFeatureInData(data, latlng){
+  if(!data || !data.features) return null;
+  var lat = latlng.lat, lng = latlng.lng;
+  for(var i = 0; i < data.features.length; i++){
+    var f = data.features[i];
+    if(!f.geometry) continue;
+    // Snelle bbox pre-filter
+    var coords = f.geometry.coordinates;
+    if(f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'){
+      try {
+        var tempLayer = L.geoJSON(f);
+        var found = false;
+        tempLayer.eachLayer(function(sub){
+          if(found) return;
+          if(sub.getBounds && sub.getBounds().contains(latlng)){
+            var rings = sub.getLatLngs();
+            var checkRing = rings;
+            if(Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined) checkRing = rings[0];
+            else if(Array.isArray(rings[0]) && Array.isArray(rings[0][0])) checkRing = rings[0][0];
+            if(pointInPolygon(lat, lng, checkRing)) found = true;
+          }
+        });
+        if(found) return f;
+      } catch(e){}
+    }
+  }
+  return null;
+}
+
 // CBS statistieken voor een locatie — ALLE niveaus met grafieken + AI interpretatie
+// Zoekt ook in niet-actieve lagen als de data geladen is
 function buildMultiLevelStatsHtml(latlng){
   var html = '';
   var layers = [
-    {layer:_buurtLayer, name:'Buurt', icon:'grid_on', state:_layerState.buurten, cfg:LAYER_CONFIG.buurten, color:'var(--ac)'},
-    {layer:_wijkLayer, name:'Wijk', icon:'grid_view', state:_layerState.wijken, cfg:LAYER_CONFIG.wijken, color:'var(--wn)'},
-    {layer:_gemeenteLayer, name:'Gemeente', icon:'domain', state:_layerState.gemeenten, cfg:LAYER_CONFIG.gemeenten, color:'var(--cyan)'}
+    {layer:_buurtLayer, data:_buurtData, name:'Buurt', icon:'grid_on', state:_layerState.buurten, cfg:LAYER_CONFIG.buurten, color:'var(--ac)'},
+    {layer:_wijkLayer, data:_wijkData, name:'Wijk', icon:'grid_view', state:_layerState.wijken, cfg:LAYER_CONFIG.wijken, color:'var(--wn)'},
+    {layer:_gemeenteLayer, data:_gemeenteData, name:'Gemeente', icon:'domain', state:_layerState.gemeenten, cfg:LAYER_CONFIG.gemeenten, color:'var(--cyan)'}
   ];
   var findings = []; // Verzamel data voor de eindanalyse
   layers.forEach(function(l){
-    if(!l.state || !l.layer) return;
-    var feature = findFeatureAtPoint(l.layer, latlng);
+    var feature = null;
+    // Methode 1: via actieve laag op de kaart (snel)
+    if(l.state && l.layer){
+      feature = findFeatureAtPoint(l.layer, latlng);
+    }
+    // Methode 2: als laag niet actief maar data wel geladen, zoek in GeoJSON
+    if(!feature && l.data){
+      feature = findFeatureInData(l.data, latlng);
+    }
     if(!feature || !feature.properties) return;
     var p = feature.properties;
     var naam = p[l.cfg.nameField] || p[l.cfg.codeField] || '-';
