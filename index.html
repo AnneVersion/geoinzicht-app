@@ -418,7 +418,7 @@ select option{background:var(--bg);color:var(--tx)}
 
       <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v6.1</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v6.2</div>
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
@@ -1158,49 +1158,172 @@ function findFeatureAtPoint(layer, latlng){
   return found;
 }
 
-// CBS statistieken voor een locatie — toon ALLE beschikbare niveaus
+// CBS statistieken voor een locatie — ALLE niveaus met grafieken + AI interpretatie
 function buildMultiLevelStatsHtml(latlng){
   var html = '';
   var layers = [
-    {layer:_buurtLayer, name:'Buurt', icon:'grid_on', state:_layerState.buurten, cfg:LAYER_CONFIG.buurten},
-    {layer:_wijkLayer, name:'Wijk', icon:'grid_view', state:_layerState.wijken, cfg:LAYER_CONFIG.wijken},
-    {layer:_gemeenteLayer, name:'Gemeente', icon:'domain', state:_layerState.gemeenten, cfg:LAYER_CONFIG.gemeenten}
+    {layer:_buurtLayer, name:'Buurt', icon:'grid_on', state:_layerState.buurten, cfg:LAYER_CONFIG.buurten, color:'var(--ac)'},
+    {layer:_wijkLayer, name:'Wijk', icon:'grid_view', state:_layerState.wijken, cfg:LAYER_CONFIG.wijken, color:'var(--wn)'},
+    {layer:_gemeenteLayer, name:'Gemeente', icon:'domain', state:_layerState.gemeenten, cfg:LAYER_CONFIG.gemeenten, color:'var(--cyan)'}
   ];
-  var foundAny = false;
+  var findings = []; // Verzamel data voor de eindanalyse
   layers.forEach(function(l){
     if(!l.state || !l.layer) return;
     var feature = findFeatureAtPoint(l.layer, latlng);
     if(!feature || !feature.properties) return;
     var p = feature.properties;
     var naam = p[l.cfg.nameField] || p[l.cfg.codeField] || '-';
-    foundAny = true;
     html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
-    html += '<div style="font:700 11px \'Space Mono\',monospace;color:var(--ac);margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">'+l.icon+'</span> '+l.name+': '+naam+'</div>';
+    html += '<div style="font:700 11px \'Space Mono\',monospace;color:'+l.color+';margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:'+l.color+'">'+l.icon+'</span> '+l.name+': '+naam+'</div>';
     _activeIndicators.forEach(function(k){
       var v = p[k];
-      if(v !== undefined && v !== null) html += buildCompareHtml(k, v);
+      if(v === undefined || v === null) return;
+      html += buildCompareHtml(k, v);
+      // Verzamel voor eindanalyse
+      var ns = _nationalStats[k];
+      if(ns && ns.stddev > 0){
+        findings.push({level:l.name, naam:naam, key:k, val:v, z:(v-ns.avg)/ns.stddev, avg:ns.avg, stddev:ns.stddev});
+      }
     });
     html += '</div>';
   });
-  // Landelijk (altijd tonen als er actieve indicatoren zijn)
-  if(foundAny && Object.keys(_nationalStats).length > 0){
-    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
-    html += '<div style="font:700 11px \'Space Mono\',monospace;color:var(--cyan);margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--cyan)">public</span> Landelijk gemiddelde</div>';
-    _activeIndicators.forEach(function(k){
-      var ns = _nationalStats[k];
-      if(!ns) return;
-      var fm = getIndicator(k);
-      html += '<div style="margin-bottom:6px;padding:6px 8px;background:rgba(15,20,35,.4);border-radius:6px">';
-      html += '<div style="display:flex;justify-content:space-between;align-items:center">';
-      html += '<span style="font:500 11px \'DM Sans\',sans-serif;color:var(--mt);display:flex;align-items:center;gap:3px"><span class="mi" style="font-size:14px;color:var(--cyan)">'+fm.icon+'</span>'+fm.naam+'</span>';
-      html += '<span style="font:700 12px \'Space Mono\',monospace;color:var(--cyan)">'+formatVal(ns.avg)+' <span style="font-size:9px;color:var(--mt)">'+fm.eenheid+'</span></span>';
-      html += '</div>';
-      html += '<div style="font-size:9px;color:var(--mt);margin-top:2px">'+ns.count+' gebieden \u00b7 min '+formatVal(ns.min)+' \u00b7 max '+formatVal(ns.max)+' \u00b7 \u03c3 '+formatVal(ns.stddev)+'</div>';
-      html += '</div>';
-    });
-    html += '</div>';
+
+  // === AI DATA-INTERPRETATIE (educatief) ===
+  if(findings.length > 0){
+    html += buildEducationalAnalysis(findings);
   }
   return html;
+}
+
+// Genereer educatieve data-interpretatie
+function buildEducationalAnalysis(findings){
+  var h = '<div style="margin-top:12px;padding-top:10px;border-top:2px solid rgba(57,255,20,.2)">';
+  h += '<div style="font:700 12px \'Space Mono\',monospace;color:var(--ac);margin-bottom:8px;display:flex;align-items:center;gap:6px">';
+  h += '<span class="mi" style="font-size:18px;color:var(--ac)">psychology</span> Data-analyse';
+  h += '<span style="font:400 9px DM Sans,sans-serif;color:var(--mt);text-transform:none;letter-spacing:0">(automatisch afgeleid uit statistiek)</span>';
+  h += '</div>';
+
+  // Stap 1: Opvallende waarden identificeren
+  var opvallend = findings.filter(function(f){return Math.abs(f.z)>1});
+  var gemiddeld = findings.filter(function(f){return Math.abs(f.z)<=0.5});
+  var licht = findings.filter(function(f){return Math.abs(f.z)>0.5 && Math.abs(f.z)<=1});
+
+  h += '<div style="padding:8px 10px;background:rgba(57,255,20,.03);border-radius:8px;border-left:3px solid var(--ac);margin-bottom:8px">';
+  h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--ac);margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">looks_one</span> Stap 1: Opvallende waarden identificeren</div>';
+  h += '<div style="font-size:10px;color:var(--mt);line-height:1.7">';
+  h += 'We vergelijken elke indicator met het <b style="color:var(--tx)">landelijk gemiddelde</b> en berekenen de <b style="color:var(--ai)">z-score</b> = (waarde \u2212 gemiddelde) \u00f7 standaarddeviatie.<br>';
+  if(opvallend.length > 0){
+    h += '<br><b style="color:var(--wn)">'+opvallend.length+' opvallende waarde'+(opvallend.length>1?'n':'')+'</b> gevonden (|z| > 1):';
+    h += '<ul style="margin:4px 0 0 16px;padding:0">';
+    opvallend.forEach(function(f){
+      var fm = getIndicator(f.key);
+      var dir = f.z > 0 ? 'hoger' : 'lager';
+      h += '<li style="margin:2px 0"><b style="color:var(--tx)">'+fm.naam+'</b> = '+formatVal(f.val)+' '+fm.eenheid;
+      h += ' <span style="color:'+getBarColor(f.z)+'">('+(f.z>0?'+':'')+f.z.toFixed(1)+'\u03c3 '+dir+' dan gemiddeld)</span></li>';
+    });
+    h += '</ul>';
+  }
+  if(gemiddeld.length > 0){
+    h += '<br><span style="color:var(--ai)">'+gemiddeld.length+' indicator'+(gemiddeld.length>1?'en':'')+' dicht bij het gemiddelde</span> (|z| < 0.5): ';
+    h += gemiddeld.map(function(f){return getIndicator(f.key).naam}).join(', ')+'.';
+  }
+  h += '</div></div>';
+
+  // Stap 2: Patroonherkenning
+  h += '<div style="padding:8px 10px;background:rgba(56,189,248,.03);border-radius:8px;border-left:3px solid var(--ai);margin-bottom:8px">';
+  h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--ai);margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">looks_two</span> Stap 2: Patronen herkennen</div>';
+  h += '<div style="font-size:10px;color:var(--mt);line-height:1.7">';
+
+  // Zoek correlaties/patronen
+  var hWoz = findings.find(function(f){return f.key==='gem_woz_waarde'});
+  var hInk = findings.find(function(f){return f.key==='gem_inkomen_inwoner'});
+  var hBev = findings.find(function(f){return f.key==='aantal_inwoners'});
+  var hDicht = findings.find(function(f){return f.key==='bevolkingsdichtheid'});
+  var hKoop = findings.find(function(f){return f.key==='koopwoningen'});
+  var hGas = findings.find(function(f){return f.key==='gem_aardgas'});
+  var hElek = findings.find(function(f){return f.key==='gem_elektriciteit'});
+  var h65 = findings.find(function(f){return f.key==='65plus'});
+  var hArb = findings.find(function(f){return f.key==='arbeidsparticipatie'});
+
+  var patterns = [];
+  // WOZ-inkomen correlatie
+  if(hWoz && hInk){
+    if(hWoz.z > 0.5 && hInk.z > 0.5) patterns.push('WOZ-waarde en inkomen zijn <b>beide bovengemiddeld</b> \u2014 dit wijst op een <b style="color:var(--ac)">welvarend gebied</b>.');
+    else if(hWoz.z < -0.5 && hInk.z < -0.5) patterns.push('WOZ-waarde en inkomen zijn <b>beide ondergemiddeld</b> \u2014 dit wijst op een <b style="color:var(--wn)">sociaal-economisch zwakker gebied</b>.');
+    else if(hWoz.z > 1 && hInk.z < 0) patterns.push('Hoge WOZ maar laag inkomen \u2014 mogelijk <b style="color:var(--wn)">gentrificatie</b>: woningen worden duurder terwijl de huidige bewoners minder verdienen.');
+  }
+  // Vergrijzing
+  if(h65 && h65.z > 1) patterns.push('Hoog percentage 65+ ('+(h65.val).toFixed(0)+'%) \u2014 dit is een <b style="color:var(--wn)">vergrijzend gebied</b>.'+(hArb && hArb.z < -0.5 ? ' Dit verklaart ook de lagere arbeidsparticipatie.' : ''));
+  // Energie
+  if(hGas && hElek){
+    if(hGas.z > 1) patterns.push('Hoog gasverbruik ('+formatVal(hGas.val)+' m\u00b3) \u2014 waarschijnlijk <b style="color:var(--wn)">oudere, slecht ge\u00efsoleerde woningen</b>.');
+    if(hGas.z < -1) patterns.push('Laag gasverbruik \u2014 wijst op <b style="color:var(--ac)">nieuwbouw of goed ge\u00efsoleerd</b>.');
+  }
+  // Dichtheid vs koop
+  if(hDicht && hKoop){
+    if(hDicht.z > 1 && hKoop.z < -0.5) patterns.push('Hoge bevolkingsdichtheid met weinig koopwoningen \u2014 typisch <b>stedelijk huurgebied</b> (flats/appartementen).');
+    if(hDicht.z < -1 && hKoop.z > 0.5) patterns.push('Lage dichtheid met veel koopwoningen \u2014 typisch <b>suburbaan</b>/dorps woongebied.');
+  }
+
+  if(patterns.length > 0){
+    patterns.forEach(function(p){h+='<div style="margin:4px 0;padding-left:8px;border-left:2px solid rgba(56,189,248,.2)">'+p+'</div>'});
+  } else {
+    h += 'Geen sterke patronen gevonden \u2014 dit gebied scoort vrij gemiddeld op de meeste indicatoren.';
+  }
+  h += '</div></div>';
+
+  // Stap 3: Conclusie
+  h += '<div style="padding:8px 10px;background:rgba(251,191,36,.03);border-radius:8px;border-left:3px solid var(--wn);margin-bottom:8px">';
+  h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--wn);margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">looks_3</span> Stap 3: Conclusie formuleren</div>';
+  h += '<div style="font-size:10px;color:var(--mt);line-height:1.7">';
+
+  // Gebiedsprofiel samenstellen
+  var level = findings[0] ? findings[0].level : 'Gebied';
+  var naam = findings[0] ? findings[0].naam : '';
+  h += '<b style="color:var(--tx)">Profiel van '+level.toLowerCase()+' '+naam+':</b><br>';
+
+  // Bouw een profiel
+  var profiel = [];
+  if(hWoz) profiel.push(hWoz.z>0.5?'dure woningen':(hWoz.z<-0.5?'goedkope woningen':'gemiddelde woningwaarde'));
+  if(hInk) profiel.push(hInk.z>0.5?'hoge inkomens':(hInk.z<-0.5?'lage inkomens':'gemiddelde inkomens'));
+  if(hDicht) profiel.push(hDicht.z>1?'zeer dicht bebouwd':(hDicht.z>0.5?'stedelijk':(hDicht.z<-0.5?'ruim/landelijk':'gemiddelde dichtheid')));
+  if(hKoop) profiel.push(hKoop.z>0.5?'veel koopwoningen':(hKoop.z<-0.5?'veel huurwoningen':'mix koop/huur'));
+  if(h65) profiel.push(h65.z>1?'vergrijzend':(h65.z<-0.5?'jong/gezinnen':'gemiddelde leeftijdsopbouw'));
+  if(profiel.length > 0) h += 'Een gebied met '+profiel.join(', ')+'.';
+
+  // Sterke/zwakke punten
+  var sterk = opvallend.filter(function(f){
+    var isReverse = REVERSE_KEYS.indexOf(f.key)>=0;
+    return isReverse ? f.z<-1 : f.z>1;
+  });
+  var zwak = opvallend.filter(function(f){
+    var isReverse = REVERSE_KEYS.indexOf(f.key)>=0;
+    return isReverse ? f.z>1 : f.z<-1;
+  });
+  if(sterk.length>0){
+    h += '<br><span style="color:var(--ac)">Sterk:</span> '+sterk.map(function(f){return getIndicator(f.key).naam}).join(', ')+'.';
+  }
+  if(zwak.length>0){
+    h += '<br><span style="color:var(--dn)">Aandachtspunt:</span> '+zwak.map(function(f){return getIndicator(f.key).naam}).join(', ')+'.';
+  }
+
+  h += '</div></div>';
+
+  // Methode-uitleg (educatief)
+  h += '<div style="padding:8px 10px;background:rgba(100,116,139,.05);border-radius:8px;border-left:3px solid var(--mt)">';
+  h += '<div style="font:600 10px DM Sans,sans-serif;color:var(--mt);margin-bottom:3px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">help</span> Hoe werkt deze analyse?</div>';
+  h += '<div style="font-size:9px;color:var(--mt);line-height:1.6">';
+  h += 'Deze analyse is <b style="color:var(--tx)">geen AI</b> maar <b style="color:var(--tx)">regelgebaseerde statistiek</b>:<br>';
+  h += '1. <b>Data verzamelen</b>: CBS kerncijfers van alle '+(_nationalStats[_activeIndicators[0]]?_nationalStats[_activeIndicators[0]].count:'')+' gebieden in Nederland<br>';
+  h += '2. <b>Normaliseren</b>: z-score = (waarde \u2212 \u03bc) \u00f7 \u03c3 vertelt hoeveel standaarddeviaties van het gemiddelde<br>';
+  h += '3. <b>Classificeren</b>: |z| < 0.5 = gemiddeld, |z| 0.5\u20131 = licht afwijkend, |z| > 1 = opvallend, |z| > 2 = uitzonderlijk<br>';
+  h += '4. <b>Patronen zoeken</b>: bekende correlaties (WOZ\u2194inkomen, dichtheid\u2194huur, gas\u2194isolatie) controleren<br>';
+  h += '5. <b>Conclusie</b>: sterke/zwakke punten afleiden uit de richting van z-scores<br>';
+  h += '<br>Je kunt dit <b style="color:var(--tx)">zelf narekenen</b>: pak de waarde, trek het gemiddelde eraf, deel door \u03c3. Is het resultaat > 1 of < \u22121? Dan is het opvallend.';
+  h += '</div></div>';
+
+  h += '</div>';
+  return h;
 }
 
 // Backwards compat — oude aanroepen
