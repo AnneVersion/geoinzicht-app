@@ -418,7 +418,7 @@ select option{background:var(--bg);color:var(--tx)}
 
       <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v6.0</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v6.1</div>
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
@@ -925,13 +925,39 @@ function showBagFeatureInfo(p, latlng){
   document.getElementById('infoPanel').classList.add('show');
 }
 
-// Vergelijk BAG-specifieke waarden (bouwjaar, oppervlakte) met viewport gemiddelde
+// Bereken volledige descriptive statistics van een gesorteerde array
+function calcStats(sorted){
+  var n = sorted.length;
+  if(!n) return null;
+  var sum = sorted.reduce(function(a,b){return a+b},0);
+  var mean = sum/n;
+  var median = n%2===0 ? (sorted[n/2-1]+sorted[n/2])/2 : sorted[Math.floor(n/2)];
+  var variance = sorted.reduce(function(a,b){return a+(b-mean)*(b-mean)},0)/n;
+  var stddev = Math.sqrt(variance);
+  var p10 = sorted[Math.floor(n*0.10)];
+  var p25 = sorted[Math.floor(n*0.25)];
+  var p75 = sorted[Math.floor(n*0.75)];
+  var p90 = sorted[Math.floor(n*0.90)];
+  var iqr = p75 - p25;
+  var skewSum = stddev > 0 ? sorted.reduce(function(a,b){var d=(b-mean)/stddev;return a+d*d*d},0)/n : 0;
+  // Coefficient of variation
+  var cv = mean > 0 ? (stddev/mean*100) : 0;
+  return {n:n,min:sorted[0],max:sorted[n-1],mean:mean,median:median,stddev:stddev,p10:p10,p25:p25,p75:p75,p90:p90,iqr:iqr,skewness:skewSum,cv:cv};
+}
+
+// Bereken percentielrang van een waarde in een gesorteerde array
+function percentileRank(sorted, val){
+  var count = 0;
+  for(var i=0;i<sorted.length;i++){if(sorted[i]<=val)count++;else break}
+  return Math.round(count/sorted.length*100);
+}
+
+// Vergelijk BAG-specifieke waarden met uitgebreide statistieken
 function buildBagCompareHtml(p){
   if(!_bagVectorData || !_bagVectorData.length) return '';
   var html = '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
-  html += '<div style="font:700 11px \'Space Mono\',monospace;color:var(--ac);margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm">compare_arrows</span> Dit adres vs. omgeving</div>';
+  html += '<div style="font:700 11px \'Space Mono\',monospace;color:var(--ac);margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm">compare_arrows</span> Statistische analyse ('+_bagVectorData.length+' adressen)</div>';
 
-  // Bereken stats van viewport data
   var bouwjaren = [], oppervlaktes = [];
   _bagVectorData.forEach(function(f){
     var fp = f.properties;
@@ -941,53 +967,103 @@ function buildBagCompareHtml(p){
 
   if(p.bouwjaar && bouwjaren.length > 5){
     bouwjaren.sort(function(a,b){return a-b});
-    var bAvg = bouwjaren.reduce(function(a,b){return a+b},0)/bouwjaren.length;
-    var bMin = bouwjaren[0], bMax = bouwjaren[bouwjaren.length-1];
-    var bStd = Math.sqrt(bouwjaren.reduce(function(a,b){return a+(b-bAvg)*(b-bAvg)},0)/bouwjaren.length);
-    var bZ = bStd > 0 ? (p.bouwjaar - bAvg)/bStd : 0;
-    html += buildMiniCompare('event','Bouwjaar', p.bouwjaar, '', bAvg, bMin, bMax, bZ, bouwjaren.length,
-      p.bouwjaar > bAvg + bStd ? 'Nieuwer dan de meeste panden in de buurt' :
-      p.bouwjaar < bAvg - bStd ? 'Ouder dan de meeste panden in de buurt' :
-      'Vergelijkbaar bouwjaar met de omgeving');
+    var st = calcStats(bouwjaren);
+    var z = st.stddev > 0 ? (p.bouwjaar - st.mean)/st.stddev : 0;
+    var pRank = percentileRank(bouwjaren, p.bouwjaar);
+    html += buildFullStatCard('event','Bouwjaar',p.bouwjaar,'',st,z,pRank,'bouwjaar');
   }
 
   if(p.oppervlakte && oppervlaktes.length > 5){
     oppervlaktes.sort(function(a,b){return a-b});
-    var oAvg = oppervlaktes.reduce(function(a,b){return a+b},0)/oppervlaktes.length;
-    var oMin = oppervlaktes[0], oMax = oppervlaktes[oppervlaktes.length-1];
-    var oStd = Math.sqrt(oppervlaktes.reduce(function(a,b){return a+(b-oAvg)*(b-oAvg)},0)/oppervlaktes.length);
-    var oZ = oStd > 0 ? (p.oppervlakte - oAvg)/oStd : 0;
-    html += buildMiniCompare('square_foot','Oppervlakte', p.oppervlakte, 'm\u00b2', oAvg, oMin, oMax, oZ, oppervlaktes.length,
-      p.oppervlakte > oAvg + oStd ? 'Groter dan gemiddeld in deze buurt' :
-      p.oppervlakte < oAvg - oStd ? 'Kleiner dan gemiddeld in deze buurt' :
-      'Gemiddelde grootte voor deze buurt');
+    var st = calcStats(oppervlaktes);
+    var z = st.stddev > 0 ? (p.oppervlakte - st.mean)/st.stddev : 0;
+    var pRank = percentileRank(oppervlaktes, p.oppervlakte);
+    html += buildFullStatCard('square_foot','Oppervlakte',p.oppervlakte,'m\u00b2',st,z,pRank,'oppervlakte');
   }
 
   html += '</div>';
   return html;
 }
 
-// Mini vergelijkingskaart met normaalverdeling
-function buildMiniCompare(icon, label, val, unit, avg, min, max, z, n, uitleg){
-  var range = max - min;
-  var pos = range > 0 ? Math.min(100, Math.max(0, (val - min)/range*100)) : 50;
-  var avgPos = range > 0 ? Math.min(100, Math.max(0, (avg - min)/range*100)) : 50;
-  var h = '<div style="margin-bottom:10px;padding:8px 10px;background:rgba(15,20,35,.5);border-radius:8px;border-left:3px solid '+getBarColor(z)+'">';
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">';
+// Uitgebreide statistiekkaart
+function buildFullStatCard(icon,label,val,unit,st,z,pRank,type){
+  var h = '<div style="margin-bottom:12px;padding:10px;background:rgba(15,20,35,.5);border-radius:8px;border-left:3px solid '+getBarColor(z)+'">';
+  // Header: naam + waarde
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
   h += '<span style="font:600 12px \'DM Sans\',sans-serif;color:var(--tx);display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:15px;color:var(--ai)">'+icon+'</span>'+label+'</span>';
-  h += '<span style="font:700 14px \'Space Mono\',monospace;color:var(--ac)">'+val+' <span style="font-size:10px;color:var(--mt)">'+unit+'</span></span>';
+  h += '<span style="font:700 16px \'Space Mono\',monospace;color:var(--ac)">'+val+' <span style="font-size:10px;color:var(--mt)">'+unit+'</span></span>';
   h += '</div>';
-  // Normaalverdeling
-  h += buildDistSvg(z, 'normaal');
-  // Vergelijking tabel
-  h += '<div style="display:flex;gap:6px;margin:3px 0;font-size:10px">';
-  h += '<div style="flex:1;text-align:center;padding:3px;background:rgba(255,255,255,.03);border-radius:4px"><div style="color:var(--mt)">Gem.</div><div style="font:700 11px Space Mono,monospace;color:var(--ai)">'+Math.round(avg)+'</div></div>';
-  h += '<div style="flex:1;text-align:center;padding:3px;background:rgba(255,255,255,.03);border-radius:4px"><div style="color:var(--mt)">Min</div><div style="font:700 11px Space Mono,monospace;color:var(--mt)">'+min+'</div></div>';
-  h += '<div style="flex:1;text-align:center;padding:3px;background:rgba(255,255,255,.03);border-radius:4px"><div style="color:var(--mt)">Max</div><div style="font:700 11px Space Mono,monospace;color:var(--mt)">'+max+'</div></div>';
-  h += '<div style="flex:1;text-align:center;padding:3px;background:rgba(255,255,255,.03);border-radius:4px"><div style="color:var(--mt)">n</div><div style="font:700 11px Space Mono,monospace;color:var(--mt)">'+n+'</div></div>';
+
+  // Normaalverdeling SVG
+  var distType = Math.abs(st.skewness)<0.5?'normaal':(st.skewness>0?'rechts scheef':'links scheef');
+  h += buildDistSvg(z, distType);
+
+  // Percentiel + z-score badges
+  h += '<div style="display:flex;gap:6px;margin:4px 0;align-items:center">';
+  h += '<div style="padding:3px 8px;border-radius:6px;background:rgba(57,255,20,.08);font:700 11px Space Mono,monospace;color:var(--ac)">P'+pRank+'</div>';
+  h += '<div style="font-size:10px;color:var(--mt)">';
+  if(type==='bouwjaar'){
+    h += pRank>=50 ? 'Nieuwer dan '+pRank+'% van de panden' : 'Ouder dan '+(100-pRank)+'% van de panden';
+  } else {
+    h += pRank>=50 ? 'Groter dan '+pRank+'% van de adressen' : 'Kleiner dan '+(100-pRank)+'% van de adressen';
+  }
+  h += '</div></div>';
+
+  // Statistieken tabel
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:6px 0;font-size:9px">';
+  var cells = [
+    {l:'Gemiddeld',v:Math.round(st.mean),c:'var(--ai)'},
+    {l:'Mediaan',v:Math.round(st.median),c:'var(--ai)'},
+    {l:'Std.dev (\u03c3)',v:st.stddev<10?st.stddev.toFixed(1):Math.round(st.stddev),c:'var(--wn)'},
+    {l:'z-score',v:z.toFixed(2),c:getBarColor(z)},
+    {l:'P10',v:Math.round(st.p10),c:'var(--mt)'},
+    {l:'P25 (Q1)',v:Math.round(st.p25),c:'var(--mt)'},
+    {l:'P75 (Q3)',v:Math.round(st.p75),c:'var(--mt)'},
+    {l:'P90',v:Math.round(st.p90),c:'var(--mt)'},
+    {l:'Min',v:st.min,c:'var(--mt)'},
+    {l:'Max',v:st.max,c:'var(--mt)'},
+    {l:'IQR',v:Math.round(st.iqr),c:'var(--mt)'},
+    {l:'CV',v:st.cv.toFixed(0)+'%',c:'var(--mt)'}
+  ];
+  cells.forEach(function(c){
+    h += '<div style="text-align:center;padding:3px 2px;background:rgba(255,255,255,.03);border-radius:4px">';
+    h += '<div style="color:var(--mt);font-size:8px;white-space:nowrap">'+c.l+'</div>';
+    h += '<div style="font:700 10px Space Mono,monospace;color:'+c.c+'">'+c.v+'</div></div>';
+  });
   h += '</div>';
-  // Interpretatie
-  h += '<div style="font-size:10px;color:var(--mt);margin-top:2px"><span class="mi mi-sm" style="font-size:12px;vertical-align:-2px;color:var(--ai)">lightbulb</span> '+uitleg+'</div>';
+
+  // Interpretatie blok
+  h += '<div style="padding:6px 8px;background:rgba(56,189,248,.04);border-radius:6px;border-left:2px solid var(--ai);margin-top:4px">';
+  h += '<div style="font:600 10px \'DM Sans\',sans-serif;color:var(--ai);margin-bottom:3px;display:flex;align-items:center;gap:3px"><span class="mi mi-sm" style="font-size:13px">school</span> Wat betekent dit?</div>';
+  h += '<div style="font-size:10px;color:var(--mt);line-height:1.6">';
+
+  // Z-score uitleg
+  h += '<b style="color:var(--tx)">z-score = '+z.toFixed(2)+'</b>: ';
+  if(Math.abs(z)<0.5) h += 'Deze waarde is <b style="color:var(--ai)">heel gemiddeld</b>. ';
+  else if(Math.abs(z)<1) h += 'Licht '+(z>0?'boven':'onder')+' gemiddeld, maar <b style="color:var(--ai)">binnen normaal bereik</b> (68% van alle waarden). ';
+  else if(Math.abs(z)<2) h += '<b style="color:var(--wn)">'+(z>0?'Boven':'Onder')+'gemiddeld</b>. Valt buiten het bereik waar 68% van de waarden ligt. ';
+  else h += '<b style="color:var(--dn)">Uitzonderlijk '+(z>0?'hoog':'laag')+'</b>. Valt buiten 95% van alle waarden. ';
+
+  // Standaarddeviatie uitleg
+  h += '<br>\u03c3 = '+Math.round(st.stddev)+': ';
+  if(st.cv < 15) h += 'Lage spreiding \u2014 de '+label.toLowerCase()+'s in deze buurt zijn <b style="color:var(--ai)">heel uniform</b>. ';
+  else if(st.cv < 30) h += 'Gemiddelde spreiding \u2014 er is een <b style="color:var(--ai)">normale variatie</b> in '+label.toLowerCase()+'s. ';
+  else h += 'Hoge spreiding \u2014 er is <b style="color:var(--wn)">veel variatie</b> in '+label.toLowerCase()+'s (CV='+st.cv.toFixed(0)+'%). ';
+
+  // Verdeling
+  h += '<br>Verdeling: <b style="color:var(--tx)">'+distType+'</b>';
+  if(distType==='rechts scheef') h += ' \u2014 er zijn enkele uitschieters naar boven.';
+  else if(distType==='links scheef') h += ' \u2014 er zijn enkele uitschieters naar beneden.';
+  else h += ' \u2014 de waarden zijn symmetrisch verdeeld rond het gemiddelde.';
+
+  // Context-specifieke uitleg
+  if(type==='bouwjaar'){
+    h += '<br><b style="color:var(--tx)">IQR = '+Math.round(st.iqr)+' jaar</b>: de middelste 50% van de panden is gebouwd tussen '+Math.round(st.p25)+' en '+Math.round(st.p75)+'.';
+  } else {
+    h += '<br><b style="color:var(--tx)">IQR = '+Math.round(st.iqr)+' m\u00b2</b>: de middelste 50% van de adressen heeft '+Math.round(st.p25)+'\u2013'+Math.round(st.p75)+' m\u00b2.';
+  }
+
+  h += '</div></div>';
   h += '</div>';
   return h;
 }
