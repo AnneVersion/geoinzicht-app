@@ -11,10 +11,11 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 48'%3E%3Crect y='0' width='64' height='16' fill='%23AE1C28'/%3E%3Crect y='16' width='64' height='16' fill='%23FFF'/%3E%3Crect y='32' width='64' height='16' fill='%2321468B'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-:root{--bg:#0a0f1a;--p:rgba(15,20,35,.85);--p2:rgba(25,32,52,.7);--bd:rgba(55,65,90,.5);--tx:#e2e8f0;--mt:#64748b;--ac:#39ff14;--ac2:#22c55e;--up:#22c55e;--dn:#ef4444;--pu:#a78bfa;--ai:#38bdf8;--wn:#fbbf24;--cyan:#06b6d4;--radius:12px;--glass:rgba(20,28,50,.6);--glass-bd:rgba(80,100,140,.3);--shadow:0 8px 32px rgba(0,0,0,.4)}
+:root{--bg:#0a0f1a;--p:rgba(15,20,35,.85);--p2:rgba(25,32,52,.7);--bd:rgba(55,65,90,.5);--tx:#e2e8f0;--mt:#64748b;--ac:#39ff14;--ac2:#22c55e;--up:#22c55e;--dn:#ef4444;--pu:#39ff14;--ai:#38bdf8;--wn:#fbbf24;--cyan:#06b6d4;--radius:12px;--glass:rgba(20,28,50,.6);--glass-bd:rgba(80,100,140,.15);--shadow:0 8px 32px rgba(0,0,0,.4)}
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);overflow:hidden;height:100vh;height:100dvh}
@@ -26,9 +27,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);overf
 .mi-lg{font-size:22px}
 
 /* Sidebar with glass effect */
-.sidebar{width:360px;background:var(--p);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border-right:1px solid var(--glass-bd);display:flex;flex-direction:column;overflow:hidden;z-index:100;transition:transform .4s cubic-bezier(.4,0,.2,1)}
+.sidebar{width:360px;background:var(--p);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);display:flex;flex-direction:column;overflow:hidden;z-index:100;transition:transform .4s cubic-bezier(.4,0,.2,1)}
 .sidebar.hidden{transform:translateX(-100%);position:absolute;height:100%}
-.sidebar-footer{padding:14px 16px;border-top:1px solid var(--glass-bd);text-align:center;flex-shrink:0;background:rgba(10,15,26,.5)}
+.sidebar-footer{padding:14px 16px;text-align:center;flex-shrink:0;background:rgba(10,15,26,.5)}
 .neon-text{font:900 15px 'Space Mono',monospace;color:#39ff14;text-shadow:0 0 7px #39ff14,0 0 10px #39ff14,0 0 21px #39ff14,0 0 42px #0fa,0 0 82px #0fa;letter-spacing:3px;animation:neonPulse 2s ease-in-out infinite alternate}
 @keyframes neonPulse{from{text-shadow:0 0 5px #39ff14,0 0 10px #39ff14,0 0 20px #39ff14,0 0 40px #0fa}to{text-shadow:0 0 10px #39ff14,0 0 20px #39ff14,0 0 40px #39ff14,0 0 80px #0fa,0 0 120px #0fa}}
 
@@ -36,26 +37,26 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);overf
 #map{width:100%;height:100%}
 
 /* Header */
-.header{padding:14px 16px;border-bottom:1px solid var(--glass-bd);display:flex;align-items:center;gap:10px;background:rgba(10,15,26,.4)}
+.header{padding:14px 16px;display:flex;align-items:center;gap:12px;background:rgba(10,15,26,.4)}
 .sb-logo{font-family:'Space Mono',monospace;font-size:17px;font-weight:700;background:linear-gradient(135deg,#39ff14 0%,#22c55e 50%,#06b6d4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .header-right{margin-left:auto;display:flex;gap:6px;align-items:center}
 
 /* Search */
-.search-wrap{padding:10px 14px;border-bottom:1px solid var(--glass-bd);position:relative}
-.search-wrap input{background:var(--glass);color:var(--tx);border:1px solid var(--glass-bd);border-radius:10px;padding:10px 12px 10px 36px;font:400 13px 'DM Sans',sans-serif;width:100%;outline:none;transition:all .3s cubic-bezier(.4,0,.2,1);backdrop-filter:blur(10px)}
-.search-wrap input:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(57,255,20,.1),0 0 20px rgba(57,255,20,.05)}
+.search-wrap{padding:10px 14px;position:relative}
+.search-wrap input{background:var(--glass);color:var(--tx);border:none;border-radius:10px;padding:10px 12px 10px 36px;font:400 13px 'DM Sans',sans-serif;width:100%;outline:none;transition:all .3s cubic-bezier(.4,0,.2,1);backdrop-filter:blur(10px)}
+.search-wrap input:focus{box-shadow:0 0 0 2px rgba(57,255,20,.2),0 0 20px rgba(57,255,20,.05)}
 .search-wrap input::placeholder{color:var(--mt);transition:opacity .2s}
 .search-wrap input:focus::placeholder{opacity:.5}
 .search-wrap .s-icon{position:absolute;left:24px;top:50%;transform:translateY(-50%);color:var(--mt);transition:color .3s}
 .search-wrap input:focus ~ .s-icon,.search-wrap input:focus + .s-icon{color:var(--ac)}
-.search-results{display:none;position:absolute;left:14px;right:14px;top:50px;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--glass-bd);border-radius:10px;max-height:220px;overflow-y:auto;z-index:200;box-shadow:var(--shadow);animation:slideDown .2s ease-out}
+.search-results{display:none;position:absolute;left:14px;right:14px;top:50px;background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:10px;max-height:220px;overflow-y:auto;z-index:200;box-shadow:var(--shadow);animation:slideDown .2s ease-out}
 @keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
 .search-item{padding:10px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--glass-bd);transition:all .15s ease}
 .search-item:hover{background:rgba(57,255,20,.08);padding-left:16px}
 .search-item:last-child{border:none}
 
 /* Tabs */
-.tabs{display:flex;border-bottom:1px solid var(--glass-bd);background:rgba(10,15,26,.3)}
+.tabs{display:flex;background:rgba(10,15,26,.3)}
 .tab{flex:1;padding:12px 8px;text-align:center;font-size:11px;font-weight:600;color:var(--mt);cursor:pointer;border-bottom:2px solid transparent;transition:all .3s cubic-bezier(.4,0,.2,1);letter-spacing:.3px;text-transform:uppercase;position:relative}
 .tab.active{color:var(--ac);border-bottom-color:var(--ac)}
 .tab:hover{color:var(--tx);background:rgba(255,255,255,.02)}
@@ -76,13 +77,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);overf
 .sh .mi{font-size:16px;color:var(--pu)}
 
 /* Glass cards */
-.card{background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--glass-bd);border-radius:var(--radius);padding:14px;margin-bottom:10px;transition:all .3s cubic-bezier(.4,0,.2,1)}
-.card:hover{border-color:rgba(100,120,160,.4);box-shadow:0 4px 20px rgba(0,0,0,.2)}
+.card{background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:none;border-radius:var(--radius);padding:14px;margin-bottom:10px;transition:all .3s cubic-bezier(.4,0,.2,1)}
+.card:hover{box-shadow:0 4px 20px rgba(0,0,0,.2)}
 
 /* Stats */
 .stat-row{display:flex;gap:10px;margin-bottom:10px}
-.stat{flex:1;background:var(--glass);backdrop-filter:blur(8px);border:1px solid var(--glass-bd);border-radius:10px;padding:12px 8px;text-align:center;transition:all .3s ease}
-.stat:hover{border-color:var(--ac);transform:translateY(-2px);box-shadow:0 4px 16px rgba(57,255,20,.1)}
+.stat{flex:1;background:var(--glass);backdrop-filter:blur(8px);border:none;border-radius:10px;padding:12px 8px;text-align:center;transition:all .3s ease}
+.stat:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(57,255,20,.1)}
 .stat b{display:block;font:700 20px 'Space Mono',monospace;color:var(--ac);transition:transform .2s}
 .stat:hover b{transform:scale(1.05)}
 .stat small{font-size:10px;color:var(--mt);letter-spacing:.3px}
@@ -93,21 +94,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);overf
 .btn:hover::before{opacity:1}
 .btn:active{transform:scale(.96)}
 .btn-p{background:linear-gradient(135deg,var(--ac),var(--ac2));color:#000;font-weight:700}.btn-p:hover{box-shadow:0 4px 20px rgba(57,255,20,.3)}
-.btn-o{background:transparent;color:var(--ac);border:1px solid var(--ac)}.btn-o:hover{background:rgba(57,255,20,.08);box-shadow:0 0 20px rgba(57,255,20,.1)}
-.btn-s{background:var(--glass);color:var(--tx);border:1px solid var(--glass-bd)}.btn-s:hover{background:rgba(255,255,255,.08);border-color:rgba(100,120,160,.5)}
-.btn-s.active{border-color:var(--ac);color:var(--ac);background:rgba(57,255,20,.08);box-shadow:0 0 12px rgba(57,255,20,.1)}
+.btn-o{background:transparent;color:var(--ac)}.btn-o:hover{background:rgba(57,255,20,.08);box-shadow:0 0 20px rgba(57,255,20,.1)}
+.btn-s{background:var(--glass);color:var(--tx)}.btn-s:hover{background:rgba(255,255,255,.08)}
+.btn-s.active{color:var(--ac);background:rgba(57,255,20,.1);box-shadow:0 0 12px rgba(57,255,20,.08)}
 
 /* Select */
-select{background:var(--glass);color:var(--tx);border:1px solid var(--glass-bd);border-radius:10px;padding:10px 12px;font:500 13px 'DM Sans',sans-serif;width:100%;outline:none;appearance:none;-webkit-appearance:none;cursor:pointer;transition:all .3s ease;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
-select:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(57,255,20,.08)}
-select:hover{border-color:rgba(100,120,160,.6)}
+select{background:var(--glass);color:var(--tx);border:none;border-radius:10px;padding:10px 12px;font:500 13px 'DM Sans',sans-serif;width:100%;outline:none;appearance:none;-webkit-appearance:none;cursor:pointer;transition:all .3s ease;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+select:focus{box-shadow:0 0 0 2px rgba(57,255,20,.15)}
+select:hover{background:rgba(30,40,65,.7)}
 select option{background:var(--bg);color:var(--tx)}
 
 /* Legend */
 .legend{display:flex;flex-direction:column;gap:3px;margin-top:8px}
 .legend-row{display:flex;align-items:center;gap:8px;font-size:11px;padding:2px 0;transition:opacity .2s}
 .legend-row:hover{opacity:.8}
-.legend-color{width:28px;height:14px;border-radius:4px;border:1px solid rgba(255,255,255,.08);transition:transform .2s}
+.legend-color{width:28px;height:14px;border-radius:4px;transition:transform .2s}
 .legend-row:hover .legend-color{transform:scaleX(1.1)}
 
 /* Progress */
@@ -119,7 +120,7 @@ select option{background:var(--bg);color:var(--tx)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* Info panel */
-.info-panel{position:absolute;top:12px;right:12px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border:1px solid var(--glass-bd);border-radius:var(--radius);padding:16px;z-index:500;min-width:280px;max-width:380px;max-height:calc(100vh - 40px);overflow-y:auto;display:none;box-shadow:var(--shadow);animation:slideIn .3s cubic-bezier(.4,0,.2,1)}
+.info-panel{position:absolute;top:12px;right:12px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border:none;border-radius:var(--radius);padding:16px;z-index:500;min-width:280px;max-width:380px;max-height:calc(100vh - 40px);overflow-y:auto;display:none;box-shadow:var(--shadow);animation:slideIn .3s cubic-bezier(.4,0,.2,1)}
 @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 .info-panel.show{display:block}
 .info-panel h3{font:700 14px 'Space Mono',monospace;color:var(--ac);margin-bottom:10px;display:flex;align-items:center;gap:6px}
@@ -136,8 +137,8 @@ select option{background:var(--bg);color:var(--tx)}
 .info-dist{font:400 9px 'Space Mono',monospace;color:var(--mt);padding:2px 5px;border-radius:3px;background:rgba(45,58,77,.3);display:inline-block;margin-top:2px}
 
 /* Sidebar toggle */
-.sidebar-toggle{position:absolute;top:12px;left:12px;z-index:600;background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--glass-bd);border-radius:10px;width:40px;height:40px;display:none;place-items:center;cursor:pointer;color:var(--ac);font-size:20px;transition:all .3s;box-shadow:var(--shadow)}
-.sidebar-toggle:hover{background:rgba(57,255,20,.1);border-color:var(--ac)}
+.sidebar-toggle{position:absolute;top:12px;left:12px;z-index:600;background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:none;border-radius:10px;width:40px;height:40px;display:none;place-items:center;cursor:pointer;color:var(--ac);font-size:20px;transition:all .3s;box-shadow:var(--shadow)}
+.sidebar-toggle:hover{background:rgba(57,255,20,.1)}
 
 /* Loading */
 .loading-overlay{position:fixed;inset:0;background:rgba(10,15,26,.97);z-index:9999;display:grid;place-items:center}
@@ -159,13 +160,13 @@ select option{background:var(--bg);color:var(--tx)}
 .indicator-list{display:flex;flex-direction:column;gap:3px;max-height:320px;overflow-y:auto;padding-right:4px}
 .indicator-list::-webkit-scrollbar{width:3px}
 .indicator-list::-webkit-scrollbar-thumb{background:var(--glass-bd);border-radius:3px}
-.ind-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;cursor:pointer;transition:all .2s ease;border:1px solid transparent;font-size:12px;user-select:none;-webkit-user-select:none}
-.ind-item:hover{background:rgba(255,255,255,.03);border-color:var(--glass-bd)}
-.ind-item.active{background:rgba(57,255,20,.06);border-color:rgba(57,255,20,.2)}
-.ind-item.primary{background:rgba(57,255,20,.1);border-color:rgba(57,255,20,.4);box-shadow:0 0 12px rgba(57,255,20,.08)}
-.ind-item .ind-icon{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;background:var(--glass);border:1px solid var(--glass-bd);flex-shrink:0;transition:all .2s}
-.ind-item.active .ind-icon{background:rgba(57,255,20,.1);border-color:rgba(57,255,20,.3);color:var(--ac)}
-.ind-item.primary .ind-icon{background:rgba(57,255,20,.2);border-color:rgba(57,255,20,.5);color:var(--ac)}
+.ind-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;cursor:pointer;transition:all .2s ease;border:none;font-size:12px;user-select:none;-webkit-user-select:none}
+.ind-item:hover{background:rgba(255,255,255,.04)}
+.ind-item.active{background:rgba(57,255,20,.06)}
+.ind-item.primary{background:rgba(57,255,20,.1);box-shadow:0 0 12px rgba(57,255,20,.08)}
+.ind-item .ind-icon{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;background:var(--glass);border:none;flex-shrink:0;transition:all .2s}
+.ind-item.active .ind-icon{background:rgba(57,255,20,.1);color:var(--ac)}
+.ind-item.primary .ind-icon{background:rgba(57,255,20,.2);color:var(--ac)}
 .ind-item .ind-icon .mi{font-size:15px;color:var(--mt);transition:color .2s}
 .ind-item.active .ind-icon .mi,.ind-item.primary .ind-icon .mi{color:var(--ac)}
 .ind-item .ind-name{font-weight:500;color:var(--mt);transition:color .2s;flex:1}
@@ -200,7 +201,7 @@ select option{background:var(--bg);color:var(--tx)}
   <div class="sidebar" id="sidebar">
     <div class="header">
       <div style="display:flex;align-items:center;gap:10px">
-        <img src="logo.svg" alt="DC" style="width:38px;height:38px;filter:drop-shadow(0 0 8px rgba(57,255,20,.2))">
+        <img src="logo.svg" alt="DC" style="width:52px;height:52px;filter:drop-shadow(0 0 12px rgba(57,255,20,.3))">
         <div>
           <div class="sb-logo">GeoInzicht</div>
           <span style="font-size:9px;color:var(--mt);letter-spacing:.5px">CBS buurtdata op de kaart</span>
@@ -233,6 +234,9 @@ select option{background:var(--bg);color:var(--tx)}
         <button class="btn btn-s" data-layer="bag" onclick="toggleLayer('bag')"><span class="mi mi-sm">location_on</span> BAG Adressen</button>
         <button class="btn btn-s" data-layer="panden" onclick="toggleLayer('panden')"><span class="mi mi-sm">apartment</span> BAG Panden</button>
       </div>
+
+      <div class="sh" id="bagStatusSection" style="display:none"><span class="mi">filter_alt</span> BAG Status filter</div>
+      <div id="bagStatusBtns" style="display:none;gap:5px;flex-wrap:wrap;margin-bottom:8px"></div>
 
       <div class="sh"><span class="mi">filter_alt</span> Filter gemeente</div>
       <select id="gemeenteFilter" onchange="filterGemeente()">
@@ -370,7 +374,7 @@ select option{background:var(--bg);color:var(--tx)}
 
       <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v5.4</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v5.5</div>
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
@@ -639,22 +643,83 @@ function toggleLayer(type){
 // ============================================================
 // BAG WMS
 // ============================================================
+var BAG_STATUSES = [
+  {id:'all',  label:'Alle',          color:'var(--tx)'},
+  {id:'gebruik', label:'In gebruik',    color:'var(--ac)'},
+  {id:'buiten', label:'Buiten gebruik', color:'var(--wn)'},
+  {id:'gevormd', label:'Gevormd',       color:'var(--ai)'},
+  {id:'ingetrokken', label:'Ingetrokken',   color:'var(--dn)'},
+  {id:'niet', label:'Niet gerealiseerd', color:'var(--mt)'}
+];
+var _bagStatusFilter = 'all';
+
+function buildBagStatusButtons(){
+  var el = document.getElementById('bagStatusBtns');
+  var html = '';
+  BAG_STATUSES.forEach(function(s){
+    html += '<button class="btn btn-s'+(s.id==='all'?' active':'')+'" data-bagstatus="'+s.id+'" onclick="setBagStatus(\''+s.id+'\')" style="font-size:10px;padding:5px 10px">';
+    html += '<span style="width:8px;height:8px;border-radius:50%;background:'+s.color+';display:inline-block"></span> '+s.label;
+    html += '</button>';
+  });
+  el.innerHTML = html;
+}
+
+function setBagStatus(id){
+  _bagStatusFilter = id;
+  document.querySelectorAll('[data-bagstatus]').forEach(function(b){
+    b.classList.toggle('active', b.dataset.bagstatus === id);
+  });
+  // Herlaad BAG WMS met filter
+  if(_layerState.bag && _bagWmsLayer){
+    _map.removeLayer(_bagWmsLayer);
+    _bagWmsLayer = null;
+    createBagWmsLayer();
+  }
+}
+
+function getCqlFilter(){
+  if(_bagStatusFilter === 'all') return null;
+  var map = {
+    'gebruik': "status = 'Verblijfsobject in gebruik' OR status = 'Verblijfsobject in gebruik (niet ingemeten)'",
+    'buiten': "status = 'Verblijfsobject buiten gebruik'",
+    'gevormd': "status = 'Verblijfsobject gevormd'",
+    'ingetrokken': "status = 'Verblijfsobject ingetrokken'",
+    'niet': "status = 'Niet gerealiseerd verblijfsobject'"
+  };
+  return map[_bagStatusFilter] || null;
+}
+
+function createBagWmsLayer(){
+  var opts = {
+    layers:'verblijfsobject',styles:'bag:verblijfsobject_status',format:'image/png',transparent:true,
+    version:'1.1.1',opacity:0.9,maxZoom:22,tileSize:256,minZoom:15
+  };
+  var cql = getCqlFilter();
+  if(cql) opts.CQL_FILTER = cql;
+  _bagWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, opts).addTo(_map);
+  fixLayerOrder();
+}
+
 function toggleBagLayer(on){
   if(!_map) return;
+  var statusSection = document.getElementById('bagStatusSection');
+  var statusBtns = document.getElementById('bagStatusBtns');
   if(on){
     if(_bagWmsLayer) return;
-    _bagWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, {
-      layers:'verblijfsobject',styles:'bag:verblijfsobject_status',format:'image/png',transparent:true,
-      version:'1.1.1',opacity:0.9,maxZoom:22,tileSize:256,minZoom:15
-    }).addTo(_map);
-    fixLayerOrder();
+    createBagWmsLayer();
+    statusSection.style.display = '';
+    statusBtns.style.display = 'flex';
     if(_map.getZoom() < 15){
       _map.setZoom(15);
-      toast('Ingezoomd naar niveau 15 \u2014 BAG adressen nu zichtbaar');
+      toast('Ingezoomd naar niveau 15 — BAG adressen nu zichtbaar');
     } else {
       toast('BAG adressen actief (gekleurd op status)');
     }
-  } else if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
+  } else {
+    if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
+    statusSection.style.display = 'none';
+    statusBtns.style.display = 'none';
+  }
 }
 
 function bagGetFeatureInfo(e){
@@ -1153,6 +1218,7 @@ async function init(){
     initMap();
     buildIndicatorList();
     buildBasemapButtons();
+    buildBagStatusButtons();
     renderIndicatorDefs();
     setupSearch();
 
@@ -1186,14 +1252,7 @@ async function init(){
     document.getElementById('dsJaar').textContent = meta.year || '\u2014';
     document.getElementById('dsGenerated').textContent = meta.generated ? meta.generated.substring(0,10) : '\u2014';
 
-    // BAG adressen op achtergrond laden (zichtbaar vanaf zoom 15, gekleurd op status)
-    _layerState.bag = true;
-    document.querySelector('[data-layer="bag"]').classList.add('active');
-    _bagWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, {
-      layers:'verblijfsobject',styles:'bag:verblijfsobject_status',format:'image/png',transparent:true,
-      version:'1.1.1',opacity:0.9,maxZoom:22,tileSize:256,minZoom:15
-    }).addTo(_map);
-    fixLayerOrder();
+    // BAG adressen NIET standaard laden — gebruiker klikt zelf op de toggle
 
     loadBar.style.width = '100%';
     loadMsg.textContent = 'Klaar!';
