@@ -851,6 +851,9 @@ function switchYear(year){
     renderChoropleth('gemeenten');
     computeNationalStats();
 
+    // Update indicator definities op Info tab
+    renderIndicatorDefs();
+
     // Herlaad buurten en wijken op achtergrond (altijd, voor filters en stats)
     setTimeout(function(){ loadBackgroundCbsData(); }, 500);
 
@@ -3764,16 +3767,165 @@ function toggleSidebar(){
   setTimeout(function(){if(_map)_map.invalidateSize()},400);
 }
 
+// Uitleg per indicator
+var INDICATOR_UITLEG = {
+  'aantal_inwoners': 'Totaal aantal geregistreerde inwoners in het gebied. Gebaseerd op de BRP (Basisregistratie Personen).',
+  'mannen': 'Aantal mannelijke inwoners geregistreerd in het gebied.',
+  'vrouwen': 'Aantal vrouwelijke inwoners geregistreerd in het gebied.',
+  '0_15': 'Percentage van de bevolking jonger dan 15 jaar. Indicator voor gezinnen met jonge kinderen.',
+  '15_25': 'Percentage 15-24 jarigen. Hoog percentage kan wijzen op studentenpopulatie.',
+  '25_45': 'Percentage 25-44 jarigen. De werkende en gezinsvormende leeftijdsgroep.',
+  '45_65': 'Percentage 45-64 jarigen. Vaak gevestigde bewoners met stabiel inkomen.',
+  '65plus': 'Percentage 65-plussers. Hoog percentage duidt op vergrijzing en hogere zorgbehoefte.',
+  'bevolkingsdichtheid': 'Inwoners per vierkante kilometer. Stedelijke gebieden: >2500, landelijk: <500.',
+  'huishoudens': 'Totaal aantal huishoudens (alleenstaand, samenwonend, gezin) in het gebied.',
+  'gem_huishouden_grootte': 'Gemiddeld aantal personen per huishouden. Landelijk circa 2,1. Lager = meer alleenstaanden.',
+  'woningvoorraad': 'Totaal aantal woningen in het gebied, ongeacht of ze bewoond zijn.',
+  'gem_woz_waarde': 'Gemiddelde WOZ-waarde (Wet Waardering Onroerende Zaken) van woningen. Bepalend voor OZB belasting.',
+  'koopwoningen': 'Percentage woningen in eigendom. Hoger = meer vermogensopbouw bij bewoners.',
+  'huurwoningen': 'Percentage huurwoningen (sociaal + vrije sector). Hoger = meer doorstroom.',
+  'pct_eengezins': 'Percentage eengezinswoningen (rijtjes, twee-onder-een-kap, vrijstaand). Typisch voor suburbaan.',
+  'gem_aardgas': 'Gemiddeld jaarlijks aardgasverbruik per woning in m\u00b3. Hoger = mogelijk slecht ge\u00efsoleerd.',
+  'gem_elektriciteit': 'Gemiddeld jaarlijks elektriciteitsverbruik per woning in kWh. Inclusief warmtepompen.',
+  'gem_inkomen_inwoner': 'Gemiddeld besteedbaar inkomen per inwoner. Inclusief lonen, uitkeringen en pensioenen.',
+  'arbeidsparticipatie': 'Netto arbeidsparticipatie: percentage 15-74 jarigen dat minimaal 12 uur per week werkt.',
+  'bedrijfsvestigingen': 'Aantal geregistreerde bedrijfsvestigingen (KvK). Indicator voor lokale economische activiteit.',
+  'personenautos': 'Totaal aantal geregistreerde personenauto\'s. Indicator voor mobiliteit en autobezit.',
+  'afstand_huisarts': 'Gemiddelde afstand tot dichtstbijzijnde huisartsenpraktijk in km. >2 km = aandachtspunt.',
+  'afstand_supermarkt': 'Gemiddelde afstand tot dichtstbijzijnde grote supermarkt in km. >3 km = voedselwoestijn.'
+};
+
 function renderIndicatorDefs(){
   var el = document.getElementById('indicatorDefs');
-  var html = '';
-  INDICATORS.forEach(function(fm){
-    html += '<div style="padding:5px 0;border-bottom:1px solid var(--glass-bd);display:flex;align-items:center;gap:6px">';
-    html += '<span class="mi mi-sm" style="color:var(--ai);flex-shrink:0">'+fm.icon+'</span>';
-    html += '<div><div style="font:600 11px \'DM Sans\',sans-serif;color:var(--tx)">'+fm.naam+'</div>';
-    html += '<div style="font-size:9px;color:var(--mt)">'+fm.key+' \u00b7 '+fm.eenheid+'</div></div></div>';
+  // Alleen indicatoren tonen die beschikbaar zijn voor het actieve jaar
+  var yearInds = _yearIndicators[_activeYear];
+  var avSet = yearInds ? new Set(yearInds) : null;
+  var available = INDICATORS.filter(function(fm){ return !avSet || avSet.has(fm.key); });
+
+  // Zorg dat nationalStats berekend is
+  if(!_nationalStats || Object.keys(_nationalStats).length === 0) computeNationalStats();
+
+  // Groepeer per categorie
+  var categories = [
+    {label:'Bevolking', icon:'groups', color:'var(--ac)', keys:['aantal_inwoners','mannen','vrouwen','0_15','15_25','25_45','45_65','65plus','bevolkingsdichtheid','huishoudens','gem_huishouden_grootte']},
+    {label:'Woningen & Vastgoed', icon:'home', color:'var(--wn)', keys:['woningvoorraad','gem_woz_waarde','koopwoningen','huurwoningen','pct_eengezins']},
+    {label:'Energie', icon:'bolt', color:'var(--cyan)', keys:['gem_aardgas','gem_elektriciteit']},
+    {label:'Economie', icon:'payments', color:'var(--ai)', keys:['gem_inkomen_inwoner','arbeidsparticipatie','bedrijfsvestigingen','personenautos']},
+    {label:'Voorzieningen', icon:'local_hospital', color:'#f59e0b', keys:['afstand_huisarts','afstand_supermarkt']}
+  ];
+
+  var html = '<div style="font:500 10px \'Space Mono\',monospace;color:var(--ac);margin-bottom:8px">'+available.length+'/'+INDICATORS.length+' indicatoren beschikbaar voor '+_activeYear+'</div>';
+
+  categories.forEach(function(cat){
+    var catInds = available.filter(function(fm){ return cat.keys.indexOf(fm.key) > -1; });
+    if(catInds.length === 0) return;
+
+    html += '<div style="margin-top:8px;margin-bottom:4px;font:700 10px \'DM Sans\',sans-serif;color:'+cat.color+';display:flex;align-items:center;gap:4px;text-transform:uppercase;letter-spacing:.5px">';
+    html += '<span class="mi mi-sm" style="color:'+cat.color+'">'+cat.icon+'</span> '+cat.label+' ('+catInds.length+')</div>';
+
+    catInds.forEach(function(fm){
+      var ns = _nationalStats[fm.key];
+      var uitleg = INDICATOR_UITLEG[fm.key] || '';
+      var isActive = _activeIndicators.indexOf(fm.key) >= 0;
+
+      html += '<div style="padding:6px 4px;border-bottom:1px solid var(--glass-bd);cursor:pointer;transition:background .15s" ';
+      html += 'onmouseenter="this.querySelector(\'.ind-tooltip\').style.display=\'block\'" ';
+      html += 'onmouseleave="this.querySelector(\'.ind-tooltip\').style.display=\'none\'">';
+
+      // Hoofdrij
+      html += '<div style="display:flex;align-items:center;gap:6px">';
+      html += '<span class="mi mi-sm" style="color:'+(isActive ? 'var(--ac)' : cat.color)+';flex-shrink:0">'+fm.icon+'</span>';
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font:600 11px \'DM Sans\',sans-serif;color:'+(isActive ? 'var(--ac)' : 'var(--tx)')+'">'+fm.naam;
+      if(isActive) html += ' <span style="font-size:8px;background:rgba(57,255,20,.15);color:var(--ac);padding:1px 5px;border-radius:4px;vertical-align:1px">actief</span>';
+      html += '</div>';
+      html += '<div style="font-size:9px;color:var(--mt)">'+fm.eenheid+'</div>';
+      html += '</div>';
+
+      // Mini-stats
+      if(ns){
+        html += '<div style="display:flex;gap:4px;flex-shrink:0">';
+        html += '<span style="font:400 9px \'Space Mono\',monospace;color:var(--mt);background:var(--glass);padding:1px 4px;border-radius:3px" title="Landelijk gemiddelde">\u00f8 '+fmtStat(ns.avg, fm.key)+'</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+
+      // Tooltip (verborgen, verschijnt bij hover)
+      html += '<div class="ind-tooltip" style="display:none;margin-top:6px;padding:8px;background:rgba(10,15,26,.8);border-radius:8px;border:1px solid var(--glass-bd)">';
+      // Uitleg
+      if(uitleg) html += '<div style="font-size:10px;color:var(--tx);margin-bottom:6px;line-height:1.5">'+uitleg+'</div>';
+
+      if(ns){
+        // Stats grid
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px">';
+        html += '<div style="text-align:center;padding:4px;background:rgba(57,255,20,.06);border-radius:4px"><div style="font-size:8px;color:var(--mt)">Gemiddeld</div><div style="font:700 11px \'Space Mono\',monospace;color:var(--ac)">'+fmtStat(ns.avg, fm.key)+'</div></div>';
+        html += '<div style="text-align:center;padding:4px;background:rgba(56,189,248,.06);border-radius:4px"><div style="font-size:8px;color:var(--mt)">Mediaan</div><div style="font:700 11px \'Space Mono\',monospace;color:var(--ai)">'+fmtStat(ns.median, fm.key)+'</div></div>';
+        html += '<div style="text-align:center;padding:4px;background:rgba(251,191,36,.06);border-radius:4px"><div style="font-size:8px;color:var(--mt)">Std.dev</div><div style="font:700 11px \'Space Mono\',monospace;color:var(--wn)">'+fmtStat(ns.stddev, fm.key)+'</div></div>';
+        html += '</div>';
+
+        // Min/Max + range
+        html += '<div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:4px">';
+        html += '<span style="color:var(--dn)">Min: '+fmtStat(ns.min, fm.key)+'</span>';
+        html += '<span style="color:var(--mt)">|</span>';
+        html += '<span style="color:var(--up)">Max: '+fmtStat(ns.max, fm.key)+'</span>';
+        html += '</div>';
+
+        // Visuele balk: P10 — Gem — P90
+        html += '<div style="position:relative;height:8px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden">';
+        var range = ns.max - ns.min || 1;
+        var avgPct = ((ns.avg - ns.min) / range * 100).toFixed(1);
+        var p10Pct = ns.p10 ? ((ns.p10 - ns.min) / range * 100).toFixed(1) : '10';
+        var p90Pct = ns.p90 ? ((ns.p90 - ns.min) / range * 100).toFixed(1) : '90';
+        html += '<div style="position:absolute;left:'+p10Pct+'%;right:'+(100-parseFloat(p90Pct))+'%;height:100%;background:rgba(57,255,20,.15);border-radius:4px"></div>';
+        html += '<div style="position:absolute;left:'+avgPct+'%;top:0;width:2px;height:100%;background:var(--ac)"></div>';
+        html += '</div>';
+        html += '<div style="display:flex;justify-content:space-between;font-size:8px;color:var(--mt);margin-top:2px">';
+        html += '<span>P10: '+fmtStat(ns.p10, fm.key)+'</span>';
+        html += '<span>P90: '+fmtStat(ns.p90, fm.key)+'</span>';
+        html += '</div>';
+
+        // Distributie info
+        html += '<div style="font-size:8px;color:var(--mt);margin-top:4px">';
+        html += 'Distributie: '+ns.distType+' \u00b7 n='+ns.count+' gemeenten';
+        if(Math.abs(ns.skewness) > 0.5) html += ' \u00b7 scheefheid: '+(ns.skewness > 0 ? '+' : '')+ns.skewness.toFixed(2);
+        html += '</div>';
+      } else {
+        html += '<div style="font-size:9px;color:var(--mt);font-style:italic">Geen landelijke statistieken beschikbaar voor dit jaar</div>';
+      }
+      html += '</div>'; // end tooltip
+      html += '</div>'; // end indicator row
+    });
   });
+
+  // Ontbrekende indicatoren
+  var missing = INDICATORS.filter(function(fm){ return avSet && !avSet.has(fm.key); });
+  if(missing.length > 0){
+    html += '<div style="margin-top:10px;padding:8px;background:rgba(239,68,68,.06);border-radius:8px;border:1px solid rgba(239,68,68,.15)">';
+    html += '<div style="font:600 9px \'DM Sans\',sans-serif;color:var(--dn);margin-bottom:4px">Niet beschikbaar in '+_activeYear+' ('+missing.length+')</div>';
+    html += '<div style="font-size:9px;color:var(--mt);line-height:1.6">';
+    missing.forEach(function(fm){
+      html += '<span style="display:inline-flex;align-items:center;gap:3px;margin:1px 4px 1px 0;padding:1px 6px;background:rgba(239,68,68,.05);border-radius:3px;opacity:.6">';
+      html += '<span class="mi" style="font-size:10px">'+fm.icon+'</span> '+fm.naam+'</span>';
+    });
+    html += '</div></div>';
+  }
+
   el.innerHTML = html;
+}
+
+function fmtStat(v, key){
+  if(v == null || v === undefined) return '\u2014';
+  if(typeof v !== 'number') return String(v);
+  if(key === 'gem_woz_waarde') return '\u20ac'+Math.round(v/1000)+'k';
+  if(key === 'gem_inkomen_inwoner') return '\u20ac'+Math.round(v/1000)+'k';
+  if(key === 'afstand_huisarts' || key === 'afstand_supermarkt') return v.toFixed(1)+'km';
+  if(key === 'gem_aardgas') return Math.round(v)+'m\u00b3';
+  if(key === 'gem_elektriciteit') return Math.round(v)+'kWh';
+  if(v >= 10000) return v.toLocaleString('nl-NL');
+  if(v >= 100) return Math.round(v).toLocaleString('nl-NL');
+  if(v >= 10) return v.toFixed(1);
+  if(v >= 1) return v.toFixed(1);
+  return v.toFixed(2);
 }
 
 function toast(msg){
