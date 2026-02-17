@@ -373,7 +373,7 @@ select option{background:var(--bg);color:var(--tx)}
 
       <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v5.6</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v5.7</div>
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
@@ -478,8 +478,9 @@ function initMap(){
 
   _map.on('click', function(e){
     if(_map.getZoom() >= 16){
-      if(_pandWmsLayer) pandGetFeatureInfo(e);
-      else if(_bagWmsLayer) bagGetFeatureInfo(e);
+      // Prioriteit: BAG adressen (meer detail), dan panden
+      if(_bagWmsLayer) bagGetFeatureInfo(e);
+      else if(_pandWmsLayer) pandGetFeatureInfo(e);
     }
   });
 }
@@ -691,12 +692,27 @@ function getCqlFilter(){
 function createBagWmsLayer(){
   var opts = {
     layers:'verblijfsobject',format:'image/png',transparent:true,
-    version:'1.1.1',opacity:0.85,maxZoom:22,tileSize:256,minZoom:15
+    version:'1.1.1',opacity:1.0,maxZoom:22,tileSize:256,minZoom:15
   };
   var cql = getCqlFilter();
   if(cql) opts.CQL_FILTER = cql;
   _bagWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, opts).addTo(_map);
   fixLayerOrder();
+}
+
+function dimChoroplethLayers(dim){
+  // Dim/undim choropleth lagen zodat BAG WMS goed zichtbaar is
+  var opacity = dim ? 0.12 : 0.65;
+  var borderOp = dim ? 0.1 : 0.5;
+  [_gemeenteLayer, _wijkLayer, _buurtLayer].forEach(function(layer){
+    if(!layer) return;
+    layer.eachLayer(function(sub){
+      try{
+        var s = sub.options;
+        sub.setStyle({fillOpacity:opacity, opacity:borderOp});
+      }catch(e){}
+    });
+  });
 }
 
 function toggleBagLayer(on){
@@ -708,16 +724,26 @@ function toggleBagLayer(on){
     createBagWmsLayer();
     statusSection.style.display = '';
     statusBtns.style.display = 'flex';
+    // Dim choropleth lagen voor contrast
+    dimChoroplethLayers(true);
+    // Panden automatisch mee aanzetten als context
+    if(!_layerState.panden){
+      _layerState.panden = true;
+      document.querySelector('[data-layer="panden"]').classList.add('active');
+      togglePandLayer(true);
+    }
     if(_map.getZoom() < 17){
       _map.setZoom(17);
-      toast('Ingezoomd naar niveau 17 — BAG adressen nu zichtbaar');
+      toast('BAG adressen + panden actief — ingezoomd');
     } else {
-      toast('BAG adressen actief');
+      toast('BAG adressen + panden actief');
     }
   } else {
     if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
     statusSection.style.display = 'none';
     statusBtns.style.display = 'none';
+    // Herstel choropleth opacity
+    dimChoroplethLayers(false);
   }
 }
 
@@ -815,17 +841,22 @@ function togglePandLayer(on){
   if(on){
     if(_pandWmsLayer) return;
     _pandWmsLayer = L.tileLayer.wms(PDOK_BAG_WMS, {
-      layers:'pand',styles:'bag:pand_status',format:'image/png',transparent:true,
-      version:'1.1.1',opacity:0.7,maxZoom:22,tileSize:256,minZoom:15
+      layers:'pand',format:'image/png',transparent:true,
+      version:'1.1.1',opacity:0.6,maxZoom:22,tileSize:256,minZoom:15
     }).addTo(_map);
     fixLayerOrder();
+    dimChoroplethLayers(true);
     if(_map.getZoom() < 17){
       _map.setZoom(17);
       toast('Ingezoomd naar niveau 17 \u2014 BAG panden nu zichtbaar');
     } else {
       toast('BAG panden actief');
     }
-  } else if(_pandWmsLayer){_map.removeLayer(_pandWmsLayer);_pandWmsLayer=null}
+  } else {
+    if(_pandWmsLayer){_map.removeLayer(_pandWmsLayer);_pandWmsLayer=null}
+    // Herstel choropleth alleen als BAG adressen ook uit staan
+    if(!_layerState.bag) dimChoroplethLayers(false);
+  }
 }
 
 function pandGetFeatureInfo(e){
@@ -858,7 +889,6 @@ function pandGetFeatureInfo(e){
     html += buildAreaStatsHtml(e.latlng);
     document.getElementById('infoContent').innerHTML = html;
     document.getElementById('infoPanel').classList.add('show');
-    if(_bagWmsLayer) bagGetFeatureInfo(e);
   }).catch(function(){});
 }
 
