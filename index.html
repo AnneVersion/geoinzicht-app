@@ -373,7 +373,7 @@ select option{background:var(--bg);color:var(--tx)}
 
       <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v5.8</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v5.9</div>
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
@@ -761,16 +761,88 @@ function showBagFeatureInfo(p, latlng){
   var hnr = (p.huisnummer||'') + (p.huisletter||'') + (p.toevoeging?' '+p.toevoeging:'');
   document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">location_on</span> '+((straat+' '+hnr).trim() || 'BAG Object');
   var html = '';
+  // Basisgegevens
   if(p.postcode) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">mail</span> Postcode</span><span class="info-val">'+p.postcode+'</span></div>';
   if(p.woonplaats) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">location_city</span> Woonplaats</span><span class="info-val">'+p.woonplaats+'</span></div>';
   if(p.gebruiksdoel) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">category</span> Gebruiksdoel</span><span class="info-val">'+p.gebruiksdoel+'</span></div>';
-  if(p.bouwjaar) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">event</span> Bouwjaar</span><span class="info-val">'+p.bouwjaar+'</span></div>';
-  if(p.oppervlakte) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">square_foot</span> Oppervlakte</span><span class="info-val">'+p.oppervlakte+' m\u00b2</span></div>';
   if(p.status) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">info</span> Status</span><span class="info-val" style="color:'+bagStatusToColor(p.status)+'">'+p.status+'</span></div>';
   if(p.pandstatus) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">apartment</span> Pand</span><span class="info-val" style="font-size:10px">'+p.pandstatus+'</span></div>';
-  html += buildAreaStatsHtml(latlng);
+
+  // === VERGELIJKING: dit adres vs buurt/viewport ===
+  html += buildBagCompareHtml(p);
+
+  // === CBS STATISTIEKEN: alle niveaus (buurt, wijk, gemeente, landelijk) ===
+  html += buildMultiLevelStatsHtml(latlng);
+
   document.getElementById('infoContent').innerHTML = html;
   document.getElementById('infoPanel').classList.add('show');
+}
+
+// Vergelijk BAG-specifieke waarden (bouwjaar, oppervlakte) met viewport gemiddelde
+function buildBagCompareHtml(p){
+  if(!_bagVectorData || !_bagVectorData.length) return '';
+  var html = '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
+  html += '<div style="font:700 11px \'Space Mono\',monospace;color:var(--ac);margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm">compare_arrows</span> Dit adres vs. omgeving</div>';
+
+  // Bereken stats van viewport data
+  var bouwjaren = [], oppervlaktes = [];
+  _bagVectorData.forEach(function(f){
+    var fp = f.properties;
+    if(fp.bouwjaar && fp.bouwjaar > 1000) bouwjaren.push(fp.bouwjaar);
+    if(fp.oppervlakte && fp.oppervlakte > 0) oppervlaktes.push(fp.oppervlakte);
+  });
+
+  if(p.bouwjaar && bouwjaren.length > 5){
+    bouwjaren.sort(function(a,b){return a-b});
+    var bAvg = bouwjaren.reduce(function(a,b){return a+b},0)/bouwjaren.length;
+    var bMin = bouwjaren[0], bMax = bouwjaren[bouwjaren.length-1];
+    var bStd = Math.sqrt(bouwjaren.reduce(function(a,b){return a+(b-bAvg)*(b-bAvg)},0)/bouwjaren.length);
+    var bZ = bStd > 0 ? (p.bouwjaar - bAvg)/bStd : 0;
+    html += buildMiniCompare('event','Bouwjaar', p.bouwjaar, '', bAvg, bMin, bMax, bZ, bouwjaren.length,
+      p.bouwjaar > bAvg + bStd ? 'Nieuwer dan de meeste panden in de buurt' :
+      p.bouwjaar < bAvg - bStd ? 'Ouder dan de meeste panden in de buurt' :
+      'Vergelijkbaar bouwjaar met de omgeving');
+  }
+
+  if(p.oppervlakte && oppervlaktes.length > 5){
+    oppervlaktes.sort(function(a,b){return a-b});
+    var oAvg = oppervlaktes.reduce(function(a,b){return a+b},0)/oppervlaktes.length;
+    var oMin = oppervlaktes[0], oMax = oppervlaktes[oppervlaktes.length-1];
+    var oStd = Math.sqrt(oppervlaktes.reduce(function(a,b){return a+(b-oAvg)*(b-oAvg)},0)/oppervlaktes.length);
+    var oZ = oStd > 0 ? (p.oppervlakte - oAvg)/oStd : 0;
+    html += buildMiniCompare('square_foot','Oppervlakte', p.oppervlakte, 'm\u00b2', oAvg, oMin, oMax, oZ, oppervlaktes.length,
+      p.oppervlakte > oAvg + oStd ? 'Groter dan gemiddeld in deze buurt' :
+      p.oppervlakte < oAvg - oStd ? 'Kleiner dan gemiddeld in deze buurt' :
+      'Gemiddelde grootte voor deze buurt');
+  }
+
+  html += '</div>';
+  return html;
+}
+
+// Mini vergelijkingskaart met normaalverdeling
+function buildMiniCompare(icon, label, val, unit, avg, min, max, z, n, uitleg){
+  var range = max - min;
+  var pos = range > 0 ? Math.min(100, Math.max(0, (val - min)/range*100)) : 50;
+  var avgPos = range > 0 ? Math.min(100, Math.max(0, (avg - min)/range*100)) : 50;
+  var h = '<div style="margin-bottom:10px;padding:8px 10px;background:rgba(15,20,35,.5);border-radius:8px;border-left:3px solid '+getBarColor(z)+'">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">';
+  h += '<span style="font:600 12px \'DM Sans\',sans-serif;color:var(--tx);display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:15px;color:var(--ai)">'+icon+'</span>'+label+'</span>';
+  h += '<span style="font:700 14px \'Space Mono\',monospace;color:var(--ac)">'+val+' <span style="font-size:10px;color:var(--mt)">'+unit+'</span></span>';
+  h += '</div>';
+  // Normaalverdeling
+  h += buildDistSvg(z, 'normaal');
+  // Vergelijking tabel
+  h += '<div style="display:flex;gap:6px;margin:3px 0;font-size:10px">';
+  h += '<div style="flex:1;text-align:center;padding:3px;background:rgba(255,255,255,.03);border-radius:4px"><div style="color:var(--mt)">Gem.</div><div style="font:700 11px Space Mono,monospace;color:var(--ai)">'+Math.round(avg)+'</div></div>';
+  h += '<div style="flex:1;text-align:center;padding:3px;background:rgba(255,255,255,.03);border-radius:4px"><div style="color:var(--mt)">Min</div><div style="font:700 11px Space Mono,monospace;color:var(--mt)">'+min+'</div></div>';
+  h += '<div style="flex:1;text-align:center;padding:3px;background:rgba(255,255,255,.03);border-radius:4px"><div style="color:var(--mt)">Max</div><div style="font:700 11px Space Mono,monospace;color:var(--mt)">'+max+'</div></div>';
+  h += '<div style="flex:1;text-align:center;padding:3px;background:rgba(255,255,255,.03);border-radius:4px"><div style="color:var(--mt)">n</div><div style="font:700 11px Space Mono,monospace;color:var(--mt)">'+n+'</div></div>';
+  h += '</div>';
+  // Interpretatie
+  h += '<div style="font-size:10px;color:var(--mt);margin-top:2px"><span class="mi mi-sm" style="font-size:12px;vertical-align:-2px;color:var(--ai)">lightbulb</span> '+uitleg+'</div>';
+  h += '</div>';
+  return h;
 }
 
 function updateBagStatusCounts(counts){
@@ -846,45 +918,69 @@ function onBagMoveEnd(){
 
 // bagStatusColor via bagStatusToColor() hierboven
 
-// Zoek CBS statistieken voor een locatie (punt-in-polygoon)
-function buildAreaStatsHtml(latlng){
+// Zoek feature in een laag via punt-in-polygoon
+function findFeatureAtPoint(layer, latlng){
+  if(!layer) return null;
+  var found = null;
+  layer.eachLayer(function(sub){
+    if(found) return;
+    try{
+      if(sub.getBounds && sub.getBounds().contains(latlng)){
+        if(sub.getLatLngs) found = sub.feature;
+      }
+    }catch(e){}
+  });
+  return found;
+}
+
+// CBS statistieken voor een locatie — toon ALLE beschikbare niveaus
+function buildMultiLevelStatsHtml(latlng){
   var html = '';
-  // Zoek in de meest gedetailleerde actieve laag
   var layers = [
-    {layer:_buurtLayer, name:'Buurt', state:_layerState.buurten, cfg:LAYER_CONFIG.buurten},
-    {layer:_wijkLayer, name:'Wijk', state:_layerState.wijken, cfg:LAYER_CONFIG.wijken},
-    {layer:_gemeenteLayer, name:'Gemeente', state:_layerState.gemeenten, cfg:LAYER_CONFIG.gemeenten}
+    {layer:_buurtLayer, name:'Buurt', icon:'grid_on', state:_layerState.buurten, cfg:LAYER_CONFIG.buurten},
+    {layer:_wijkLayer, name:'Wijk', icon:'grid_view', state:_layerState.wijken, cfg:LAYER_CONFIG.wijken},
+    {layer:_gemeenteLayer, name:'Gemeente', icon:'domain', state:_layerState.gemeenten, cfg:LAYER_CONFIG.gemeenten}
   ];
-  for(var i=0;i<layers.length;i++){
-    var l = layers[i];
-    if(!l.state || !l.layer) continue;
-    var found = null;
-    l.layer.eachLayer(function(sub){
-      if(found) return;
-      try{
-        if(sub.getBounds && sub.getBounds().contains(latlng)){
-          // Echte punt-in-polygoon check via leaflet
-          var latLngs = sub.getLatLngs ? sub.getLatLngs() : null;
-          if(latLngs){
-            found = sub.feature;
-          }
-        }
-      }catch(e){}
+  var foundAny = false;
+  layers.forEach(function(l){
+    if(!l.state || !l.layer) return;
+    var feature = findFeatureAtPoint(l.layer, latlng);
+    if(!feature || !feature.properties) return;
+    var p = feature.properties;
+    var naam = p[l.cfg.nameField] || p[l.cfg.codeField] || '-';
+    foundAny = true;
+    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
+    html += '<div style="font:700 11px \'Space Mono\',monospace;color:var(--ac);margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">'+l.icon+'</span> '+l.name+': '+naam+'</div>';
+    _activeIndicators.forEach(function(k){
+      var v = p[k];
+      if(v !== undefined && v !== null) html += buildCompareHtml(k, v);
     });
-    if(found && found.properties){
-      var p = found.properties;
-      var naam = p[l.cfg.nameField] || p[l.cfg.codeField] || '-';
-      html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
-      html += '<div style="font:700 11px \'Space Mono\',monospace;color:var(--ac);margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">bar_chart</span>'+l.name+': '+naam+'</div>';
-      _activeIndicators.forEach(function(k){
-        var v = p[k];
-        if(v !== undefined && v !== null) html += buildCompareHtml(k, v);
-      });
+    html += '</div>';
+  });
+  // Landelijk (altijd tonen als er actieve indicatoren zijn)
+  if(foundAny && Object.keys(_nationalStats).length > 0){
+    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
+    html += '<div style="font:700 11px \'Space Mono\',monospace;color:var(--cyan);margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--cyan)">public</span> Landelijk gemiddelde</div>';
+    _activeIndicators.forEach(function(k){
+      var ns = _nationalStats[k];
+      if(!ns) return;
+      var fm = getIndicator(k);
+      html += '<div style="margin-bottom:6px;padding:6px 8px;background:rgba(15,20,35,.4);border-radius:6px">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+      html += '<span style="font:500 11px \'DM Sans\',sans-serif;color:var(--mt);display:flex;align-items:center;gap:3px"><span class="mi" style="font-size:14px;color:var(--cyan)">'+fm.icon+'</span>'+fm.naam+'</span>';
+      html += '<span style="font:700 12px \'Space Mono\',monospace;color:var(--cyan)">'+formatVal(ns.avg)+' <span style="font-size:9px;color:var(--mt)">'+fm.eenheid+'</span></span>';
       html += '</div>';
-      break; // Alleen de meest gedetailleerde laag tonen
-    }
+      html += '<div style="font-size:9px;color:var(--mt);margin-top:2px">'+ns.count+' gebieden \u00b7 min '+formatVal(ns.min)+' \u00b7 max '+formatVal(ns.max)+' \u00b7 \u03c3 '+formatVal(ns.stddev)+'</div>';
+      html += '</div>';
+    });
+    html += '</div>';
   }
   return html;
+}
+
+// Backwards compat — oude aanroepen
+function buildAreaStatsHtml(latlng){
+  return buildMultiLevelStatsHtml(latlng);
 }
 
 // ============================================================
