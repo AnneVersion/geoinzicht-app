@@ -285,6 +285,15 @@ select option{background:var(--bg);color:var(--tx)}
         <span id="bagCacheText">Cache: 0 adressen</span>
         <button class="btn btn-s" onclick="clearBagCache();toast('BAG cache gewist');loadBagVectors()" style="font-size:9px;padding:2px 8px;margin-left:auto"><span class="mi mi-sm" style="font-size:11px">delete</span> Wis cache</button>
       </div>
+      <div id="bagLoadProgress" style="display:none;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <span style="font:500 10px 'DM Sans',sans-serif;color:var(--ai);display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">downloading</span> <span id="bagLoadText">Adressen laden...</span></span>
+          <span id="bagLoadPct" style="font:700 10px 'Space Mono',monospace;color:var(--ac)">0%</span>
+        </div>
+        <div style="height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">
+          <div id="bagLoadBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--ac),var(--ai));border-radius:3px;transition:width .3s ease"></div>
+        </div>
+      </div>
 
       <div class="sh"><span class="mi">filter_alt</span> Filter gemeente</div>
       <select id="gemeenteFilter" onchange="filterGemeente()">
@@ -860,43 +869,84 @@ function loadBagVectors(){
     updateBagStatusCountsFromData();
   }
 
-  // Ophalen met paginering — doorladen tot alle features binnen zijn
+  // Stap 1: Vraag totaal aantal features op via resultType=hits (XML)
   _bagLoading = true;
   var bbox = b.getSouth()+','+b.getWest()+','+b.getNorth()+','+b.getEast()+',EPSG:4326';
   var key = bagTileKey(b.getCenter().lat, b.getCenter().lng);
   var pageSize = 2000;
   var allFeatures = [];
 
+  // UI: toon progress bar
+  var progEl = document.getElementById('bagLoadProgress');
+  var progText = document.getElementById('bagLoadText');
+  var progPct = document.getElementById('bagLoadPct');
+  var progBar = document.getElementById('bagLoadBar');
+  if(progEl) progEl.style.display = 'block';
+
+  function updateProgress(loaded, total){
+    if(!progText) return;
+    var pct = total > 0 ? Math.min(100, Math.round(loaded/total*100)) : 0;
+    progText.textContent = loaded.toLocaleString('nl-NL')+' / '+(total>0?total.toLocaleString('nl-NL'):'?')+' adressen';
+    progPct.textContent = pct+'%';
+    progBar.style.width = pct+'%';
+  }
+
+  function finishLoading(){
+    _bagLoading = false;
+    if(progEl) progEl.style.display = 'none';
+    var totalCached = 0; for(var k in _bagCache) totalCached += _bagCache[k].length;
+    // Update cache info tekst
+    var cacheText = document.getElementById('bagCacheText');
+    if(cacheText) cacheText.textContent = 'Cache: '+totalCached.toLocaleString('nl-NL')+' adressen';
+    toast(allFeatures.length.toLocaleString('nl-NL')+' adressen geladen \u2714');
+  }
+
+  // Haal totaal op via hits request (XML)
+  var hitsUrl = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&resultType=hits&srsName=EPSG:4326&BBOX='+bbox;
+  var totalExpected = 0;
+
+  fetch(hitsUrl).then(function(r){return r.text()}).then(function(xml){
+    // Parse numberMatched uit de XML
+    var match = xml.match(/numberMatched="(\d+)"/);
+    totalExpected = match ? parseInt(match[1]) : 0;
+    updateProgress(0, totalExpected);
+    // Start het laden van de features
+    fetchPage(0);
+  }).catch(function(){
+    // Kon totaal niet ophalen, laad gewoon door
+    fetchPage(0);
+  });
+
   function fetchPage(startIndex){
     var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+pageSize+'&startIndex='+startIndex+'&srsName=EPSG:4326&BBOX='+bbox;
     fetch(url).then(function(r){return r.json()}).then(function(d){
       var features = d.features || [];
       allFeatures = allFeatures.concat(features);
-      // Tussentijds renderen (eerste batch meteen tonen)
+      // Update progress
+      updateProgress(allFeatures.length, totalExpected);
+      // Cache opslaan en tussentijds renderen
       _bagCache[key] = allFeatures;
       saveBagCache();
       _bagVectorData = getCachedBagFeatures();
       renderBagVectors();
       updateBagStatusCountsFromData();
       if(features.length >= pageSize){
-        // Er zijn mogelijk meer features — volgende pagina laden
-        toast(allFeatures.length+' adressen geladen, meer ophalen\u2026');
+        // Meer pagina's beschikbaar — doorladen
         fetchPage(startIndex + pageSize);
       } else {
-        // Klaar — alle features binnen
-        _bagLoading = false;
-        var totalCached = 0; for(var k in _bagCache) totalCached += _bagCache[k].length;
-        toast(allFeatures.length+' adressen geladen ('+totalCached+' in cache)');
+        // Klaar
+        finishLoading();
       }
     }).catch(function(e){
       console.warn('BAG WFS error (page '+startIndex+'):',e);
-      _bagLoading = false;
       if(allFeatures.length > 0){
-        toast(allFeatures.length+' adressen geladen (fout bij verdere pagina)');
+        finishLoading();
+      } else {
+        _bagLoading = false;
+        if(progEl) progEl.style.display = 'none';
       }
     });
   }
-  fetchPage(0);
 }
 
 function updateBagStatusCountsFromData(){
@@ -1050,52 +1100,45 @@ function buildBagCompareHtml(p, latlng){
     }
   }
 
-  // Bouw de vergelijking: buurt-niveau als beschikbaar, anders viewport
-  var levels = [];
-  if(buurtFeatures && buurtFeatures.length > 5){
-    levels.push({name:'Buurt: '+buurtNaam, features:buurtFeatures, icon:'grid_on', color:'var(--ac)'});
-  }
-  if(_bagVectorData.length > (buurtFeatures ? buurtFeatures.length : 0) + 10){
-    levels.push({name:'Alle geladen adressen ('+_bagVectorData.length+')', features:_bagVectorData, icon:'map', color:'var(--ai)'});
-  }
-  if(!levels.length){
-    levels.push({name:'Geladen adressen ('+_bagVectorData.length+')', features:_bagVectorData, icon:'map', color:'var(--ac)'});
-  }
+  // Gebruik alleen buurt-adressen als beschikbaar
+  var compareFeatures = (buurtFeatures && buurtFeatures.length > 5) ? buurtFeatures : _bagVectorData;
+  var compareLabel = buurtFeatures && buurtFeatures.length > 5
+    ? 'Buurt: '+buurtNaam+' ('+buurtFeatures.length+' adressen)'
+    : 'Geladen adressen ('+_bagVectorData.length+')';
+  var compareIcon = buurtFeatures && buurtFeatures.length > 5 ? 'grid_on' : 'map';
+  var compareColor = 'var(--ac)';
 
-  levels.forEach(function(level){
-    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
-    html += '<div style="font:700 12px \'Space Mono\',monospace;color:'+level.color+';margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">'+level.icon+'</span> '+level.name+'</div>';
+  html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
+  html += '<div style="font:700 12px \'Space Mono\',monospace;color:'+compareColor+';margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">'+compareIcon+'</span> '+compareLabel+'</div>';
 
-    var bouwjaren = [], oppervlaktes = [];
-    level.features.forEach(function(f){
-      var fp = f.properties;
-      if(fp.bouwjaar && fp.bouwjaar > 1000) bouwjaren.push(fp.bouwjaar);
-      if(fp.oppervlakte && fp.oppervlakte > 0) oppervlaktes.push(fp.oppervlakte);
-    });
-
-    if(p.bouwjaar && bouwjaren.length > 5){
-      bouwjaren.sort(function(a,b){return a-b});
-      var st = calcStats(bouwjaren);
-      var z = st.stddev > 0 ? (p.bouwjaar - st.mean)/st.stddev : 0;
-      var pRank = percentileRank(bouwjaren, p.bouwjaar);
-      html += buildFullStatCard('event','Bouwjaar',p.bouwjaar,'',st,z,pRank,'bouwjaar');
-    }
-
-    if(p.oppervlakte && oppervlaktes.length > 5){
-      oppervlaktes.sort(function(a,b){return a-b});
-      var st = calcStats(oppervlaktes);
-      var z = st.stddev > 0 ? (p.oppervlakte - st.mean)/st.stddev : 0;
-      var pRank = percentileRank(oppervlaktes, p.oppervlakte);
-      html += buildFullStatCard('square_foot','Oppervlakte',p.oppervlakte,'m\u00b2',st,z,pRank,'oppervlakte');
-    }
-
-    if(bouwjaren.length <= 5 && oppervlaktes.length <= 5){
-      html += '<div style="font-size:11px;color:var(--mt);padding:6px 0">Te weinig adressen (' +level.features.length+ ') voor betrouwbare statistiek. Laad meer adressen door in te zoomen op dit gebied.</div>';
-    }
-
-    html += '</div>';
+  var bouwjaren = [], oppervlaktes = [];
+  compareFeatures.forEach(function(f){
+    var fp = f.properties;
+    if(fp.bouwjaar && fp.bouwjaar > 1000) bouwjaren.push(fp.bouwjaar);
+    if(fp.oppervlakte && fp.oppervlakte > 0) oppervlaktes.push(fp.oppervlakte);
   });
 
+  if(p.bouwjaar && bouwjaren.length > 5){
+    bouwjaren.sort(function(a,b){return a-b});
+    var st = calcStats(bouwjaren);
+    var z = st.stddev > 0 ? (p.bouwjaar - st.mean)/st.stddev : 0;
+    var pRank = percentileRank(bouwjaren, p.bouwjaar);
+    html += buildFullStatCard('event','Bouwjaar',p.bouwjaar,'',st,z,pRank,'bouwjaar');
+  }
+
+  if(p.oppervlakte && oppervlaktes.length > 5){
+    oppervlaktes.sort(function(a,b){return a-b});
+    var st = calcStats(oppervlaktes);
+    var z = st.stddev > 0 ? (p.oppervlakte - st.mean)/st.stddev : 0;
+    var pRank = percentileRank(oppervlaktes, p.oppervlakte);
+    html += buildFullStatCard('square_foot','Oppervlakte',p.oppervlakte,'m\u00b2',st,z,pRank,'oppervlakte');
+  }
+
+  if(bouwjaren.length <= 5 && oppervlaktes.length <= 5){
+    html += '<div style="font-size:11px;color:var(--mt);padding:6px 0">Te weinig adressen ('+compareFeatures.length+') in deze buurt. Laad meer door in te zoomen op dit gebied.</div>';
+  }
+
+  html += '</div>';
   return html;
 }
 
@@ -1200,9 +1243,9 @@ function updateBagStatusCounts(counts){
 }
 
 function dimChoroplethLayers(dim){
-  // Dim/undim choropleth lagen zodat BAG WMS goed zichtbaar is
-  var opacity = dim ? 0.12 : 0.65;
-  var borderOp = dim ? 0.1 : 0.5;
+  // Dim choropleth maar houd kleuren zichtbaar (WOZ etc.)
+  var opacity = dim ? 0.35 : 0.65;
+  var borderOp = dim ? 0.25 : 0.5;
   [_gemeenteLayer, _wijkLayer, _buurtLayer].forEach(function(layer){
     if(!layer) return;
     layer.eachLayer(function(sub){
