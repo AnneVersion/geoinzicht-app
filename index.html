@@ -567,15 +567,19 @@ function renderChoropleth(type){
     },
     onEachFeature: function(feature, layer){
       layer.on('mouseover', function(e){
+        // Skip hover als BAG/panden actief zijn (choropleth is gedimd)
+        if(_layerState.bag || _layerState.panden) return;
         e.target.setStyle({weight:2.5,color:'#39ff14',fillOpacity:0.9});
         e.target.bringToFront();
         showFeatureInfo(e.target.feature.properties, cfg, type, false);
       });
       layer.on('mouseout', function(e){
+        if(_layerState.bag || _layerState.panden) return;
         newLayer.resetStyle(e.target);
         document.getElementById('infoPanel').classList.remove('show');
       });
       layer.on('click', function(){
+        // Click altijd toestaan (ook gedimd), toon info
         showFeatureInfo(feature.properties, cfg, type, true);
       });
     }
