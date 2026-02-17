@@ -543,9 +543,10 @@ select option{background:var(--bg);color:var(--tx)}
 // ============================================================
 // CONFIG
 // ============================================================
-var GEMEENTEN_URL = 'gemeenten_2022.geojson';
-var BUURTEN_URL   = 'buurten_2022.geojson';
-var WIJKEN_URL    = 'wijken_2022.geojson';
+var _cacheBust = '?v=' + Date.now(); // Voorkom browser-cache van oude data
+var GEMEENTEN_URL = 'gemeenten_2022.geojson' + _cacheBust;
+var BUURTEN_URL   = 'buurten_2022.geojson' + _cacheBust;
+var WIJKEN_URL    = 'wijken_2022.geojson' + _cacheBust;
 var PDOK_BAG_WMS  = 'https://service.pdok.nl/lv/bag/wms/v2_0';
 var PDOK_BAG_WFS  = 'https://service.pdok.nl/lv/bag/wfs/v2_0';
 var PDOK_SUGGEST = 'https://api.pdok.nl/bzk/locatieserver/search/v3_1/suggest?q=';
