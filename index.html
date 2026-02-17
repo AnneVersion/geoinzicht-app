@@ -1214,29 +1214,61 @@ function buildBagCompareHtml(p, latlng){
   if(!_bagVectorData || !_bagVectorData.length) return '';
   var html = '';
 
-  // Zoek de buurt waar dit adres in ligt
-  var buurtFeature = findFeatureAtPoint(_buurtLayer, latlng);
+  // Zoek de buurt waar dit adres in ligt — zoek in buurtlaag OF in buurtdata
+  var buurtFeature = null;
   var buurtLayerObj = null;
   var buurtNaam = null;
   var buurtFeatures = null;
 
-  if(_buurtLayer && buurtFeature){
+  // Methode 1: via actieve buurtlaag
+  if(_buurtLayer){
+    buurtFeature = findFeatureAtPoint(_buurtLayer, latlng);
+    if(buurtFeature){
+      _buurtLayer.eachLayer(function(sub){
+        if(sub.feature === buurtFeature) buurtLayerObj = sub;
+      });
+    }
+  }
+  // Methode 2: als buurtlaag niet actief maar buurtdata wel geladen, zoek in data
+  if(!buurtFeature && _buurtData){
+    for(var i = 0; i < _buurtData.features.length; i++){
+      var bf = _buurtData.features[i];
+      if(!bf.geometry) continue;
+      try {
+        var tempLayer = L.geoJSON(bf);
+        var found = false;
+        tempLayer.eachLayer(function(sub){
+          if(!found && sub.getBounds && sub.getBounds().contains(latlng)){
+            // Precise check met pointInPolygon
+            var rings = sub.getLatLngs();
+            var checkRing = rings;
+            if(Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined) checkRing = rings[0];
+            else if(Array.isArray(rings[0]) && Array.isArray(rings[0][0])) checkRing = rings[0][0];
+            if(pointInPolygon(latlng.lat, latlng.lng, checkRing)){
+              buurtFeature = bf;
+              buurtLayerObj = sub;
+              found = true;
+            }
+          }
+        });
+        if(found) break;
+      } catch(e){}
+    }
+  }
+
+  if(buurtFeature){
     buurtNaam = buurtFeature.properties.buurtnaam || buurtFeature.properties.buurtcode || 'buurt';
-    // Vind de Leaflet layer voor deze buurt
-    _buurtLayer.eachLayer(function(sub){
-      if(sub.feature === buurtFeature) buurtLayerObj = sub;
-    });
     if(buurtLayerObj){
       buurtFeatures = getBagFeaturesInBuurt(buurtLayerObj);
     }
   }
 
-  // Gebruik alleen buurt-adressen als beschikbaar
+  // Altijd vergelijken ten opzichte van de buurt
   var compareFeatures = (buurtFeatures && buurtFeatures.length > 5) ? buurtFeatures : _bagVectorData;
-  var compareLabel = buurtFeatures && buurtFeatures.length > 5
+  var compareLabel = (buurtFeatures && buurtFeatures.length > 5)
     ? 'Buurt: '+buurtNaam+' ('+buurtFeatures.length+' adressen)'
-    : 'Geladen adressen ('+_bagVectorData.length+')';
-  var compareIcon = buurtFeatures && buurtFeatures.length > 5 ? 'grid_on' : 'map';
+    : (buurtNaam ? 'Buurt: '+buurtNaam+' (te weinig BAG data \u2014 '+(_bagVectorData.length)+' geladen adressen gebruikt)' : 'Zichtbare adressen ('+_bagVectorData.length+')');
+  var compareIcon = 'grid_on';
   var compareColor = 'var(--ac)';
 
   html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
@@ -1606,64 +1638,65 @@ function buildEducationalAnalysis(findings){
 
   h += '</div></div>';
 
-  // Methode-uitleg (educatief) — met concreet rekenvoorbeeld
+  // Methode-uitleg (educatief) — met analogie en concreet rekenvoorbeeld
   h += '<div style="padding:12px 14px;background:rgba(100,116,139,.05);border-radius:10px;border-left:3px solid var(--mt)">';
-  h += '<div style="font:600 12px DM Sans,sans-serif;color:var(--mt);margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">school</span> Hoe werkt deze analyse? (uitleg voor beginners)</div>';
+  h += '<div style="font:600 12px DM Sans,sans-serif;color:var(--mt);margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">school</span> Hoe lees je deze analyse?</div>';
   h += '<div style="font-size:11px;color:var(--mt);line-height:1.8">';
 
-  // Stap 1: Wat is een gemiddelde
-  h += '<b style="color:var(--tx)">\u2776 Wat is een gemiddelde?</b><br>';
-  h += 'Stel je voor: je hebt de WOZ-waarde van <b>alle</b> buurten in Nederland. Tel ze bij elkaar op en deel door het aantal buurten. Dat is het <b style="color:var(--ai)">gemiddelde</b> (\u03bc). Het vertelt je wat \u201cnormaal\u201d is.<br><br>';
+  // Analogie eerst — maakt het direct concreet
+  h += '<div style="padding:10px 12px;background:rgba(56,189,248,.06);border-radius:8px;margin-bottom:10px;border-left:3px solid var(--ai)">';
+  h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--ai);margin-bottom:4px">Stel je een schoolklas voor</div>';
+  h += '<div style="font-size:11px;color:var(--tx);line-height:1.8">';
+  h += 'In een klas van 30 leerlingen is de gemiddelde lengte 1,75 m. De meeste leerlingen zitten tussen 1,70 en 1,80 m. ';
+  h += 'Als jij 1,90 m bent, ben je duidelijk langer dan de rest \u2014 maar h\u00f3\u00e9 bijzonder is dat precies?<br><br>';
+  h += 'De <b style="color:var(--ai)">z-score</b> beantwoordt die vraag. Het getal zegt: <b>hoeveel stappen van \u201cnormaal\u201d</b> zit je af? ';
+  h += 'E\u00e9n stap (\u03c3) is de \u201cnormale spreiding\u201d \u2014 het verschil dat je verwacht tussen willekeurige buurten.';
+  h += '</div></div>';
 
-  // Stap 2: Wat is spreiding
-  h += '<b style="color:var(--tx)">\u2777 Hoe ver wijken buurten af?</b><br>';
-  h += 'Sommige buurten zitten dicht bij het gemiddelde, andere ver ervandaan. De <b style="color:var(--wn)">standaarddeviatie</b> (\u03c3) meet hoe ver waarden gemiddeld afwijken. Een kleine \u03c3 = alles lijkt op elkaar. Een grote \u03c3 = veel verschil.<br><br>';
-
-  // Stap 3: z-score uitleg + echt rekenvoorbeeld
-  h += '<b style="color:var(--tx)">\u2778 De z-score: hoe bijzonder is dit gebied?</b><br>';
-  h += 'De formule is simpel: <b style="color:var(--ai)">z = (jouw waarde \u2212 gemiddelde) \u00f7 standaarddeviatie</b><br><br>';
-
-  // Pak het eerste opvallende finding als echt voorbeeld, of anders het eerste finding
+  // Concreet rekenvoorbeeld met echte data
   var voorbeeld = opvallend.length > 0 ? opvallend[0] : findings[0];
   if(voorbeeld){
     var vfm = getIndicator(voorbeeld.key);
-    h += '<div style="padding:10px 12px;background:rgba(56,189,248,.06);border-radius:8px;margin:4px 0 8px;border:1px dashed rgba(56,189,248,.2)">';
-    h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--ai);margin-bottom:4px">\ud83d\udcdd Rekenvoorbeeld met echte data:</div>';
+    h += '<div style="padding:10px 12px;background:rgba(57,255,20,.04);border-radius:8px;margin-bottom:10px;border:1px dashed rgba(57,255,20,.2)">';
+    h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--ac);margin-bottom:6px">\ud83d\udcdd Concreet voorbeeld met jouw data:</div>';
     h += '<div style="font-size:11px;line-height:1.9;color:var(--tx)">';
-    h += 'Indicator: <b>'+vfm.naam+'</b><br>';
-    h += 'Waarde van dit gebied: <b style="color:var(--ac)">'+formatVal(voorbeeld.val)+' '+vfm.eenheid+'</b><br>';
-    h += 'Landelijk gemiddelde (\u03bc): <b>'+formatVal(voorbeeld.avg)+' '+vfm.eenheid+'</b><br>';
-    h += 'Standaarddeviatie (\u03c3): <b>'+formatVal(voorbeeld.stddev)+' '+vfm.eenheid+'</b><br><br>';
-    h += '<b>Berekening:</b><br>';
+    h += '<b>'+vfm.naam+'</b> van dit gebied = <b style="color:var(--ac)">'+formatVal(voorbeeld.val)+' '+vfm.eenheid+'</b><br>';
+    h += 'Het Nederlands gemiddelde = <b>'+formatVal(voorbeeld.avg)+' '+vfm.eenheid+'</b><br>';
+    h += 'De normale spreiding (\u03c3) = <b>'+formatVal(voorbeeld.stddev)+' '+vfm.eenheid+'</b><br><br>';
+    h += '<b>Hoe ver van normaal?</b><br>';
     h += '<div style="padding:8px 12px;background:rgba(57,255,20,.06);border-radius:6px;font:700 12px Space Mono,monospace;color:var(--ac);margin:4px 0">';
-    h += 'z = ('+formatVal(voorbeeld.val)+' \u2212 '+formatVal(voorbeeld.avg)+') \u00f7 '+formatVal(voorbeeld.stddev);
-    h += ' = '+(voorbeeld.val - voorbeeld.avg >= 0 ? '+' : '')+formatVal(voorbeeld.val - voorbeeld.avg)+' \u00f7 '+formatVal(voorbeeld.stddev);
-    h += ' = <span style="color:'+(Math.abs(voorbeeld.z)>1?'var(--wn)':'var(--ai)')+'">'+voorbeeld.z.toFixed(2)+'</span>';
+    var verschil = voorbeeld.val - voorbeeld.avg;
+    h += 'Verschil = '+formatVal(voorbeeld.val)+' \u2212 '+formatVal(voorbeeld.avg)+' = '+(verschil >= 0 ? '+' : '')+formatVal(verschil)+' '+vfm.eenheid+'<br>';
+    h += 'Dat is '+formatVal(verschil)+' \u00f7 '+formatVal(voorbeeld.stddev)+' = <span style="color:'+(Math.abs(voorbeeld.z)>1?'var(--wn)':'var(--ai)')+'">'+voorbeeld.z.toFixed(2)+' stappen</span> van normaal';
     h += '</div>';
-    h += '<b>Betekenis:</b> ';
-    if(Math.abs(voorbeeld.z) < 0.5) h += 'De z-score is bijna 0 \u2192 dit gebied is <b style="color:var(--ai)">heel gemiddeld</b> voor deze indicator.';
-    else if(Math.abs(voorbeeld.z) < 1) h += 'De z-score zit tussen -1 en +1 \u2192 <b style="color:var(--ai)">normaal</b>, 68% van alle gebieden valt hierin.';
-    else if(Math.abs(voorbeeld.z) < 2) h += 'De z-score is '+(voorbeeld.z>0?'boven':'onder')+' de 1 \u2192 <b style="color:var(--wn)">opvallend</b>! Dit gebied zit buiten de middelste 68% van Nederland.';
-    else h += 'De z-score is '+(voorbeeld.z>0?'boven':'onder')+' de 2 \u2192 <b style="color:var(--dn)">uitzonderlijk</b>! Slechts 5% van alle gebieden wijkt zo ver af.';
+    h += '<b>Wat betekent dit?</b> ';
+    if(Math.abs(voorbeeld.z) < 0.5) h += 'Minder dan een halve stap \u2192 <b style="color:var(--ai)">heel normaal</b>. Dit gebied is typisch Nederlands.';
+    else if(Math.abs(voorbeeld.z) < 1) h += 'Minder dan \u00e9\u00e9n stap \u2192 <b style="color:var(--ai)">vrij normaal</b>. 68% van alle gebieden zit binnen deze marge.';
+    else if(Math.abs(voorbeeld.z) < 2) h += 'Meer dan \u00e9\u00e9n stap \u2192 <b style="color:var(--wn)">opvallend '+(voorbeeld.z>0?'hoog':'laag')+'</b>. Dit gebied valt buiten de range waar de meeste (68%) gebieden zitten.';
+    else h += 'Meer dan twee stappen \u2192 <b style="color:var(--dn)">uitzonderlijk</b>. Slechts 5% van alle gebieden in Nederland wijkt zo ver af.';
     h += '</div></div>';
   }
 
-  // Stap 4: De vuistregels
-  h += '<b style="color:var(--tx)">\u2779 Vuistregels om te onthouden:</b><br>';
-  h += '<div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:4px 0 6px;font-size:11px">';
-  h += '<b style="color:var(--ai)">|z| < 0.5</b><span>\u2192 Gemiddeld \u2014 niets bijzonders</span>';
-  h += '<b style="color:var(--ai)">|z| 0.5 \u2013 1</b><span>\u2192 Iets afwijkend, maar nog normaal</span>';
-  h += '<b style="color:var(--wn)">|z| 1 \u2013 2</b><span>\u2192 Opvallend \u2014 valt buiten de \u201cnormale\u201d 68%</span>';
-  h += '<b style="color:var(--dn)">|z| > 2</b><span>\u2192 Uitzonderlijk \u2014 slechts 5% wijkt zo ver af</span>';
+  // Snelle referentietabel
+  h += '<div style="padding:8px 12px;background:rgba(255,255,255,.02);border-radius:8px;margin-bottom:8px">';
+  h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--tx);margin-bottom:6px">Snelle leeswijzer z-score:</div>';
+  h += '<div style="display:grid;grid-template-columns:70px 1fr;gap:3px 10px;font-size:11px">';
+  h += '<span style="color:var(--ai);font-weight:700">0 tot \u00b10.5</span><span>\u2192 Normaal — niets bijzonders, vergelijkbaar met de meeste gebieden</span>';
+  h += '<span style="color:var(--ai);font-weight:700">\u00b10.5 tot \u00b11</span><span>\u2192 Licht afwijkend — een klein verschil, maar nog steeds gebruikelijk</span>';
+  h += '<span style="color:var(--wn);font-weight:700">\u00b11 tot \u00b12</span><span>\u2192 Opvallend — dit gebied wijkt duidelijk af van het gemiddelde</span>';
+  h += '<span style="color:var(--dn);font-weight:700">Meer dan \u00b12</span><span>\u2192 Uitzonderlijk — slechts 5% van Nederland scoort zo afwijkend</span>';
+  h += '</div></div>';
+
+  // Waarom nuttig
+  h += '<div style="font-size:11px;color:var(--mt);margin-bottom:6px">';
+  h += '<b style="color:var(--tx)">Waarom is dit nuttig?</b> ';
+  h += 'Getallen alleen zeggen weinig. \u20ac300.000 WOZ klinkt als \u201cveel\u201d, maar in Amsterdam is het goedkoop en in Oost-Groningen extreem duur. ';
+  h += 'De z-score zet alles in context: het zegt niet wat de waarde <i>is</i>, maar hoe <i>bijzonder</i> het is vergeleken met de rest van Nederland.';
   h += '</div>';
 
-  // Stap 5: Patronen
-  h += '<br><b style="color:var(--tx)">\u277a Patronen herkennen:</b><br>';
-  h += 'Als meerdere indicatoren samen hoog of laag zijn, is er een <b>patroon</b>. Bijvoorbeeld: hoge WOZ \u00e9n hoog inkomen \u2192 welvarend gebied. Hoog gas \u2192 slecht ge\u00efsoleerd. Dit is geen AI maar bekende statistische samenhang.<br>';
-
   // Disclaimer
-  h += '<br><div style="padding:6px 10px;background:rgba(251,191,36,.05);border-radius:6px;border-left:2px solid var(--wn)">';
-  h += '<b style="color:var(--wn);font-size:10px">\u26a0 Let op:</b> <span style="font-size:10px">Dit zijn automatische berekeningen op CBS-data. De conclusies zijn indicatief \u2014 voor een volledig beeld is lokale kennis nodig.</span>';
+  h += '<div style="padding:6px 10px;background:rgba(251,191,36,.05);border-radius:6px;border-left:2px solid var(--wn);margin-top:6px">';
+  h += '<b style="color:var(--wn);font-size:10px">\u26a0 Disclaimer:</b> <span style="font-size:10px">Dit zijn automatische berekeningen op CBS open data. De conclusies zijn indicatief \u2014 voor een volledig beeld is lokale kennis nodig.</span>';
   h += '</div>';
 
   h += '</div></div>';
@@ -2330,22 +2363,34 @@ function printInfoPanel(){
   html += '@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}';
   html += '</style></head><body>';
 
-  // Header
+  // Header met logo en branding
   html += '<div class="rh">';
-  html += '<div><h1 style="background:linear-gradient(135deg,#16a34a,#0284c7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">GeoInzicht</h1>';
-  html += '<div style="font:600 9px Space Mono,monospace;color:#94a3b8;letter-spacing:2px;margin-top:2px">STATISTISCH RAPPORT</div></div>';
+  html += '<div style="display:flex;align-items:center;gap:14px">';
+  // Inline SVG mini-logo (gestripte versie van het globe logo)
+  html += '<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 1000 1000" style="flex-shrink:0">';
+  html += '<defs><radialGradient id="rs" cx="38%" cy="32%" r="65%"><stop offset="0%" stop-color="#1a5c2a" stop-opacity="0.7"/><stop offset="100%" stop-color="#041a08" stop-opacity="0.2"/></radialGradient></defs>';
+  html += '<circle cx="500" cy="500" r="380" fill="url(#rs)"/><circle cx="500" cy="500" r="380" fill="none" stroke="#16a34a" stroke-width="8" opacity="0.5"/>';
+  html += '<g fill="none" stroke="#16a34a" stroke-width="3" opacity="0.25"><ellipse cx="500" cy="500" rx="380" ry="72"/><ellipse cx="500" cy="500" rx="220" ry="380"/></g>';
+  html += '<g fill="#16a34a" opacity="0.7"><circle cx="477" cy="275" r="18"/><circle cx="609" cy="245" r="16"/><circle cx="632" cy="419" r="16"/><circle cx="183" cy="254" r="18"/><circle cx="809" cy="216" r="16"/></g>';
+  html += '<g stroke="#16a34a" stroke-width="3" opacity="0.3"><line x1="477" y1="275" x2="609" y2="245"/><line x1="609" y1="245" x2="632" y2="419"/><line x1="477" y1="275" x2="183" y2="254"/><line x1="609" y1="245" x2="809" y2="216"/></g>';
+  html += '</svg>';
+  html += '<div>';
+  html += '<h1 style="background:linear-gradient(135deg,#16a34a,#0284c7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">GeoInzicht</h1>';
+  html += '<div style="font:900 10px Space Mono,monospace;color:#16a34a;letter-spacing:3px;margin-top:2px">DATA CONSULTANTS</div>';
+  html += '<div style="font:400 9px DM Sans,sans-serif;color:#94a3b8;margin-top:1px">Statistisch Rapport</div>';
+  html += '</div></div>';
   html += '<div style="text-align:right;font-size:10px;color:#64748b">';
   html += '<div style="font-weight:600;color:#0f172a;font-size:12px">'+locationName+'</div>';
   html += '<div>'+dateStr+'</div>';
-  html += '<div>GeoInzicht v6.3</div></div></div>';
+  html += '<div>GeoInzicht v6.4</div></div></div>';
 
   // Content
   html += '<div>'+pc+'</div>';
 
-  // Footer
+  // Footer met branding
   html += '<div class="rf">';
   html += '<div><b>Databronnen:</b> CBS Kerncijfers wijken en buurten 2022 | BAG Basisregistratie Adressen en Gebouwen (Kadaster) | PDOK Locatieserver</div>';
-  html += '<div style="white-space:nowrap">GeoInzicht v6.3 \u2014 Data Consultants</div></div>';
+  html += '<div style="white-space:nowrap;text-align:right"><b style="color:#16a34a;font-size:9px;letter-spacing:2px">DATA CONSULTANTS</b><br>GeoInzicht v6.4</div></div>';
 
   html += '<script>window.onload=function(){setTimeout(function(){window.print()},500)}<\/script>';
   html += '</body></html>';
