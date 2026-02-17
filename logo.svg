@@ -61,8 +61,7 @@
     <clipPath id="gc"><circle cx="500" cy="500" r="380"/></clipPath>
   </defs>
 
-  <!-- DEEP SPACE -->
-  <rect width="1000" height="1000" fill="#020408"/>
+  <!-- DEEP SPACE (transparent) -->
 
   <!-- ===== BLACK HOLE (center of globe, seen through ocean) ===== -->
   <circle cx="500" cy="500" r="160" fill="url(#bhCore)"/>

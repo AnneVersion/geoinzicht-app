@@ -72,9 +72,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);overf
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 
 /* Section headers */
-.sh{font:700 11px 'Space Mono',monospace;color:var(--pu);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px;display:flex;align-items:center;gap:6px}
+.sh{font:700 11px 'Space Mono',monospace;color:var(--ac);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px;display:flex;align-items:center;gap:6px}
 .sh:first-child{margin-top:0}
-.sh .mi{font-size:16px;color:var(--pu)}
+.sh .mi{font-size:16px;color:var(--ac)}
 
 /* Glass cards */
 .card{background:var(--glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:none;border-radius:var(--radius);padding:14px;margin-bottom:10px;transition:all .3s cubic-bezier(.4,0,.2,1)}
@@ -311,7 +311,7 @@ select option{background:var(--bg);color:var(--tx)}
       <div class="card">
         <div style="font-size:11px;color:var(--mt);line-height:1.7">
           <div style="padding:5px 0;border-bottom:1px solid var(--glass-bd)">
-            <div style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--pu)">query_stats</span> CBS Kerncijfers wijken en buurten</div>
+            <div style="color:var(--tx);font-weight:600;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">query_stats</span> CBS Kerncijfers wijken en buurten</div>
             <div>Bron: CBS via PDOK WFS &middot; Frequentie: jaarlijks &middot; Peildatum: 1 jan 2022</div>
             <div>Indicatoren: bevolking, woningen, inkomen, energie, arbeid, voorzieningen</div>
             <div>API: <code style="font-family:'Space Mono',monospace;font-size:9px;color:var(--ai);background:rgba(56,189,248,.08);padding:1px 4px;border-radius:3px">service.pdok.nl/cbs/wijkenbuurten</code></div>
@@ -378,7 +378,7 @@ select option{background:var(--bg);color:var(--tx)}
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
-            <div style="display:flex;align-items:center;gap:4px;padding:2px 0"><span class="mi mi-sm" style="color:var(--pu)">query_stats</span> <b style="color:var(--tx)">CBS</b> &#8212; Kerncijfers wijken en buurten</div>
+            <div style="display:flex;align-items:center;gap:4px;padding:2px 0"><span class="mi mi-sm" style="color:var(--ac)">query_stats</span> <b style="color:var(--tx)">CBS</b> &#8212; Kerncijfers wijken en buurten</div>
             <div style="display:flex;align-items:center;gap:4px;padding:2px 0"><span class="mi mi-sm" style="color:var(--cyan)">public</span> <b style="color:var(--tx)">PDOK</b> &#8212; Geometrie, BAG WMS, Locatieserver</div>
             <div style="display:flex;align-items:center;gap:4px;padding:2px 0"><span class="mi mi-sm" style="color:var(--ai)">domain</span> <b style="color:var(--tx)">Kadaster</b> &#8212; BAG verblijfsobjecten &amp; panden</div>
           </div>
@@ -794,7 +794,7 @@ function buildAreaStatsHtml(latlng){
       var p = found.properties;
       var naam = p[l.cfg.nameField] || p[l.cfg.codeField] || '-';
       html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
-      html += '<div style="font:700 11px \'Space Mono\',monospace;color:var(--pu);margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--pu)">bar_chart</span>'+l.name+': '+naam+'</div>';
+      html += '<div style="font:700 11px \'Space Mono\',monospace;color:var(--ac);margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">bar_chart</span>'+l.name+': '+naam+'</div>';
       _activeIndicators.forEach(function(k){
         var v = p[k];
         if(v !== undefined && v !== null) html += buildCompareHtml(k, v);
