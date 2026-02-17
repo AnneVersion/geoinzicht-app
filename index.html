@@ -3460,6 +3460,7 @@ function loadSelection(){
   var p2 = _wijkData ? Promise.resolve() : fetch(WIJKEN_URL).then(function(r){return r.json()}).then(function(d){
     _wijkData = d;
     document.getElementById('dsWijken').textContent = d.features.length.toLocaleString('nl-NL') + ' features';
+    buildWijkFilter();
   });
 
   Promise.all([p1, p2]).then(function(){
@@ -3469,6 +3470,12 @@ function loadSelection(){
       document.querySelector('[data-layer="buurten"]').classList.add('active');
     }
     renderChoropleth('buurten');
+    // Wijken ook renderen
+    if(!_layerState.wijken){
+      _layerState.wijken = true;
+      document.querySelector('[data-layer="wijken"]').classList.add('active');
+    }
+    renderChoropleth('wijken');
     updateActiveStats();
 
     // BAG data op achtergrond laden (cache vullen) — zonder de choropleth te dimmen
