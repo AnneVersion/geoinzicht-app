@@ -1274,6 +1274,48 @@ function buildBagCompareHtml(p, latlng){
   html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
   html += '<div style="font:700 12px \'Space Mono\',monospace;color:'+compareColor+';margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">'+compareIcon+'</span> '+compareLabel+'</div>';
 
+  // === Buurt kerncijfers (CBS + BAG gecombineerd) ===
+  if(buurtFeature && buurtFeature.properties){
+    var bp = buurtFeature.properties;
+    var buurtRows = [];
+    // BAG verblijfsobjecten in deze buurt
+    if(buurtFeatures && buurtFeatures.length > 0){
+      buurtRows.push({icon:'location_on', label:'BAG verblijfsobjecten', val:buurtFeatures.length.toLocaleString('nl-NL'), color:'var(--ai)'});
+    }
+    // CBS woningvoorraad
+    if(bp.woningvoorraad && bp.woningvoorraad > 0) buurtRows.push({icon:'location_city', label:'Woningvoorraad (CBS)', val:bp.woningvoorraad.toLocaleString('nl-NL'), color:'var(--tx)'});
+    // Koop en huur
+    var koop = bp.koopwoningen, huur = bp.huurwoningen;
+    var voorraad = bp.woningvoorraad || 0;
+    if(koop !== undefined && koop !== null && voorraad > 0){
+      var koopAantal = Math.round(voorraad * koop / 100);
+      buurtRows.push({icon:'key', label:'Koopwoningen', val:koopAantal.toLocaleString('nl-NL')+' ('+koop+'%)', color:'var(--ac)'});
+    }
+    if(huur !== undefined && huur !== null && voorraad > 0){
+      var huurAantal = Math.round(voorraad * huur / 100);
+      buurtRows.push({icon:'real_estate_agent', label:'Huurwoningen', val:huurAantal.toLocaleString('nl-NL')+' ('+huur+'%)', color:'var(--wn)'});
+    }
+    if(koop !== undefined && huur !== undefined && voorraad > 0){
+      buurtRows.push({icon:'home', label:'Koop + huur totaal', val:voorraad.toLocaleString('nl-NL'), color:'var(--cyan)'});
+    }
+    // Huishoudens
+    if(bp.huishoudens && bp.huishoudens > 0) buurtRows.push({icon:'family_restroom', label:'Huishoudens', val:bp.huishoudens.toLocaleString('nl-NL'), color:'var(--tx)'});
+    // Inwoners
+    if(bp.aantal_inwoners && bp.aantal_inwoners > 0) buurtRows.push({icon:'groups', label:'Inwoners', val:bp.aantal_inwoners.toLocaleString('nl-NL'), color:'var(--tx)'});
+
+    if(buurtRows.length > 0){
+      html += '<div style="margin-bottom:10px;padding:8px 10px;background:rgba(57,255,20,.03);border-radius:8px">';
+      buurtRows.forEach(function(r){
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04)">';
+        html += '<span style="font-size:11px;color:var(--mt);display:flex;align-items:center;gap:5px"><span class="mi mi-sm" style="font-size:13px;color:'+r.color+'">'+r.icon+'</span>'+r.label+'</span>';
+        html += '<span style="font:700 11px Space Mono,monospace;color:'+r.color+'">'+r.val+'</span>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+  }
+
+  // === BAG statistieken: bouwjaar + oppervlakte ===
   var bouwjaren = [], oppervlaktes = [];
   compareFeatures.forEach(function(f){
     var fp = f.properties;
@@ -2031,6 +2073,157 @@ function buildDistSvg(zScore, distType){
   return svg;
 }
 
+// AI-achtige menselijke uitleg per indicator — alsof je het aan een kind uitlegt
+function humanExplain(key, val, z, ns, fm){
+  var abs = Math.abs(z);
+  var h = z >= 0 ? 'meer' : 'minder';
+  var hb = z >= 0 ? 'hoger' : 'lager';
+  var v = formatVal(val);
+  var gem = formatVal(ns.avg);
+
+  // Per indicator: context-rijke uitleg in gewone mensentaal
+  if(key === 'aantal_inwoners'){
+    if(abs < 0.5) return 'Hier wonen ongeveer evenveel mensen als in een gemiddeld Nederlands gebied.';
+    if(z > 0) return 'Dit is een druk gebied \u2014 hier wonen '+h+' mensen dan in de meeste andere gebieden. Denk aan een levendige wijk met veel buren.';
+    return 'Dit is een rustig gebied met relatief weinig inwoners. Denk aan een klein dorp of buitenwijk.';
+  }
+  if(key === 'gem_woz_waarde'){
+    var euros = val * 1000;
+    if(abs < 0.5) return 'De huizen hier kosten ongeveer wat een gemiddeld huis in Nederland kost (\u00b1\u20ac'+Math.round(ns.avg*1000).toLocaleString('nl-NL')+').';
+    if(z > 1.5) return 'De huizen hier zijn flink duurder dan gemiddeld. Dit is een populair of gewild woongebied \u2014 vergelijkbaar met de duurdere wijken in grote steden.';
+    if(z > 0) return 'De huizen hier zijn iets duurder dan gemiddeld in Nederland. Een prettige buurt waar mensen graag wonen.';
+    if(z < -1.5) return 'De huizen hier zijn een stuk goedkoper dan gemiddeld. Dat kan komen door de locatie, het type woningen of de voorzieningen in de buurt.';
+    return 'De huizen hier zijn iets goedkoper dan het Nederlands gemiddelde.';
+  }
+  if(key === 'gem_inkomen_inwoner'){
+    if(abs < 0.5) return 'De mensen hier verdienen ongeveer evenveel als een gemiddelde Nederlander.';
+    if(z > 1.5) return 'Hier wonen mensen met duidelijk hogere inkomens. Denk aan een welvarende wijk met tweeverdieners of hogere functies.';
+    if(z > 0) return 'De inkomens zijn hier iets hoger dan gemiddeld \u2014 de meeste bewoners zitten financieel goed.';
+    if(z < -1.5) return 'De inkomens zijn hier lager dan in de meeste andere buurten. Dat kan komen door meer uitkeringsgerechtigden, studenten of gepensioneerden.';
+    return 'De inkomens zijn hier iets lager dan gemiddeld in Nederland.';
+  }
+  if(key === 'koopwoningen'){
+    if(abs < 0.5) return 'Er is hier een gezonde mix van koop- en huurwoningen, net als in de meeste Nederlandse buurten.';
+    if(z > 1) return 'Hier staan vooral koopwoningen \u2014 de meeste bewoners zijn eigenaar van hun huis. Typisch voor een rustige, gevestigde buurt.';
+    if(z < -1) return 'Hier wordt veel gehuurd. Denk aan een stedelijke buurt met flats of sociale woningbouw.';
+    return z > 0 ? 'Iets meer koopwoningen dan gemiddeld.' : 'Iets meer huurwoningen dan gemiddeld.';
+  }
+  if(key === '65plus'){
+    if(abs < 0.5) return 'De leeftijdsverdeling is hier normaal \u2014 een gezonde mix van jong en oud.';
+    if(z > 1.5) return 'Dit is een vergrijzende buurt \u2014 hier wonen opvallend veel 65-plussers. Mogelijk een rustig woongebied dat populair is bij gepensioneerden.';
+    if(z > 0) return 'Er wonen hier iets meer ouderen dan gemiddeld.';
+    if(z < -1) return 'Dit is een jonge buurt \u2014 weinig 65-plussers. Waarschijnlijk veel gezinnen of jonge stellen.';
+    return 'Iets minder 65-plussers dan gemiddeld.';
+  }
+  if(key === 'bevolkingsdichtheid'){
+    if(abs < 0.5) return 'Een normaal bebouwd gebied, niet te druk en niet te leeg.';
+    if(z > 1.5) return 'Een dichtbebouwde stadswijk \u2014 veel mensen op weinig ruimte. Denk aan een buurt met flats, appartementen en weinig tuinen.';
+    if(z > 0) return 'Iets drukker bebouwd dan gemiddeld, maar nog ruim vergeleken met de binnenstad.';
+    if(z < -1.5) return 'Een heel ruim en open gebied \u2014 veel groen, grote kavels of agrarisch land. Typisch voor het platteland.';
+    return 'Iets minder dicht bebouwd dan gemiddeld.';
+  }
+  if(key === 'gem_aardgas'){
+    if(abs < 0.5) return 'Het gasverbruik is hier gemiddeld voor Nederland.';
+    if(z > 1.5) return 'Hier wordt veel gas verstookt! Dat kan betekenen dat de woningen ouder of slecht ge\u00efsoleerd zijn, of dat er veel met gas gekookt en verwarmd wordt.';
+    if(z > 0) return 'Het gasverbruik is iets hoger dan gemiddeld \u2014 mogelijk oudere woningen met minder isolatie.';
+    if(z < -1.5) return 'Heel weinig gasverbruik \u2014 dit wijst op nieuwbouw, goede isolatie, of woningen met een warmtepomp. Goed voor het milieu!';
+    return 'Iets minder gasverbruik dan gemiddeld \u2014 redelijk energiezuinig.';
+  }
+  if(key === 'gem_elektriciteit'){
+    if(abs < 0.5) return 'Het stroomverbruik is hier normaal.';
+    if(z > 1) return 'Hier wordt meer stroom gebruikt dan gemiddeld. Mogelijk grotere woningen, meer apparaten, of elektrisch verwarmen.';
+    if(z < -1) return 'Laag stroomverbruik \u2014 mogelijk kleinere woningen of bewust zuinige bewoners.';
+    return z > 0 ? 'Iets meer stroomverbruik dan gemiddeld.' : 'Iets minder stroomverbruik dan gemiddeld.';
+  }
+  if(key === 'gem_huishouden_grootte'){
+    if(abs < 0.5) return 'De huishoudens zijn hier gemiddeld van grootte.';
+    if(z > 1) return 'Hier wonen veel gezinnen \u2014 de huishoudens zijn groter dan gemiddeld. Denk aan gezinnen met kinderen.';
+    if(z < -1) return 'Hier wonen veel alleenstaanden of stellen zonder kinderen \u2014 de huishoudens zijn klein.';
+    return z > 0 ? 'Iets grotere huishoudens dan gemiddeld.' : 'Iets kleinere huishoudens dan gemiddeld.';
+  }
+  if(key === 'arbeidsparticipatie'){
+    if(abs < 0.5) return 'Ongeveer evenveel mensen werken hier als in de rest van Nederland.';
+    if(z > 1) return 'Hier werken veel mensen \u2014 een actieve buurt met veel tweeverdieners. Goed teken voor de lokale economie.';
+    if(z < -1) return 'Minder mensen werken hier dan gemiddeld. Dat kan komen door vergrijzing, studenten, of een hoger percentage uitkeringsgerechtigden.';
+    return z > 0 ? 'Iets meer werkenden dan gemiddeld.' : 'Iets minder werkenden dan gemiddeld.';
+  }
+  if(key === 'afstand_huisarts'){
+    if(abs < 0.5) return 'De huisarts is op een normale afstand \u2014 niet ver, niet dichtbij.';
+    if(z > 1) return 'De huisarts is hier ver weg. Bewoners moeten verder rijden voor medische zorg \u2014 typisch voor dunbevolkte gebieden.';
+    if(z < -1) return 'De huisarts is heel dichtbij \u2014 handig, vooral voor ouderen en gezinnen met kleine kinderen.';
+    return z > 0 ? 'De huisarts is iets verder weg dan gemiddeld.' : 'De huisarts is dichterbij dan gemiddeld.';
+  }
+  if(key === 'afstand_supermarkt'){
+    if(abs < 0.5) return 'De supermarkt is op een normale afstand.';
+    if(z > 1) return 'De dichtstbijzijnde supermarkt is ver weg \u2014 boodschappen doen zonder auto is lastig hier.';
+    if(z < -1) return 'Heel handig: de supermarkt is vlakbij! Lekker voor als je snel iets nodig hebt.';
+    return z > 0 ? 'De supermarkt is iets verder dan gemiddeld.' : 'De supermarkt is iets dichterbij dan gemiddeld.';
+  }
+  if(key === 'huishoudens' || key === 'woningvoorraad'){
+    if(abs < 0.5) return 'Een gemiddeld aantal voor een Nederlands gebied.';
+    if(z > 1) return 'Een groot gebied met veel '+(key==='huishoudens'?'huishoudens':'woningen')+' \u2014 waarschijnlijk een stadswijk of groot dorp.';
+    if(z < -1) return 'Een klein gebied met weinig '+(key==='huishoudens'?'huishoudens':'woningen')+' \u2014 waarschijnlijk een rustig buurtje.';
+    return z > 0 ? 'Iets meer dan gemiddeld.' : 'Iets minder dan gemiddeld.';
+  }
+  if(key === 'bedrijfsvestigingen'){
+    if(abs < 0.5) return 'Een normale mix van wonen en werken.';
+    if(z > 1) return 'Hier zijn veel bedrijven gevestigd \u2014 een ondernemend en economisch actief gebied.';
+    if(z < -1) return 'Weinig bedrijven hier \u2014 dit is vooral een woongebied.';
+    return z > 0 ? 'Iets meer bedrijvigheid dan gemiddeld.' : 'Iets minder bedrijvigheid dan gemiddeld.';
+  }
+  if(key === 'huurwoningen'){
+    if(abs < 0.5) return 'Een normale verdeling van huur- en koopwoningen.';
+    if(z > 1) return 'Hier wordt veel gehuurd \u2014 typisch voor een buurt met sociale woningbouw of studentenflats.';
+    if(z < -1) return 'Weinig huurwoningen \u2014 de meeste bewoners zijn huiseigenaar.';
+    return z > 0 ? 'Iets meer huurwoningen dan gemiddeld.' : 'Iets minder huurwoningen dan gemiddeld.';
+  }
+  if(key === 'pct_eengezins'){
+    if(abs < 0.5) return 'Een normale mix van eengezins- en meergezinswoningen.';
+    if(z > 1) return 'Vooral rijtjeshuizen en vrijstaande woningen hier \u2014 een typische gezinsbuurt met tuinen.';
+    if(z < -1) return 'Weinig eengezinswoningen \u2014 hier staan vooral flats en appartementen.';
+    return z > 0 ? 'Iets meer eengezinswoningen dan gemiddeld.' : 'Meer appartementen dan gemiddeld.';
+  }
+  if(key === 'personenautos'){
+    if(abs < 0.5) return 'Een normaal aantal auto\'s voor dit soort gebied.';
+    if(z > 1) return 'Veel auto\'s in deze buurt \u2014 bewoners zijn afhankelijk van de auto, waarschijnlijk omdat het OV minder goed bereikbaar is.';
+    if(z < -1) return 'Weinig auto\'s \u2014 bewoners fietsen, lopen of pakken het OV. Typisch voor een goed bereikbare stadswijk.';
+    return z > 0 ? 'Iets meer auto\'s dan gemiddeld.' : 'Iets minder auto\'s dan gemiddeld.';
+  }
+  // Leeftijdsgroepen
+  if(key === '0_15'){
+    if(abs < 0.5) return 'Een normaal percentage kinderen \u2014 een gemiddelde mix van gezinnen.';
+    if(z > 1) return 'Veel kinderen in deze buurt! Een echte gezinsbuurt, waarschijnlijk met scholen en speeltuinen in de buurt.';
+    if(z < -1) return 'Weinig kinderen \u2014 hier wonen vooral volwassenen en ouderen.';
+    return z > 0 ? 'Iets meer kinderen dan gemiddeld.' : 'Iets minder kinderen dan gemiddeld.';
+  }
+  if(key === '15_25'){
+    if(abs < 0.5) return 'Een normaal percentage jongeren.';
+    if(z > 1) return 'Veel jongeren! Mogelijk een studentenwijk of een buurt populair bij starters.';
+    if(z < -1) return 'Weinig jongeren \u2014 een gevestigde buurt met vooral volwassenen en ouderen.';
+    return z > 0 ? 'Iets meer jongeren dan gemiddeld.' : 'Iets minder jongeren dan gemiddeld.';
+  }
+  if(key === '25_45'){
+    if(abs < 0.5) return 'Een normaal aandeel werkende volwassenen.';
+    if(z > 1) return 'Veel jonge werkenden \u2014 een dynamische buurt met carrièremakers en jonge gezinnen.';
+    if(z < -1) return 'Minder jonge werkenden dan gemiddeld \u2014 waarschijnlijk een oudere of meer vergrijsde buurt.';
+    return z > 0 ? 'Iets meer 25-45 jarigen.' : 'Iets minder 25-45 jarigen.';
+  }
+  if(key === '45_65'){
+    if(abs < 0.5) return 'Een normaal aandeel 45-65 jarigen.';
+    if(z > 1) return 'Veel 45-plussers \u2014 een gevestigde buurt waar mensen al langere tijd wonen.';
+    if(z < -1) return 'Minder 45-65 jarigen \u2014 een jongere buurt.';
+    return z > 0 ? 'Iets meer 45-65 jarigen.' : 'Iets minder 45-65 jarigen.';
+  }
+  if(key === 'mannen' || key === 'vrouwen'){
+    if(abs < 0.5) return 'Een normale verhouding.';
+    return z > 0 ? 'Iets meer '+fm.naam.toLowerCase()+' dan gemiddeld.' : 'Iets minder '+fm.naam.toLowerCase()+' dan gemiddeld.';
+  }
+  // Fallback
+  if(abs < 0.5) return 'Dit is een gemiddelde waarde voor Nederland.';
+  if(z > 0) return 'Dit is '+hb+' dan in de meeste andere gebieden.';
+  return 'Dit is '+hb+' dan in de meeste andere gebieden.';
+}
+
 // Interpreteer z-score in menselijke taal
 function interpretZScore(z, key, fm){
   var abs = Math.abs(z);
@@ -2076,8 +2269,13 @@ function buildCompareHtml(key, val){
   html += '</div>';
   // Normaalverdeling SVG
   html += buildDistSvg(zScore, ns.distType);
-  // Interpretatie
+  // Korte statistische interpretatie
   html += '<div style="font-size:11px;color:var(--mt);margin-top:3px;line-height:1.5">'+interpretZScore(zScore, key, fm)+'</div>';
+  // Menselijke uitleg (kindertaal)
+  html += '<div style="font-size:11px;color:var(--tx);margin-top:4px;padding:6px 10px;background:rgba(57,255,20,.03);border-radius:6px;border-left:2px solid rgba(57,255,20,.15);line-height:1.6">';
+  html += '<span class="mi mi-sm" style="font-size:13px;color:var(--ac);vertical-align:-2px">lightbulb</span> ';
+  html += humanExplain(key, val, zScore, ns, fm);
+  html += '</div>';
   // Bar met positie
   html += '<div class="info-bar" style="height:6px;margin:6px 0 0;border-radius:3px">';
   html += '<div class="info-bar-fill" style="width:'+pos+'%;background:'+getBarColor(zScore)+';border-radius:3px"></div>';
