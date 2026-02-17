@@ -374,7 +374,7 @@ select option{background:var(--bg);color:var(--tx)}
 
       <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v5.5</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v5.6</div>
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
@@ -478,7 +478,7 @@ function initMap(){
   setBasemap('dark');
 
   _map.on('click', function(e){
-    if(_map.getZoom() >= 15){
+    if(_map.getZoom() >= 16){
       if(_pandWmsLayer) pandGetFeatureInfo(e);
       else if(_bagWmsLayer) bagGetFeatureInfo(e);
     }
@@ -691,8 +691,8 @@ function getCqlFilter(){
 
 function createBagWmsLayer(){
   var opts = {
-    layers:'verblijfsobject',styles:'bag:verblijfsobject_status',format:'image/png',transparent:true,
-    version:'1.1.1',opacity:0.9,maxZoom:22,tileSize:256,minZoom:15
+    layers:'verblijfsobject',format:'image/png',transparent:true,
+    version:'1.1.1',opacity:0.85,maxZoom:22,tileSize:256,minZoom:15
   };
   var cql = getCqlFilter();
   if(cql) opts.CQL_FILTER = cql;
@@ -709,11 +709,11 @@ function toggleBagLayer(on){
     createBagWmsLayer();
     statusSection.style.display = '';
     statusBtns.style.display = 'flex';
-    if(_map.getZoom() < 15){
-      _map.setZoom(15);
-      toast('Ingezoomd naar niveau 15 — BAG adressen nu zichtbaar');
+    if(_map.getZoom() < 17){
+      _map.setZoom(17);
+      toast('Ingezoomd naar niveau 17 — BAG adressen nu zichtbaar');
     } else {
-      toast('BAG adressen actief (gekleurd op status)');
+      toast('BAG adressen actief');
     }
   } else {
     if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
@@ -731,9 +731,11 @@ function bagGetFeatureInfo(e){
   var url = PDOK_BAG_WMS+'?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo'+
     '&FORMAT=image/png&TRANSPARENT=true'+
     '&QUERY_LAYERS=verblijfsobject&LAYERS=verblijfsobject'+
-    '&INFO_FORMAT=application/json&FEATURE_COUNT=1&BUFFER=12'+
+    '&INFO_FORMAT=application/json&FEATURE_COUNT=5&BUFFER=12'+
     '&X='+Math.round(pt.x)+'&Y='+Math.round(pt.y)+
     '&SRS=EPSG:4326&WIDTH='+size.x+'&HEIGHT='+size.y+'&BBOX='+bbox;
+  var cql = getCqlFilter();
+  if(cql) url += '&CQL_FILTER='+encodeURIComponent(cql);
   fetch(url).then(function(r){return r.json()}).then(function(d){
     if(!d.features||!d.features.length) return;
     var p = d.features[0].properties;
@@ -818,11 +820,11 @@ function togglePandLayer(on){
       version:'1.1.1',opacity:0.7,maxZoom:22,tileSize:256,minZoom:15
     }).addTo(_map);
     fixLayerOrder();
-    if(_map.getZoom() < 15){
-      _map.setZoom(15);
-      toast('Ingezoomd naar niveau 15 \u2014 BAG panden nu zichtbaar');
+    if(_map.getZoom() < 17){
+      _map.setZoom(17);
+      toast('Ingezoomd naar niveau 17 \u2014 BAG panden nu zichtbaar');
     } else {
-      toast('BAG panden actief (gekleurd op status)');
+      toast('BAG panden actief');
     }
   } else if(_pandWmsLayer){_map.removeLayer(_pandWmsLayer);_pandWmsLayer=null}
 }
@@ -1073,6 +1075,68 @@ function computeNationalStats(){
   });
 }
 
+// Genereer SVG normaalverdeling curve met positie-marker
+function buildDistSvg(zScore, distType){
+  var w=180,h=48,pad=4;
+  var pts=[];
+  // Bel-curve genereren (of scheef als distType aangeeft)
+  var skew = distType==='rechts scheef'?0.6:(distType==='links scheef'?-0.6:0);
+  for(var i=0;i<=40;i++){
+    var x = -3.5 + i*7/40;
+    var xs = x - skew;
+    var y = Math.exp(-0.5*xs*xs)/2.5066; // normaal PDF
+    pts.push({x:pad+(i/40)*(w-2*pad), y:h-pad-y*(h-2*pad)*2.8});
+  }
+  var path = 'M'+pts[0].x+','+((h-pad))+' ';
+  pts.forEach(function(p){path+='L'+p.x+','+p.y+' '});
+  path += 'L'+pts[pts.length-1].x+','+(h-pad)+' Z';
+  // Marker positie: z-score naar x
+  var zClamped = Math.max(-3.5,Math.min(3.5,zScore));
+  var mx = pad+((zClamped+3.5)/7)*(w-2*pad);
+  // Kleur zones (sigma)
+  var svg = '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="display:block;margin:2px 0">';
+  // Vulling met gradient
+  svg += '<defs><linearGradient id="gc'+Math.abs(Math.round(zScore*100))+'" x1="0" y1="0" x2="1" y2="0">';
+  svg += '<stop offset="0%" stop-color="#ef4444" stop-opacity="0.3"/>';
+  svg += '<stop offset="15%" stop-color="#fbbf24" stop-opacity="0.3"/>';
+  svg += '<stop offset="35%" stop-color="#38bdf8" stop-opacity="0.3"/>';
+  svg += '<stop offset="65%" stop-color="#38bdf8" stop-opacity="0.3"/>';
+  svg += '<stop offset="85%" stop-color="#fbbf24" stop-opacity="0.3"/>';
+  svg += '<stop offset="100%" stop-color="#ef4444" stop-opacity="0.3"/>';
+  svg += '</linearGradient></defs>';
+  svg += '<path d="'+path+'" fill="url(#gc'+Math.abs(Math.round(zScore*100))+')" stroke="rgba(226,232,240,0.3)" stroke-width="1"/>';
+  // Sigma lijnen
+  [-2,-1,0,1,2].forEach(function(s){
+    var sx=pad+((s+3.5)/7)*(w-2*pad);
+    var op=s===0?0.5:0.15;
+    svg+='<line x1="'+sx+'" y1="'+(pad)+'" x2="'+sx+'" y2="'+(h-pad)+'" stroke="rgba(226,232,240,'+op+')" stroke-width="'+(s===0?1.5:0.5)+'" stroke-dasharray="'+(s===0?'':'2,2')+'"/>';
+  });
+  // Waarde marker
+  svg += '<line x1="'+mx+'" y1="2" x2="'+mx+'" y2="'+(h-2)+'" stroke="#39ff14" stroke-width="2"/>';
+  svg += '<circle cx="'+mx+'" cy="6" r="3" fill="#39ff14"/>';
+  // Sigma labels
+  svg += '<text x="'+pad+'" y="'+(h-1)+'" font-size="7" fill="rgba(226,232,240,0.4)" font-family="Space Mono,monospace">-3\u03c3</text>';
+  svg += '<text x="'+(w-pad-16)+'" y="'+(h-1)+'" font-size="7" fill="rgba(226,232,240,0.4)" font-family="Space Mono,monospace">+3\u03c3</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+// Interpreteer z-score in menselijke taal
+function interpretZScore(z, key, fm){
+  var abs = Math.abs(z);
+  var richting = z >= 0 ? 'hoog' : 'laag';
+  var isReverse = REVERSE_KEYS.indexOf(key) >= 0;
+  // Bij "afstand" indicatoren is lager = beter
+  if(isReverse){ richting = z >= 0 ? 'ver' : 'dichtbij'; }
+
+  if(abs < 0.5) return '<span style="color:var(--ai)">Gemiddeld</span> \u2014 typisch voor Nederland';
+  if(abs < 1.0) return '<span style="color:var(--ai)">Licht '+richting+'</span> \u2014 binnen normaal bereik';
+  if(abs < 1.5) return '<span style="color:var(--wn)">Bovengemiddeld '+richting+'</span> \u2014 top '+(z>0?'30':'30')+'%';
+  if(abs < 2.0) return '<span style="color:var(--wn)">'+(richting==='hoog'||richting==='ver'?'Hoog':'Laag')+'</span> \u2014 top '+(z>0?'7':'7')+'%';
+  if(abs < 2.5) return '<span style="color:var(--dn)">Zeer '+(richting==='hoog'||richting==='ver'?'hoog':'laag')+'</span> \u2014 top 2%';
+  return '<span style="color:var(--dn)">Extreem '+(richting==='hoog'||richting==='ver'?'hoog':'laag')+'</span> \u2014 uitzonderlijk (<1%)';
+}
+
 // Bouw vergelijking HTML voor een indicator waarde vs landelijk
 function buildCompareHtml(key, val){
   var ns = _nationalStats[key];
@@ -1082,12 +1146,11 @@ function buildCompareHtml(key, val){
   var pctSign = pctDiff >= 0 ? '+' : '';
   var diffClass = pctDiff >= 0 ? 'up' : 'dn';
   var diffLabel = pctDiff >= 0 ? 'boven' : 'onder';
+  var zScore = ns.stddev > 0 ? ((val - ns.avg) / ns.stddev) : 0;
   // Positie op de balk (0-100%)
   var range = ns.max - ns.min;
   var pos = range > 0 ? Math.min(100, Math.max(0, (val - ns.min) / range * 100)) : 50;
   var avgPos = range > 0 ? Math.min(100, Math.max(0, (ns.avg - ns.min) / range * 100)) : 50;
-  // Kleur van de bar
-  var zScore = ns.stddev > 0 ? ((val - ns.avg) / ns.stddev) : 0;
 
   var html = '<div style="margin-bottom:10px;padding:8px 10px;background:rgba(15,20,35,.5);border-radius:8px;border-left:3px solid '+getBarColor(zScore)+'">';
   // Regel 1: naam + waarde
@@ -1095,20 +1158,25 @@ function buildCompareHtml(key, val){
   html += '<span style="font:600 12px \'DM Sans\',sans-serif;color:var(--tx);display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:15px;color:var(--ai)">'+fm.icon+'</span>'+fm.naam+'</span>';
   html += '<span style="font:700 14px \'Space Mono\',monospace;color:var(--ac)">'+formatVal(val)+'</span>';
   html += '</div>';
-  // Regel 2: vergelijking in woorden
-  html += '<div style="font-size:11px;color:var(--mt);margin-bottom:4px">';
-  html += '<span class="'+diffClass+'" style="font-weight:700">'+pctSign+pctDiff.toFixed(0)+'%</span> '+diffLabel+' gemiddeld';
-  html += ' <span style="opacity:.5">(gem. '+formatVal(ns.avg)+' '+fm.eenheid+')</span>';
+  // Regel 2: vergelijking
+  html += '<div style="font-size:11px;color:var(--mt);margin-bottom:2px">';
+  html += '<span class="'+diffClass+'" style="font-weight:700">'+pctSign+pctDiff.toFixed(0)+'%</span> '+diffLabel+' gem.';
+  html += ' <span style="opacity:.5">('+formatVal(ns.avg)+' '+fm.eenheid+')</span>';
+  html += ' &middot; <span style="opacity:.5">z='+zScore.toFixed(1)+'</span>';
   html += '</div>';
+  // Normaalverdeling SVG
+  html += buildDistSvg(zScore, ns.distType);
+  // Interpretatie
+  html += '<div style="font-size:10px;color:var(--mt);margin-top:1px">'+interpretZScore(zScore, key, fm)+'</div>';
   // Bar met positie
-  html += '<div class="info-bar" style="height:6px;margin:0;border-radius:3px">';
+  html += '<div class="info-bar" style="height:5px;margin:4px 0 0;border-radius:3px">';
   html += '<div class="info-bar-fill" style="width:'+pos+'%;background:'+getBarColor(zScore)+';border-radius:3px"></div>';
-  html += '<div class="info-bar-marker" style="left:'+avgPos+'%;top:-2px;height:10px;width:2px;background:var(--tx);opacity:.6" title="Gemiddeld: '+formatVal(ns.avg)+'"></div>';
+  html += '<div class="info-bar-marker" style="left:'+avgPos+'%;top:-2px;height:9px;width:1.5px;background:var(--tx);opacity:.5" title="Gem: '+formatVal(ns.avg)+'"></div>';
   html += '</div>';
-  // Regel 3: min — max
-  html += '<div style="display:flex;justify-content:space-between;margin-top:3px">';
-  html += '<span style="font:400 9px \'Space Mono\',monospace;color:var(--mt)">min '+formatVal(ns.min)+'</span>';
-  html += '<span style="font:400 9px \'Space Mono\',monospace;color:var(--mt)">max '+formatVal(ns.max)+'</span>';
+  // min — max
+  html += '<div style="display:flex;justify-content:space-between;margin-top:2px">';
+  html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.6">'+formatVal(ns.min)+'</span>';
+  html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.6">'+formatVal(ns.max)+'</span>';
   html += '</div>';
   html += '</div>';
   return html;
