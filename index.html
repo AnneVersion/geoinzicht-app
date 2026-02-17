@@ -1428,10 +1428,19 @@ function updateBagCacheUI(){
     }
   }
   if(el) el.textContent = txt;
-  // Update badge op BAG knop
+  // Update badge op BAG knop: geladen/totaal
   if(btnEl){
-    if(_bagMemCount > 0) btnEl.textContent = '('+_bagMemCount.toLocaleString('nl-NL')+')';
-    else btnEl.textContent = '';
+    var totalAvailBtn = 0;
+    if(_bagIndex) for(var kb in _bagIndex) totalAvailBtn += (_bagIndex[kb].count || 0);
+    if(_bagMemCount > 0 && totalAvailBtn > 0){
+      btnEl.textContent = '('+_bagMemCount.toLocaleString('nl-NL')+'/'+totalAvailBtn.toLocaleString('nl-NL')+')';
+    } else if(_bagMemCount > 0){
+      btnEl.textContent = '('+_bagMemCount.toLocaleString('nl-NL')+')';
+    } else if(totalAvailBtn > 0){
+      btnEl.textContent = '(0/'+totalAvailBtn.toLocaleString('nl-NL')+')';
+    } else {
+      btnEl.textContent = '';
+    }
   }
 }
 
@@ -2307,7 +2316,110 @@ function prefetchBagCounts(){
     if(queue.length === 0 && running === 0){
       _bagPrefetching = false;
       updateBagCacheUI();
+      // Herrender gemeente dropdown met bijgewerkte counts
+      buildGemeenteFilter();
       console.log('BAG prefetch klaar:', Object.keys(_bagIndex).length, 'gemeenten in index');
+      // Start buurt/wijk prefetch als data beschikbaar is
+      setTimeout(function(){ prefetchBagSubareaCounts(); }, 500);
+    }
+  }
+
+  processNext();
+}
+
+// BAG prefetch voor buurten en wijken — lichtgewicht hits queries
+var _bagWijkIndex = {};   // {wijkcode: {naam, count, gemeente}}
+var _bagBuurtIndex = {};  // {buurtcode: {naam, count, gemeente}}
+var _bagSubPrefetching = false;
+
+function prefetchBagSubareaCounts(){
+  if(_bagSubPrefetching) return;
+  // Alleen als er wijk- of buurtdata geladen is
+  if(!_wijkData && !_buurtData) return;
+  _bagSubPrefetching = true;
+
+  var items = [];
+
+  // Wijken
+  if(_wijkData){
+    _wijkData.features.forEach(function(f){
+      var p = f.properties;
+      var code = p.wijkcode || '';
+      var naam = p.wijknaam || '';
+      if(!code || !naam || !f.geometry) return;
+      if(_bagWijkIndex[code]) return; // Al opgehaald
+      items.push({code:code, naam:naam, type:'wijk', gemeente:p.gemeentenaam||'', geom:f.geometry});
+    });
+  }
+
+  // Buurten
+  if(_buurtData){
+    _buurtData.features.forEach(function(f){
+      var p = f.properties;
+      var code = p.buurtcode || '';
+      var naam = p.buurtnaam || '';
+      if(!code || !naam || !f.geometry) return;
+      if(_bagBuurtIndex[code]) return;
+      items.push({code:code, naam:naam, type:'buurt', gemeente:p.gemeentenaam||'', geom:f.geometry});
+    });
+  }
+
+  if(items.length === 0){ _bagSubPrefetching = false; return; }
+
+  console.log('BAG subarea prefetch: '+items.length+' wijken/buurten');
+  var total = items.length;
+  var done = 0;
+  var queue = items.slice();
+  var concurrency = 6;
+  var running = 0;
+
+  function processNext(){
+    while(queue.length > 0 && running < concurrency){
+      var item = queue.shift();
+      running++;
+      (function(it){
+        // Bereken bbox
+        var coords = [];
+        function ex(g){
+          if(!g) return;
+          if(g.type==='Polygon') g.coordinates.forEach(function(r){r.forEach(function(c){coords.push(c)})});
+          else if(g.type==='MultiPolygon') g.coordinates.forEach(function(p){p.forEach(function(r){r.forEach(function(c){coords.push(c)})})});
+        }
+        ex(it.geom);
+        if(coords.length === 0){ running--; done++; processNext(); return; }
+        var mnLng=Infinity,mxLng=-Infinity,mnLat=Infinity,mxLat=-Infinity;
+        coords.forEach(function(c){if(c[0]<mnLng)mnLng=c[0];if(c[0]>mxLng)mxLng=c[0];if(c[1]<mnLat)mnLat=c[1];if(c[1]>mxLat)mxLat=c[1]});
+        var bbox = mnLat.toFixed(5)+','+mnLng.toFixed(5)+','+mxLat.toFixed(5)+','+mxLng.toFixed(5)+',EPSG:4326';
+        var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&resultType=hits&srsName=EPSG:4326&BBOX='+bbox;
+
+        fetch(url).then(function(r){ return r.text(); }).then(function(xml){
+          var m = xml.match(/numberMatched="(\d+)"/);
+          var count = m ? parseInt(m[1]) : 0;
+          if(it.type === 'wijk'){
+            _bagWijkIndex[it.code] = {naam:it.naam, count:count, gemeente:it.gemeente};
+          } else {
+            _bagBuurtIndex[it.code] = {naam:it.naam, count:count, gemeente:it.gemeente};
+          }
+        }).catch(function(){}).finally(function(){
+          running--;
+          done++;
+          if(done % 50 === 0){
+            console.log('BAG subarea prefetch: '+done+'/'+total);
+            // Herrender dropdowns tussentijds
+            if(_wijkData && Object.keys(_bagWijkIndex).length > 0) buildWijkFilter();
+            if(_buurtData && Object.keys(_bagBuurtIndex).length > 0) buildBuurtFilter();
+          }
+          processNext();
+        });
+      })(item);
+    }
+
+    if(queue.length === 0 && running === 0){
+      _bagSubPrefetching = false;
+      console.log('BAG subarea prefetch klaar: '+Object.keys(_bagWijkIndex).length+' wijken, '+Object.keys(_bagBuurtIndex).length+' buurten');
+      // Definitieve dropdown update
+      if(_wijkData) buildWijkFilter();
+      if(_buurtData) buildBuurtFilter();
     }
   }
 
@@ -2442,20 +2554,24 @@ function startBagBackgroundLoad(){
 
   if(gemeenteGeoms.length === 0){
     // Alle gemeenten in scope zijn al geladen
+    console.log('BAG bg: alle gemeenten al geladen ('+Object.keys(_bagBgLoaded).length+')');
     return;
   }
 
-  // Als geen selectie (alle gemeenten) en meer dan 20, gebruik viewport als filter
-  if(gemFilter === 'all' && gemeenteGeoms.length > 20){
-    var b = _map.getBounds();
-    gemeenteGeoms = gemeenteGeoms.filter(function(g){
-      var parts = g.bbox.split(',');
-      var s = parseFloat(parts[0]), w = parseFloat(parts[1]), n = parseFloat(parts[2]), e = parseFloat(parts[3]);
-      return !(n < b.getSouth() || s > b.getNorth() || e < b.getWest() || w > b.getEast());
-    });
-    if(gemeenteGeoms.length === 0){
-      return; // Niets nieuws in viewport — doorladen stopt vanzelf
-    }
+  // Als geen selectie: sorteer op afstand tot viewport-centrum (dichtstbij eerst)
+  if(gemFilter === 'all' && gemeenteGeoms.length > 5){
+    try {
+      var center = _map.getCenter();
+      var cLat = center.lat, cLng = center.lng;
+      gemeenteGeoms.sort(function(a,b){
+        var pa = a.bbox.split(','), pb = b.bbox.split(',');
+        var aMidLat = (parseFloat(pa[0])+parseFloat(pa[2]))/2, aMidLng = (parseFloat(pa[1])+parseFloat(pa[3]))/2;
+        var bMidLat = (parseFloat(pb[0])+parseFloat(pb[2]))/2, bMidLng = (parseFloat(pb[1])+parseFloat(pb[3]))/2;
+        var distA = Math.pow(aMidLat-cLat,2) + Math.pow(aMidLng-cLng,2);
+        var distB = Math.pow(bMidLat-cLat,2) + Math.pow(bMidLng-cLng,2);
+        return distA - distB;
+      });
+    } catch(e){}
   }
 
   _bagBgRunning = true;
@@ -3202,14 +3318,25 @@ function showFeatureInfo(p, cfg, type, isClick, geoFeature){
           kernRows.push({icon:'straighten', label:'\u00a0\u00a0\u00d8 Oppervlakte', val:bagStats.avgOpp + ' m\u00b2', color:'var(--ai)'});
         }
       }
-    } else if(!isClick && _bagIndex && gemCode && _bagIndex[gemCode]){
-      // Hover: snelle info uit _bagIndex
-      var idxInfo = _bagIndex[gemCode];
-      if(type === 'gemeenten'){
-        kernRows.push({icon:'location_on', label:'BAG Adressen', val:_bagMemCount > 0 ? _bagMemCount.toLocaleString('nl-NL')+'/'+idxInfo.count.toLocaleString('nl-NL')+' geladen' : idxInfo.count.toLocaleString('nl-NL')+' totaal', color:'var(--ai)'});
-      } else {
-        // Buurten/wijken: toon gemeente-totaal als context
-        kernRows.push({icon:'location_on', label:'BAG Gem. Totaal', val:idxInfo.count.toLocaleString('nl-NL')+' ('+escapeHtml(idxInfo.naam||gemCode)+')', color:'var(--ai)'});
+    } else if(!isClick){
+      // Hover: snelle info uit prefetch indexes
+      if(type === 'gemeenten' && _bagIndex && gemCode && _bagIndex[gemCode]){
+        var idxInfo = _bagIndex[gemCode];
+        kernRows.push({icon:'location_on', label:'BAG Adressen', val:idxInfo.count.toLocaleString('nl-NL'), color:'var(--ai)'});
+      } else if(type === 'wijken'){
+        var wCode = p.wijkcode || '';
+        if(wCode && _bagWijkIndex[wCode]){
+          kernRows.push({icon:'location_on', label:'BAG Adressen', val:_bagWijkIndex[wCode].count.toLocaleString('nl-NL'), color:'var(--ai)'});
+        } else if(_bagIndex && gemCode && _bagIndex[gemCode]){
+          kernRows.push({icon:'location_on', label:'BAG Gem. Totaal', val:_bagIndex[gemCode].count.toLocaleString('nl-NL')+' ('+escapeHtml(_bagIndex[gemCode].naam||gemCode)+')', color:'var(--ai)'});
+        }
+      } else if(type === 'buurten'){
+        var bCode = p.buurtcode || '';
+        if(bCode && _bagBuurtIndex[bCode]){
+          kernRows.push({icon:'location_on', label:'BAG Adressen', val:_bagBuurtIndex[bCode].count.toLocaleString('nl-NL'), color:'var(--ai)'});
+        } else if(_bagIndex && gemCode && _bagIndex[gemCode]){
+          kernRows.push({icon:'location_on', label:'BAG Gem. Totaal', val:_bagIndex[gemCode].count.toLocaleString('nl-NL')+' ('+escapeHtml(_bagIndex[gemCode].naam||gemCode)+')', color:'var(--ai)'});
+        }
       }
     }
   }
@@ -3856,13 +3983,18 @@ function buildGemeenteFilter(){
 
 function buildWijkFilter(){
   if(!_wijkData) return;
+  // Bouw naam-naar-code mapping
+  var wijkNaamToCode = {};
   var names = new Set();
   _wijkData.features.forEach(function(f){
     var n = f.properties.wijknaam;
     var g = f.properties.gemeentenaam;
+    var code = f.properties.wijkcode || '';
     if(n){
       if(_selectedGemeenten.length === 0 || _selectedGemeenten.indexOf(g) >= 0){
-        names.add(n + ' ('+g+')');
+        var display = n + ' ('+g+')';
+        names.add(display);
+        if(code) wijkNaamToCode[display] = code;
       }
     }
   });
@@ -3870,23 +4002,36 @@ function buildWijkFilter(){
   var optsEl = document.getElementById('msWijkOptions');
   var html = '';
   _allWijkNamen.forEach(function(n){
-    html += '<div class="ms-opt" data-name="'+n.replace(/"/g,'&quot;')+'" onclick="toggleMsOption(\'msWijk\',\''+n.replace(/'/g,"\\'")+'\')">';
+    var code = wijkNaamToCode[n] || '';
+    var bagInfo = '';
+    if(code && _bagWijkIndex[code]){
+      var cnt = _bagWijkIndex[code].count;
+      bagInfo = '<span style="font:400 8px Space Mono,monospace;color:var(--ai);margin-left:auto;flex-shrink:0">'+cnt.toLocaleString('nl-NL')+'</span>';
+    }
+    html += '<div class="ms-opt" data-name="'+n.replace(/"/g,'&quot;')+'" onclick="toggleMsOption(\'msWijk\',\''+n.replace(/'/g,"\\'")+'\')" style="display:flex;align-items:center;gap:4px">';
     html += '<span class="ms-check"><span class="mi" style="font-size:10px">check</span></span>';
-    html += '<span style="font-size:10px">'+n+'</span></div>';
+    html += '<span style="font-size:10px;flex:1">'+n+'</span>'+bagInfo+'</div>';
   });
   optsEl.innerHTML = html;
+  // Trigger subarea prefetch als nog niet gestart
+  if(Object.keys(_bagWijkIndex).length === 0 && !_bagSubPrefetching && _bagIndex && Object.keys(_bagIndex).length > 0){
+    setTimeout(prefetchBagSubareaCounts, 1000);
+  }
 }
 
 function buildBuurtFilter(){
   if(!_buurtData) return;
+  var buurtNaamToCode = {};
   var names = new Set();
   _buurtData.features.forEach(function(f){
     var n = f.properties.buurtnaam;
     var g = f.properties.gemeentenaam;
+    var code = f.properties.buurtcode || '';
     if(n){
-      // Filter op geselecteerde gemeenten als er een selectie is
       if(_selectedGemeenten.length === 0 || _selectedGemeenten.indexOf(g) >= 0){
-        names.add(n + ' ('+g+')');
+        var display = n + ' ('+g+')';
+        names.add(display);
+        if(code) buurtNaamToCode[display] = code;
       }
     }
   });
@@ -3894,11 +4039,21 @@ function buildBuurtFilter(){
   var optsEl = document.getElementById('msBuurtOptions');
   var html = '';
   _allBuurtNamen.forEach(function(n){
-    html += '<div class="ms-opt" data-name="'+n.replace(/"/g,'&quot;')+'" onclick="toggleMsOption(\'msBuurt\',\''+n.replace(/'/g,"\\'")+'\')">';
+    var code = buurtNaamToCode[n] || '';
+    var bagInfo = '';
+    if(code && _bagBuurtIndex[code]){
+      var cnt = _bagBuurtIndex[code].count;
+      bagInfo = '<span style="font:400 8px Space Mono,monospace;color:var(--ai);margin-left:auto;flex-shrink:0">'+cnt.toLocaleString('nl-NL')+'</span>';
+    }
+    html += '<div class="ms-opt" data-name="'+n.replace(/"/g,'&quot;')+'" onclick="toggleMsOption(\'msBuurt\',\''+n.replace(/'/g,"\\'")+'\')" style="display:flex;align-items:center;gap:4px">';
     html += '<span class="ms-check"><span class="mi" style="font-size:10px">check</span></span>';
-    html += '<span style="font-size:10px">'+n+'</span></div>';
+    html += '<span style="font-size:10px;flex:1">'+n+'</span>'+bagInfo+'</div>';
   });
   optsEl.innerHTML = html;
+  // Trigger subarea prefetch als nog niet gestart
+  if(Object.keys(_bagBuurtIndex).length === 0 && !_bagSubPrefetching && _bagIndex && Object.keys(_bagIndex).length > 0){
+    setTimeout(prefetchBagSubareaCounts, 1000);
+  }
 }
 
 function getSelectedGemeenteFilter(){
