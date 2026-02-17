@@ -605,6 +605,7 @@ var _bagWmsLayer = null;
 var _bagVectorLayer = null;
 var _bagVectorData = null; // raw WFS features cache
 var _bagLoading = false;
+var _bagForceReload = false;
 var _pandWmsLayer = null;
 var _searchMarker = null;
 var _infoPinned = false; // Panel vastzetten bij klik
@@ -991,17 +992,20 @@ function updateBagCacheUI(){
 }
 
 // Laad BAG vectordata via WFS — alle adressen in viewport
-var BAG_MAX_FEATURES = 500000;
+var BAG_PAGE_SIZE = 1000;    // PDOK hard server-limiet
+var BAG_CONCURRENCY = 6;     // Max gelijktijdige requests (browser limit per domain)
+var BAG_MIN_ZOOM = 11;       // Minimale zoom voor BAG laden
 var _bagLastBbox = '';
+var _bagLastBounds = null;
 var _bagAbort = null;
-var BAG_PAGE_SIZE = 1000;   // PDOK hard server-limiet
-var BAG_CONCURRENCY = 6;    // Max gelijktijdige requests (browser limit)
 
 function loadBagVectors(){
   if(!_map) return;
-  if(_bagLoading && _bagAbort){ _bagAbort.abort(); _bagAbort = null; _bagLoading = false; }
 
-  // Direct cache tonen
+  var zoom = _map.getZoom();
+  var b = _map.getBounds();
+
+  // Toon altijd gecachte data direct
   var cached = getCachedBagFeatures();
   if(cached.length > 0){
     _bagVectorData = cached;
@@ -1009,13 +1013,32 @@ function loadBagVectors(){
     updateBagStatusCountsFromData();
   }
 
-  var b = _map.getBounds();
-  var bbox = b.getSouth().toFixed(5)+','+b.getWest().toFixed(5)+','+b.getNorth().toFixed(5)+','+b.getEast().toFixed(5)+',EPSG:4326';
-  if(bbox === _bagLastBbox) return;
+  // Zoom-check: bij lage zoom geen WFS laden, alleen cache tonen
+  if(zoom < BAG_MIN_ZOOM){
+    if(cached.length === 0){
+      toast('Zoom in om BAG adressen te laden (zoom ≥ '+BAG_MIN_ZOOM+')','info');
+    }
+    return;
+  }
+
+  // Skip als vorige bbox nog grotendeels geldig is (>70% overlap)
+  if(_bagLastBounds && !_bagForceReload){
+    var overlap = boundsOverlap(b, _bagLastBounds);
+    if(overlap > 0.7) return;
+  }
+  _bagForceReload = false;
+
+  // Abort lopende load
+  if(_bagLoading && _bagAbort){ _bagAbort.abort(); _bagAbort = null; _bagLoading = false; }
 
   _bagLoading = true;
   _bagAbort = new AbortController();
   var signal = _bagAbort.signal;
+
+  var bbox = b.getSouth().toFixed(5)+','+b.getWest().toFixed(5)+','+b.getNorth().toFixed(5)+','+b.getEast().toFixed(5)+',EPSG:4326';
+
+  // Max features afhankelijk van zoom
+  var maxFeatures = zoom >= 15 ? 500000 : (zoom >= 13 ? 100000 : 30000);
 
   // UI elementen
   var progEl = document.getElementById('bagLoadProgress');
@@ -1030,20 +1053,29 @@ function loadBagVectors(){
   if(overlay){ overlay.style.display = 'block'; overlay.style.opacity = '1'; }
 
   var totalLoaded = 0;
-  var totalExpected = 0;
   var allFeatures = [];
   var aborted = false;
+  var startTime = Date.now();
 
-  function updateProgress(loaded, total){
+  function updateProgress(loaded, total, pagesComplete, totalPages){
     var pct = total > 0 ? Math.min(100, Math.round(loaded/total*100)) : 0;
-    var txt = loaded.toLocaleString('nl-NL')+' / '+(total>0?total.toLocaleString('nl-NL'):'?')+' adressen';
-    if(progText){ progText.textContent = txt; progPct.textContent = pct+'%'; progBar.style.width = pct+'%'; }
-    if(overlayText){ overlayText.textContent = txt; overlayPct.textContent = pct+'%'; overlayBar.style.width = pct+'%'; }
+    var elapsed = (Date.now() - startTime) / 1000;
+    var speed = elapsed > 0 ? Math.round(loaded / elapsed) : 0;
+    var eta = speed > 0 ? Math.ceil((total - loaded) / speed) : '?';
+    var txt = loaded.toLocaleString('nl-NL')+' / '+total.toLocaleString('nl-NL')+' adressen';
+    var detail = '';
+    if(totalPages > 1) detail = ' · pagina '+pagesComplete+'/'+totalPages;
+    if(speed > 0 && pct < 95) detail += ' · ~'+eta+'s';
+    if(progText){ progText.textContent = txt + detail; progPct.textContent = pct+'%'; progBar.style.width = pct+'%'; }
+    if(overlayText){ overlayText.textContent = txt; overlayPct.textContent = pct+'%' + (detail ? '\n'+detail : ''); overlayBar.style.width = pct+'%'; }
   }
 
-  function renderCurrent(){
+  function renderResults(){
+    // Sla op in cache en render direct allFeatures
     saveBagToIDB(allFeatures);
-    _bagVectorData = getCachedBagFeatures();
+    // Combineer: cache (eerder geladen gebieden) + nieuw geladen
+    var combined = getCachedBagFeatures();
+    _bagVectorData = combined.length > allFeatures.length ? combined : allFeatures;
     renderBagVectors();
     updateBagStatusCountsFromData();
   }
@@ -1051,14 +1083,16 @@ function loadBagVectors(){
   function finishLoading(){
     _bagLoading = false;
     _bagLastBbox = bbox;
+    _bagLastBounds = b;
     if(progEl) progEl.style.display = 'none';
     if(overlay){ overlay.style.opacity = '0'; setTimeout(function(){ overlay.style.display = 'none'; }, 400); }
     updateBagCacheUI();
-    toast(allFeatures.length.toLocaleString('nl-NL')+' geladen \u00b7 '+_bagMemCount.toLocaleString('nl-NL')+' totaal gecacht \u2714');
-    logEvent('bag_klaar', allFeatures.length + ' adressen, cache: ' + _bagMemCount);
+    var elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    toast(allFeatures.length.toLocaleString('nl-NL')+' adressen geladen in '+elapsed+'s · '+_bagMemCount.toLocaleString('nl-NL')+' in cache ✔');
+    logEvent('bag_klaar', allFeatures.length + ' in ' + elapsed + 's, cache: ' + _bagMemCount);
   }
 
-  // Fetch één pagina met retry
+  // Fetch één pagina met retry en exponential backoff
   function fetchPage(startIdx, retries){
     if(aborted) return Promise.resolve([]);
     var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+BAG_PAGE_SIZE+'&startIndex='+startIdx+'&sortBy=identificatie&srsName=EPSG:4326&BBOX='+bbox;
@@ -1070,10 +1104,10 @@ function loadBagVectors(){
     }).catch(function(e){
       if(e.name === 'AbortError'){ aborted = true; return []; }
       if(retries > 0){
-        // Wacht even en probeer opnieuw
-        return new Promise(function(res){ setTimeout(res, 800 + Math.random()*400); }).then(function(){ return fetchPage(startIdx, retries - 1); });
+        var delay = 1000 * Math.pow(2, 2 - retries) + Math.random()*500;
+        return new Promise(function(res){ setTimeout(res, delay); }).then(function(){ return fetchPage(startIdx, retries - 1); });
       }
-      console.warn('BAG pagina startIndex='+startIdx+' mislukt na retries:', e);
+      console.warn('BAG pagina startIndex='+startIdx+' mislukt:', e.message);
       return [];
     });
   }
@@ -1084,9 +1118,9 @@ function loadBagVectors(){
     var nextPage = 0;
     var pagesComplete = 0;
     var lastRenderAt = 0;
+    var renderInterval = Math.max(3000, Math.min(10000, totalToLoad / 5)); // Render elke ~20%
 
-    updateProgress(0, totalToLoad);
-    if(progText) progText.textContent = '0 / '+totalToLoad.toLocaleString('nl-NL')+' adressen ('+totalPages+' pagina\u2019s, '+BAG_CONCURRENCY+' tegelijk)';
+    updateProgress(0, totalToLoad, 0, totalPages);
 
     return new Promise(function(resolve){
       var runningCount = 0;
@@ -1096,20 +1130,21 @@ function loadBagVectors(){
           (function(pageIdx){
             var startIdx = pageIdx * BAG_PAGE_SIZE;
             runningCount++;
-            fetchPage(startIdx, 2).then(function(features){
+            fetchPage(startIdx, 3).then(function(features){
               runningCount--;
               if(features.length > 0){
-                allFeatures = allFeatures.concat(features);
+                // Push ipv concat (sneller bij grote arrays)
+                for(var i=0;i<features.length;i++) allFeatures.push(features[i]);
                 totalLoaded += features.length;
               }
               pagesComplete++;
-              updateProgress(totalLoaded, totalToLoad);
-              // Tussentijds renderen elke 5000 features of bij einde
-              if(totalLoaded - lastRenderAt >= 5000 || pagesComplete === totalPages){
+              updateProgress(totalLoaded, totalToLoad, pagesComplete, totalPages);
+              // Tussentijds renderen (niet te vaak — vertraagt browser)
+              if(totalLoaded - lastRenderAt >= renderInterval || pagesComplete === totalPages){
                 lastRenderAt = totalLoaded;
-                renderCurrent();
+                renderResults();
               }
-              if(pagesComplete === totalPages){
+              if(pagesComplete >= totalPages){
                 resolve();
               } else {
                 startNext();
@@ -1125,33 +1160,48 @@ function loadBagVectors(){
 
   // Start: haal eerst totaal op via hits
   var hitsUrl = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&resultType=hits&srsName=EPSG:4326&BBOX='+bbox;
-  updateProgress(0, 0);
+  updateProgress(0, 0, 0, 0);
 
   fetch(hitsUrl,{signal:signal}).then(function(r){ return r.text(); }).then(function(xml){
     var m = xml.match(/numberMatched="(\d+)"/);
-    totalExpected = m ? parseInt(m[1]) : 0;
-    if(totalExpected === 0){ finishLoading(); return; }
+    var totalExpected = m ? parseInt(m[1]) : 0;
+    if(totalExpected === 0){
+      toast('Geen BAG adressen gevonden in dit gebied');
+      finishLoading(); return;
+    }
 
-    var loadTotal = Math.min(totalExpected, BAG_MAX_FEATURES);
-    if(totalExpected > BAG_MAX_FEATURES){
-      toast(totalExpected.toLocaleString('nl-NL')+' adressen in beeld \u2014 laadt eerste '+BAG_MAX_FEATURES.toLocaleString('nl-NL'));
+    var loadTotal = Math.min(totalExpected, maxFeatures);
+    if(totalExpected > maxFeatures){
+      toast(totalExpected.toLocaleString('nl-NL')+' adressen in beeld — zoom in voor alle data, laadt eerste '+loadTotal.toLocaleString('nl-NL'));
+    } else {
+      toast(totalExpected.toLocaleString('nl-NL')+' adressen gevonden, laden...');
     }
 
     return loadAllPages(loadTotal).then(function(){
-      renderCurrent();
+      renderResults();
       finishLoading();
     });
 
   }).catch(function(e){
     if(e.name === 'AbortError') return;
     console.warn('BAG WFS hits error:',e);
-    // Fallback: eerste pagina
-    fetchPage(0, 2).then(function(features){
-      allFeatures = features;
-      renderCurrent();
-      finishLoading();
-    });
+    _bagLoading = false;
+    if(progEl) progEl.style.display = 'none';
+    if(overlay){ overlay.style.opacity = '0'; setTimeout(function(){ overlay.style.display = 'none'; }, 400); }
+    toast('BAG laden mislukt: '+e.message, 'error');
   });
+}
+
+// Bereken overlap percentage van twee Leaflet bounds (0-1)
+function boundsOverlap(b1, b2){
+  var s = Math.max(b1.getSouth(), b2.getSouth());
+  var n = Math.min(b1.getNorth(), b2.getNorth());
+  var w = Math.max(b1.getWest(), b2.getWest());
+  var e = Math.min(b1.getEast(), b2.getEast());
+  if(s >= n || w >= e) return 0;
+  var overlapArea = (n-s)*(e-w);
+  var area1 = (b1.getNorth()-b1.getSouth())*(b1.getEast()-b1.getWest());
+  return area1 > 0 ? overlapArea/area1 : 0;
 }
 
 function updateBagStatusCountsFromData(){
@@ -1565,8 +1615,10 @@ function toggleBagLayer(on){
         console.log('Buurtdata geladen op achtergrond:', d.features.length, 'buurten');
       }).catch(function(e){ console.warn('Buurtdata achtergrond laden mislukt:', e); });
     }
-    // Forceer verse load (reset bbox check)
+    // Forceer verse load
     _bagLastBbox = '';
+    _bagLastBounds = null;
+    _bagForceReload = true;
     // WFS vectordata laden voor het viewport — altijd met progress bar
     loadBagVectors();
     // Herlaad bij pan/zoom
@@ -1580,6 +1632,7 @@ function toggleBagLayer(on){
     if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null}
     _bagVectorData = null;
     _bagLastBbox = '';
+    _bagLastBounds = null;
     var progEl = document.getElementById('bagLoadProgress');
     if(progEl) progEl.style.display = 'none';
     var ov = document.getElementById('bagLoadOverlay');
@@ -1592,9 +1645,16 @@ function toggleBagLayer(on){
   }
 }
 
+var _bagMoveTimer = null;
 function onBagMoveEnd(){
-  if(_layerState.bag) loadBagVectors();
   updateBagWmsOpacity();
+  if(!_layerState.bag) return;
+  // Debounce: wacht 400ms na laatste pan/zoom voor herladen
+  if(_bagMoveTimer) clearTimeout(_bagMoveTimer);
+  _bagMoveTimer = setTimeout(function(){
+    _bagMoveTimer = null;
+    loadBagVectors();
+  }, 400);
 }
 
 // bagStatusColor via bagStatusToColor() hierboven
@@ -2665,6 +2725,8 @@ function loadSelection(){
     // BAG laden als actief
     if(_layerState.bag){
       _bagLastBbox = '';
+      _bagLastBounds = null;
+      _bagForceReload = true;
       loadBagVectors();
     }
     // Zoom naar selectie
