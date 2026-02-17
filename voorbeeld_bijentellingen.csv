@@ -1,0 +1,41 @@
+locatie,lat,lng,bijensoort,aantal,datum,waarnemer
+Vondelpark Amsterdam,52.3579,4.8686,Honingbij,45,2024-06-15,Jan de Vries
+Keukenhof Lisse,52.2697,4.5462,Aardhommel,23,2024-06-15,Marie Bakker
+Hoge Veluwe Otterlo,52.0799,5.8284,Steenhommel,12,2024-06-16,Pieter Smit
+Biesbosch Dordrecht,51.7350,4.7800,Weidehommel,34,2024-06-16,Sanne Jansen
+Kinderdijk Alblasserdam,51.8836,4.6381,Honingbij,67,2024-06-17,Kees de Boer
+Kralingse Bos Rotterdam,51.9294,4.5064,Metselbij,19,2024-06-17,Lisa Visser
+Haagse Bos Den Haag,52.0850,4.3350,Honingbij,38,2024-06-18,Tom Mulder
+Griftpark Utrecht,52.0960,5.1280,Behangersbij,8,2024-06-18,Eva Hendriks
+Noorderplantsoen Groningen,53.2244,6.5588,Aardhommel,27,2024-06-19,Dirk Wolters
+Stadspark Maastricht,50.8470,5.6860,Honingbij,52,2024-06-19,Anna Peeters
+Westerpark Amsterdam,52.3866,4.8736,Maskerbij,14,2024-06-20,Jan de Vries
+Zuiderpark Den Haag,52.0508,4.2925,Slobkousbij,6,2024-06-20,Tom Mulder
+Wilhelminapark Utrecht,52.0836,5.1354,Pluimvoetbij,11,2024-06-21,Eva Hendriks
+Beatrixpark Amsterdam,52.3445,4.8830,Weidehommel,29,2024-06-21,Marie Bakker
+Clingendael Den Haag,52.0963,4.3231,Tuinhommel,18,2024-06-22,Tom Mulder
+De Haar Haarzuilens,52.1214,4.9866,Honingbij,41,2024-06-22,Kees de Boer
+Park Sonsbeek Arnhem,51.9892,5.8988,Steenhommel,15,2024-06-23,Pieter Smit
+Leijpark Tilburg,51.5675,5.0722,Aardhommel,33,2024-06-23,Sanne Jansen
+Stadspark Leeuwarden,53.1978,5.8100,Honingbij,22,2024-06-24,Dirk Wolters
+Park Zypendaal Arnhem,51.9788,5.9142,Metselbij,9,2024-06-24,Pieter Smit
+Westbroekpark Den Haag,52.0930,4.2780,Honingbij,56,2024-06-25,Tom Mulder
+Paleispark Apeldoorn,52.2120,5.9620,Boshommel,17,2024-06-25,Lisa Visser
+Zocherpark Haarlem,52.3784,4.6294,Weidehommel,25,2024-06-26,Marie Bakker
+Goffertpark Nijmegen,51.8291,5.8469,Honingbij,48,2024-06-26,Anna Peeters
+Molenplas Roermond,51.1900,5.9660,Aardhommel,21,2024-06-27,Sanne Jansen
+Zuiderpark Rotterdam,51.8930,4.4630,Tuinhommel,13,2024-06-27,Lisa Visser
+Westerpark Assen,52.9920,6.5490,Steenhommel,7,2024-06-28,Dirk Wolters
+Emmapark Heerlen,50.8840,5.9780,Honingbij,36,2024-06-28,Anna Peeters
+Park Tivoli Eindhoven,51.4344,5.4720,Maskerbij,10,2024-06-29,Sanne Jansen
+Kruisvaarterspark Den Bosch,51.6920,5.3120,Honingbij,43,2024-06-29,Kees de Boer
+Flevopark Amsterdam,52.3600,4.9430,Aardhommel,31,2024-06-30,Jan de Vries
+Park de Hout Alkmaar,52.6320,4.7420,Weidehommel,16,2024-07-01,Marie Bakker
+Heempark Delft,52.0050,4.3680,Behangersbij,9,2024-07-01,Tom Mulder
+Lepelenburg Utrecht,52.0870,5.1310,Honingbij,39,2024-07-02,Eva Hendriks
+Hunnerpark Nijmegen,51.8466,5.8670,Boshommel,14,2024-07-02,Anna Peeters
+Thialf Park Heerenveen,52.9590,5.9240,Aardhommel,20,2024-07-03,Dirk Wolters
+Park Lingezegen Bemmel,51.9330,5.8920,Honingbij,28,2024-07-03,Pieter Smit
+Het Twiske Landsmeer,52.4280,4.8980,Slobkousbij,5,2024-07-04,Jan de Vries
+Strand Scheveningen,52.1099,4.2700,Honingbij,11,2024-07-04,Tom Mulder
+Vliegenbos Amsterdam,52.3930,4.9220,Pluimvoetbij,8,2024-07-05,Marie Bakker

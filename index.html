@@ -445,9 +445,11 @@ select option{background:var(--bg);color:var(--tx)}
       <div class="sh"><span class="mi">palette</span> Basemap</div>
       <div style="display:flex;gap:5px;flex-wrap:wrap" id="basemapBtns"></div>
 
-      <div class="sh"><span class="mi">calendar_month</span> CBS Jaar</div>
-      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px" id="yearBtns"></div>
-      <div id="yearInfo" style="font:400 9px 'Space Mono',monospace;color:var(--mt);margin-bottom:6px"></div>
+      <div class="sh"><span class="mi">calendar_month</span> CBS Jaar <span id="yearActive" style="font:700 10px 'Space Mono',monospace;color:var(--ac);text-transform:none;letter-spacing:0"></span></div>
+      <div class="card" style="padding:8px 10px;margin-bottom:6px">
+        <div style="display:flex;gap:4px;flex-wrap:wrap" id="yearBtns"></div>
+        <div id="yearInfo" style="font:400 9px 'Space Mono',monospace;color:var(--mt);margin-top:4px"></div>
+      </div>
 
       <div class="sh"><span class="mi">bar_chart</span> Indicatoren <span style="font:400 9px 'DM Sans',sans-serif;color:var(--mt);text-transform:none;letter-spacing:0">(klik om aan/uit te zetten)</span></div>
       <div class="indicator-list" id="indicatorList"></div>
@@ -645,13 +647,13 @@ select option{background:var(--bg);color:var(--tx)}
 
       <!-- Upload preview -->
       <div id="uploadPreview" style="display:none">
-        <div class="sh"><span class="mi">table_view</span> Preview <span id="uploadRowCount" style="font-size:10px;color:var(--mt);font-weight:400"></span></div>
-        <div class="card" style="padding:0;overflow-x:auto;max-height:200px">
-          <table id="uploadPreviewTable" style="font-size:9px;width:100%"></table>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <button class="btn btn-p" onclick="addUploadToMap()" style="flex:1;font-size:12px;padding:10px 16px"><span class="mi mi-sm">add_location</span> Toon op kaart</button>
+          <button class="btn btn-s" onclick="clearUploadData()" style="font-size:11px;padding:10px 12px"><span class="mi mi-sm">delete</span> Wissen</button>
         </div>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <button class="btn btn-p" onclick="addUploadToMap()" style="flex:1;font-size:11px"><span class="mi mi-sm">add_location</span> Toon op kaart</button>
-          <button class="btn btn-s" onclick="clearUploadData()" style="font-size:11px"><span class="mi mi-sm">delete</span> Wissen</button>
+        <div class="sh"><span class="mi">table_view</span> Preview <span id="uploadRowCount" style="font-size:10px;color:var(--mt);font-weight:400"></span></div>
+        <div class="card" style="padding:0;overflow-x:auto;max-height:180px">
+          <table id="uploadPreviewTable" style="font-size:9px;width:100%"></table>
         </div>
       </div>
 
@@ -869,6 +871,8 @@ function buildYearButtons(){
     html += '<button class="'+cls+'" data-year="'+y+'" onclick="switchYear('+y+')" style="font:700 11px \'Space Mono\',monospace;min-width:42px">'+y+'</button>';
   });
   el.innerHTML = html;
+  var ya = document.getElementById('yearActive');
+  if(ya) ya.textContent = '— ' + _activeYear + ' actief';
 }
 
 function switchYear(year){
@@ -882,6 +886,8 @@ function switchYear(year){
   document.querySelectorAll('#yearBtns button').forEach(function(b){
     b.classList.toggle('active', parseInt(b.dataset.year) === year);
   });
+  var ya = document.getElementById('yearActive');
+  if(ya) ya.textContent = '— ' + year + ' actief';
 
   // Reset alle geladen data
   if(_gemeenteLayer){_map.removeLayer(_gemeenteLayer);_gemeenteLayer=null}
@@ -1068,7 +1074,14 @@ function renderChoropleth(type){
       });
       layer.on('mouseout', function(e){
         if(_layerState.bag || _layerState.panden) return;
-        newLayer.resetStyle(e.target);
+        // Herstel stijl, maar bewaar selectie-highlight als dit gebied geselecteerd is
+        if(_selectionHighlights.indexOf(e.target) >= 0){
+          // Geselecteerd: herstel highlight-stijl (niet de choropleth-stijl)
+          e.target.setStyle({weight:3.5, color:'#39ff14', opacity:1, fillOpacity:0.8});
+          e.target.bringToFront();
+        } else {
+          newLayer.resetStyle(e.target);
+        }
         if(!_infoPinned) document.getElementById('infoPanel').classList.remove('show');
       });
       layer.on('click', function(e){
