@@ -300,11 +300,48 @@ select option{background:var(--bg);color:var(--tx)}
         <button class="btn btn-s" data-layer="buurten" onclick="toggleLayer('buurten')"><span class="mi mi-sm">grid_on</span> Buurten</button>
         <button class="btn btn-s" data-layer="wijken" onclick="toggleLayer('wijken')"><span class="mi mi-sm">grid_view</span> Wijken</button>
         <button class="btn btn-s" data-layer="bag" onclick="toggleLayer('bag')"><span class="mi mi-sm">location_on</span> BAG Adressen</button>
-        <button class="btn btn-s" data-layer="panden" onclick="toggleLayer('panden')"><span class="mi mi-sm">apartment</span> BAG Panden</button>
       </div>
 
       <div class="sh" id="bagStatusSection" style="display:none"><span class="mi">filter_alt</span> BAG Status filter</div>
       <div id="bagStatusBtns" style="display:none;gap:5px;flex-wrap:wrap;margin-bottom:4px"></div>
+      <!-- BAG Filters: Gebruiksdoel, Bouwjaar, Oppervlakte -->
+      <div id="bagFiltersSection" style="display:none;margin-bottom:8px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+          <select id="bagFilterGebruiksdoel" onchange="applyBagFilters()" style="flex:1;font-size:10px;padding:6px 8px;min-width:100px">
+            <option value="">Alle gebruiksdoelen</option>
+            <option value="woonfunctie">Woonfunctie</option>
+            <option value="kantoorfunctie">Kantoorfunctie</option>
+            <option value="winkelfunctie">Winkelfunctie</option>
+            <option value="industriefunctie">Industriefunctie</option>
+            <option value="bijeenkomstfunctie">Bijeenkomstfunctie</option>
+            <option value="onderwijsfunctie">Onderwijsfunctie</option>
+            <option value="sportfunctie">Sportfunctie</option>
+            <option value="gezondheidszorgfunctie">Gezondheidszorgfunctie</option>
+            <option value="logiesfunctie">Logiesfunctie</option>
+            <option value="overige gebruiksfunctie">Overig</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+          <div style="flex:1;min-width:90px">
+            <label style="font:600 9px 'DM Sans',sans-serif;color:var(--mt);display:block;margin-bottom:2px">Bouwjaar</label>
+            <div style="display:flex;gap:3px">
+              <input id="bagFilterBouwjaarMin" type="number" placeholder="Van" min="1600" max="2030" onchange="applyBagFilters()" style="width:50%;font-size:10px;padding:5px 6px;background:var(--glass);color:var(--tx);border:none;border-radius:6px;outline:none">
+              <input id="bagFilterBouwjaarMax" type="number" placeholder="Tot" min="1600" max="2030" onchange="applyBagFilters()" style="width:50%;font-size:10px;padding:5px 6px;background:var(--glass);color:var(--tx);border:none;border-radius:6px;outline:none">
+            </div>
+          </div>
+          <div style="flex:1;min-width:90px">
+            <label style="font:600 9px 'DM Sans',sans-serif;color:var(--mt);display:block;margin-bottom:2px">Oppervlakte (m2)</label>
+            <div style="display:flex;gap:3px">
+              <input id="bagFilterOppMin" type="number" placeholder="Van" min="0" onchange="applyBagFilters()" style="width:50%;font-size:10px;padding:5px 6px;background:var(--glass);color:var(--tx);border:none;border-radius:6px;outline:none">
+              <input id="bagFilterOppMax" type="number" placeholder="Tot" min="0" onchange="applyBagFilters()" style="width:50%;font-size:10px;padding:5px 6px;background:var(--glass);color:var(--tx);border:none;border-radius:6px;outline:none">
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span id="bagFilterCount" style="font:400 9px 'Space Mono',monospace;color:var(--mt)"></span>
+          <button class="btn btn-s" onclick="resetBagFilters()" style="font-size:9px;padding:2px 8px"><span class="mi mi-sm" style="font-size:11px">filter_alt_off</span> Reset</button>
+        </div>
+      </div>
       <div id="bagCacheInfo" style="display:none;font:400 9px 'Space Mono',monospace;color:var(--mt);margin-bottom:8px;display:flex;align-items:center;gap:6px">
         <span class="mi mi-sm" style="color:var(--ai)">sd_storage</span>
         <span id="bagCacheText">Cache: 0 adressen</span>
@@ -351,6 +388,18 @@ select option{background:var(--bg);color:var(--tx)}
         </div>
         <div class="ms-chips" id="msGemChips"></div>
       </div>
+      <!-- Multi-select Wijk -->
+      <div class="ms-wrap" id="msWijk" style="margin-top:6px">
+        <div class="ms-box" onclick="toggleMsDropdown('msWijk')">
+          <span class="ms-label" id="msWijkLabel">Alle wijken</span>
+          <span class="mi mi-sm" style="color:var(--mt)">expand_more</span>
+        </div>
+        <div class="ms-dropdown" id="msWijkDropdown">
+          <input class="ms-search" placeholder="Zoek wijk..." oninput="filterMsOptions('msWijk',this.value)">
+          <div class="ms-options" id="msWijkOptions"></div>
+        </div>
+        <div class="ms-chips" id="msWijkChips"></div>
+      </div>
       <!-- Multi-select Buurt -->
       <div class="ms-wrap" id="msBuurt" style="margin-top:6px">
         <div class="ms-box" onclick="toggleMsDropdown('msBuurt')">
@@ -363,7 +412,25 @@ select option{background:var(--bg);color:var(--tx)}
         </div>
         <div class="ms-chips" id="msBuurtChips"></div>
       </div>
-      <button class="ms-loadbtn" id="loadSelectionBtn" onclick="loadSelection()" style="display:none"><span class="mi mi-sm">download</span> Laad selectie (BAG + CBS)</button>
+      <div style="display:flex;gap:6px">
+        <button class="ms-loadbtn" id="loadSelectionBtn" onclick="loadSelection()" style="display:none;flex:1"><span class="mi mi-sm">download</span> Laad selectie</button>
+        <button class="ms-loadbtn" id="compareBtn" onclick="showComparisonReport()" style="display:none;flex:1;background:linear-gradient(135deg,rgba(56,189,248,.15),rgba(6,182,212,.1));color:var(--ai);border-color:rgba(56,189,248,.2)"><span class="mi mi-sm">compare_arrows</span> Vergelijk</button>
+      </div>
+
+      <!-- Achtergrond CBS data laden statusbalk -->
+      <div id="cbsBgProgress" style="display:none;margin:8px 0;padding:8px 10px;background:rgba(57,255,20,.04);border-radius:8px;border-left:3px solid var(--ac)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font:600 10px 'DM Sans',sans-serif;color:var(--ac);display:flex;align-items:center;gap:4px">
+            <span class="mi mi-sm" style="font-size:13px;animation:spin 1.5s linear infinite">sync</span>
+            <span id="cbsBgText">CBS data laden...</span>
+          </span>
+          <span id="cbsBgPct" style="font:700 10px 'Space Mono',monospace;color:var(--ac)">0%</span>
+        </div>
+        <div style="height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">
+          <div id="cbsBgBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--ac),var(--cyan));border-radius:3px;transition:width .4s ease"></div>
+        </div>
+        <div id="cbsBgDetail" style="font:400 9px 'Space Mono',monospace;color:var(--mt);margin-top:3px"></div>
+      </div>
 
       <div class="sh"><span class="mi">palette</span> Basemap</div>
       <div style="display:flex;gap:5px;flex-wrap:wrap" id="basemapBtns"></div>
@@ -487,20 +554,36 @@ select option{background:var(--bg);color:var(--tx)}
       <div class="sh"><span class="mi">refresh</span> Data verversen</div>
       <div class="card">
         <div style="font-size:11px;color:var(--mt);line-height:1.9">
-          <div style="color:var(--tx);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">terminal</span> Stap 1: GeoJSON opnieuw genereren</div>
+          <div style="color:var(--tx);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--wn)">calendar_month</span> Beschikbare CBS jaren</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
+            <span style="font:700 10px 'Space Mono',monospace;padding:3px 8px;background:rgba(57,255,20,.1);color:var(--ac);border-radius:4px">2012</span>
+            <span style="font:700 10px 'Space Mono',monospace;padding:3px 8px;background:rgba(57,255,20,.1);color:var(--ac);border-radius:4px">2017</span>
+            <span style="font:700 10px 'Space Mono',monospace;padding:3px 8px;background:rgba(57,255,20,.1);color:var(--ac);border-radius:4px">2018</span>
+            <span style="font:700 10px 'Space Mono',monospace;padding:3px 8px;background:rgba(57,255,20,.1);color:var(--ac);border-radius:4px">2019</span>
+            <span style="font:700 10px 'Space Mono',monospace;padding:3px 8px;background:rgba(57,255,20,.15);color:var(--ac);border-radius:4px;box-shadow:0 0 8px rgba(57,255,20,.2)">2022</span>
+            <span style="font:700 10px 'Space Mono',monospace;padding:3px 8px;background:rgba(57,255,20,.1);color:var(--ac);border-radius:4px">2023</span>
+            <span style="font:700 10px 'Space Mono',monospace;padding:3px 8px;background:rgba(57,255,20,.1);color:var(--ac);border-radius:4px">2024</span>
+          </div>
+          <div style="margin-bottom:6px">Selecteer een jaar via de <b style="color:var(--tx)">CBS Jaar</b> knoppen in het kaart-tabblad. De app laadt automatisch de juiste GeoJSON data.</div>
+
+          <div style="color:var(--tx);font-weight:600;margin:10px 0 6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">terminal</span> Alle jaren herbouwen</div>
+          <code style="display:block;background:rgba(10,15,26,.6);padding:8px 10px;border-radius:8px;font:400 10px 'Space Mono',monospace;color:var(--ai);margin:4px 0;border:1px solid var(--glass-bd)">python build_geojson.py --type gemeenten --all-years</code>
           <code style="display:block;background:rgba(10,15,26,.6);padding:8px 10px;border-radius:8px;font:400 10px 'Space Mono',monospace;color:var(--ai);margin:4px 0;border:1px solid var(--glass-bd)">python build_geojson.py --type buurten --year 2022</code>
           <code style="display:block;background:rgba(10,15,26,.6);padding:8px 10px;border-radius:8px;font:400 10px 'Space Mono',monospace;color:var(--ai);margin:4px 0;border:1px solid var(--glass-bd)">python build_geojson.py --type wijken --year 2022</code>
-          <div style="color:var(--tx);font-weight:600;margin:10px 0 6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">cloud_upload</span> Stap 2: Publiceren op GitHub Pages</div>
-          <code style="display:block;background:rgba(10,15,26,.6);padding:8px 10px;border-radius:8px;font:400 10px 'Space Mono',monospace;color:var(--ai);margin:4px 0;border:1px solid var(--glass-bd)">git add *.geojson<br>git commit -m "Data update"<br>git push</code>
-          <div style="color:var(--tx);font-weight:600;margin:10px 0 6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--wn)">swap_horiz</span> Ander jaar proberen?</div>
-          <code style="display:block;background:rgba(10,15,26,.6);padding:8px 10px;border-radius:8px;font:400 10px 'Space Mono',monospace;color:var(--ai);margin:4px 0;border:1px solid var(--glass-bd)">python build_geojson.py --type buurten --year 2023</code>
-          <div style="margin-top:4px;font-size:10px;color:var(--mt)">Pas daarna BUURTEN_URL / WIJKEN_URL in index.html aan.</div>
+
+          <div style="color:var(--tx);font-weight:600;margin:10px 0 6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:var(--ac)">cloud_upload</span> Publiceren</div>
+          <code style="display:block;background:rgba(10,15,26,.6);padding:8px 10px;border-radius:8px;font:400 10px 'Space Mono',monospace;color:var(--ai);margin:4px 0;border:1px solid var(--glass-bd)">git add *.geojson &amp;&amp; git commit -m "Data update" &amp;&amp; git push</code>
+
+          <div style="margin-top:8px;padding:8px 10px;background:rgba(57,255,20,.04);border-radius:8px;border-left:3px solid var(--ac);display:flex;align-items:flex-start;gap:6px">
+            <span class="mi mi-sm" style="color:var(--ac);flex-shrink:0;margin-top:1px">info</span>
+            <span>Buurten/wijken worden momenteel alleen voor 2022 en 2024 gebouwd (zwaar). Gemeenten zijn beschikbaar voor alle 7 jaren. Het <code style="font-size:9px;color:var(--ai)">--all-years</code> flag bouwt alle jaren in \u00e9\u00e9n keer.</span>
+          </div>
         </div>
       </div>
 
       <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v6.3</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v7.0</div>
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
@@ -559,6 +642,29 @@ select option{background:var(--bg);color:var(--tx)}
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Feedback popup na 30 minuten -->
+<div id="feedbackOverlay" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(10,15,26,.85);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:fadeIn .4s ease">
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--p);backdrop-filter:blur(20px);border-radius:16px;padding:28px;max-width:420px;width:90%;box-shadow:0 16px 64px rgba(0,0,0,.6);border:1px solid var(--glass-bd)">
+    <div style="text-align:center;margin-bottom:16px">
+      <span class="mi" style="font-size:36px;color:var(--ac);display:block;margin-bottom:8px">favorite</span>
+      <div style="font:700 16px 'Space Mono',monospace;color:var(--ac)">Bedankt dat je GeoInzicht gebruikt!</div>
+      <div style="font-size:12px;color:var(--mt);margin-top:6px">We waarderen je feedback enorm</div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font:600 11px 'DM Sans',sans-serif;color:var(--tx);display:block;margin-bottom:4px">Wat vind je van GeoInzicht?</label>
+      <textarea id="feedbackText" rows="4" style="width:100%;background:var(--glass);color:var(--tx);border:1px solid var(--glass-bd);border-radius:8px;padding:10px;font:400 12px 'DM Sans',sans-serif;resize:vertical;outline:none" placeholder="Je mening, suggesties, bugs..."></textarea>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font:600 11px 'DM Sans',sans-serif;color:var(--tx);display:block;margin-bottom:4px">E-mailadres (optioneel, zodat we kunnen reageren)</label>
+      <input id="feedbackEmail" type="email" style="width:100%;background:var(--glass);color:var(--tx);border:1px solid var(--glass-bd);border-radius:8px;padding:10px;font:400 12px 'DM Sans',sans-serif;outline:none" placeholder="je@email.nl">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-p" onclick="submitFeedback()" style="flex:1"><span class="mi mi-sm">send</span> Verstuur</button>
+      <button class="btn btn-s" onclick="closeFeedback()" style="flex:0"><span class="mi mi-sm">close</span> Sluiten</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ============================================================
@@ -743,21 +849,8 @@ function switchYear(year){
     renderChoropleth('gemeenten');
     computeNationalStats();
 
-    // Herlaad buurten/wijken als ze actief waren
-    if(_layerState.buurten){
-      fetch(BUURTEN_URL).then(function(r){return r.json()}).then(function(bd){
-        _buurtData = bd;
-        renderChoropleth('buurten');
-        computeNationalStats();
-      });
-    }
-    if(_layerState.wijken){
-      fetch(WIJKEN_URL).then(function(r){return r.json()}).then(function(wd){
-        _wijkData = wd;
-        renderChoropleth('wijken');
-        computeNationalStats();
-      });
-    }
+    // Herlaad buurten en wijken op achtergrond (altijd, voor filters en stats)
+    setTimeout(function(){ loadBackgroundCbsData(); }, 500);
 
     document.getElementById('dsJaar').textContent = year;
     toast('CBS '+year+' geladen \u2714 ('+availableIndicators.length+' indicatoren)');
@@ -825,10 +918,12 @@ function renderChoropleth(type){
 
   var indicator = _activeIndicators.length > 0 ? _activeIndicators[0] : 'aantal_inwoners';
   var gemFilter = getSelectedGemeenteFilter();
+  var wijkFilter = getSelectedWijkFilter();
   var buurtFilter = getSelectedBuurtFilter();
 
   function featureMatchesFilter(p){
     if(gemFilter !== 'all' && !gemFilter.has(p.gemeentenaam)) return false;
+    if(wijkFilter !== 'all' && p.wijknaam && !wijkFilter.has(p.wijknaam)) return false;
     if(buurtFilter !== 'all' && p.buurtnaam && !buurtFilter.has(p.buurtnaam)) return false;
     return true;
   }
@@ -899,7 +994,8 @@ function renderChoropleth(type){
 // ============================================================
 function toggleLayer(type){
   _layerState[type] = !_layerState[type];
-  document.querySelector('[data-layer="'+type+'"]').classList.toggle('active', _layerState[type]);
+  var btn = document.querySelector('[data-layer="'+type+'"]');
+  if(btn) btn.classList.toggle('active', _layerState[type]);
 
   if(type === 'gemeenten'){
     if(_layerState.gemeenten) renderChoropleth('gemeenten');
@@ -982,6 +1078,55 @@ function matchesBagFilter(status){
   if(_bagStatusFilter === 'all') return true;
   var s = BAG_STATUSES.filter(function(b){return b.id === _bagStatusFilter})[0];
   return s && s.match && s.match.indexOf(status) >= 0;
+}
+
+// BAG uitgebreide filters: gebruiksdoel, bouwjaar, oppervlakte
+var _bagFilterGebruiksdoel = '';
+var _bagFilterBouwjaarMin = null;
+var _bagFilterBouwjaarMax = null;
+var _bagFilterOppMin = null;
+var _bagFilterOppMax = null;
+
+function applyBagFilters(){
+  _bagFilterGebruiksdoel = (document.getElementById('bagFilterGebruiksdoel').value || '').toLowerCase();
+  _bagFilterBouwjaarMin = parseInt(document.getElementById('bagFilterBouwjaarMin').value) || null;
+  _bagFilterBouwjaarMax = parseInt(document.getElementById('bagFilterBouwjaarMax').value) || null;
+  _bagFilterOppMin = parseInt(document.getElementById('bagFilterOppMin').value) || null;
+  _bagFilterOppMax = parseInt(document.getElementById('bagFilterOppMax').value) || null;
+  if(_layerState.bag) renderBagVectors();
+  logEvent('bag_filter', 'doel='+(_bagFilterGebruiksdoel||'alle')+' bj='+(_bagFilterBouwjaarMin||'')+'-'+(_bagFilterBouwjaarMax||'')+' opp='+(_bagFilterOppMin||'')+'-'+(_bagFilterOppMax||''));
+}
+
+function resetBagFilters(){
+  document.getElementById('bagFilterGebruiksdoel').value = '';
+  document.getElementById('bagFilterBouwjaarMin').value = '';
+  document.getElementById('bagFilterBouwjaarMax').value = '';
+  document.getElementById('bagFilterOppMin').value = '';
+  document.getElementById('bagFilterOppMax').value = '';
+  _bagFilterGebruiksdoel = '';
+  _bagFilterBouwjaarMin = null;
+  _bagFilterBouwjaarMax = null;
+  _bagFilterOppMin = null;
+  _bagFilterOppMax = null;
+  if(_layerState.bag) renderBagVectors();
+}
+
+function matchesBagExtendedFilters(p){
+  // Gebruiksdoel
+  if(_bagFilterGebruiksdoel){
+    var doel = (p.gebruiksdoel || '').toLowerCase();
+    if(doel.indexOf(_bagFilterGebruiksdoel) < 0) return false;
+  }
+  // Bouwjaar
+  if(_bagFilterBouwjaarMin && p.bouwjaar && p.bouwjaar < _bagFilterBouwjaarMin) return false;
+  if(_bagFilterBouwjaarMax && p.bouwjaar && p.bouwjaar > _bagFilterBouwjaarMax) return false;
+  // Als filter actief maar feature geen bouwjaar heeft: filteren we die eruit
+  if((_bagFilterBouwjaarMin || _bagFilterBouwjaarMax) && !p.bouwjaar) return false;
+  // Oppervlakte
+  if(_bagFilterOppMin && p.oppervlakte && p.oppervlakte < _bagFilterOppMin) return false;
+  if(_bagFilterOppMax && p.oppervlakte && p.oppervlakte > _bagFilterOppMax) return false;
+  if((_bagFilterOppMin || _bagFilterOppMax) && !p.oppervlakte) return false;
+  return true;
 }
 
 function createBagWmsLayer(){
@@ -1351,7 +1496,15 @@ function updateBagStatusCountsFromData(){
 function renderBagVectors(){
   if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null}
   if(!_bagVectorData || !_bagVectorData.length) return;
-  var filtered = _bagVectorData.filter(function(f){return matchesBagFilter(f.properties.status)});
+  var filtered = _bagVectorData.filter(function(f){
+    return matchesBagFilter(f.properties.status) && matchesBagExtendedFilters(f.properties);
+  });
+  // Update filter count
+  var countEl = document.getElementById('bagFilterCount');
+  if(countEl){
+    var hasFilter = _bagFilterGebruiksdoel || _bagFilterBouwjaarMin || _bagFilterBouwjaarMax || _bagFilterOppMin || _bagFilterOppMax;
+    countEl.textContent = hasFilter ? filtered.length + '/' + _bagVectorData.length + ' adressen na filter' : '';
+  }
   var zoom = _map.getZoom();
   // Performance limiet bij lage zoom: sampling
   var maxMarkers = zoom >= 16 ? Infinity : (zoom >= 14 ? 5000 : (zoom >= 12 ? 2000 : 800));
@@ -1398,7 +1551,9 @@ function showBagFeatureInfo(p, latlng){
   if(p.woonplaats) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">location_city</span> Woonplaats</span><span class="info-val">'+p.woonplaats+'</span></div>';
   if(p.gebruiksdoel) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">category</span> Gebruiksdoel</span><span class="info-val">'+p.gebruiksdoel+'</span></div>';
   if(p.status) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">info</span> Status</span><span class="info-val" style="color:'+bagStatusToColor(p.status)+'">'+p.status+'</span></div>';
-  if(p.pandstatus) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">apartment</span> Pand</span><span class="info-val" style="font-size:10px">'+p.pandstatus+'</span></div>';
+  if(p.pandstatus) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px;color:#8B5E3C">apartment</span> Pand</span><span class="info-val" style="font-size:10px">'+p.pandstatus+'</span></div>';
+  // Pand uitleg
+  html += '<div style="font:400 9px \'Space Mono\',monospace;color:var(--mt);padding:4px 8px;margin:2px 0 6px;background:rgba(139,94,60,.08);border-radius:6px;border-left:2px solid #8B5E3C;line-height:1.5"><span class="mi mi-sm" style="font-size:11px;vertical-align:-2px;color:#8B5E3C">info</span> Panden (bruin op de kaart) kunnen meerdere verblijfsobjecten (adressen) bevatten.</div>';
 
   // === VERGELIJKING: dit adres vs buurt ===
   html += buildBagCompareHtml(p, latlng);
@@ -1734,12 +1889,12 @@ function toggleBagLayer(on){
     createBagWmsLayer();
     statusSection.style.display = '';
     statusBtns.style.display = 'flex';
+    document.getElementById('bagFiltersSection').style.display = 'block';
     document.getElementById('bagCacheInfo').style.display = 'flex';
     dimChoroplethLayers(true);
-    // Panden als context
+    // Panden automatisch als context (knop verwijderd)
     if(!_layerState.panden){
       _layerState.panden = true;
-      document.querySelector('[data-layer="panden"]').classList.add('active');
       togglePandLayer(true);
     }
     // Buurtdata op achtergrond laden (nodig voor kerncijfers bij adres-klik)
@@ -1776,9 +1931,15 @@ function toggleBagLayer(on){
     if(ov){ ov.style.opacity = '0'; setTimeout(function(){ ov.style.display = 'none'; }, 400); }
     statusSection.style.display = 'none';
     statusBtns.style.display = 'none';
+    document.getElementById('bagFiltersSection').style.display = 'none';
     document.getElementById('bagCacheInfo').style.display = 'none';
     // knop verwijderd — achtergrond laden gaat automatisch
     document.getElementById('bagBgProgress').style.display = 'none';
+    // Panden ook uit zetten (worden automatisch met BAG mee-geactiveerd)
+    if(_layerState.panden){
+      _layerState.panden = false;
+      togglePandLayer(false);
+    }
     dimChoroplethLayers(false);
     logEvent('bag_toggle', 'uit');
   }
@@ -2871,11 +3032,20 @@ function updateMap(){
 // MULTI-SELECT DROPDOWNS
 // ============================================================
 var _selectedGemeenten = [];  // Geselecteerde gemeentenamen
+var _selectedWijken = [];     // Geselecteerde wijknamen
 var _selectedBuurten = [];    // Geselecteerde buurtnamen
+var _allWijkNamen = [];       // Alle beschikbare wijknamen
 var _allBuurtNamen = [];      // Alle beschikbare buurtnamen
 
+function getMsIds(wrapId){
+  if(wrapId==='msGemeente') return {dd:'msGemDropdown',opts:'msGemOptions',label:'msGemLabel',chips:'msGemChips'};
+  if(wrapId==='msWijk') return {dd:'msWijkDropdown',opts:'msWijkOptions',label:'msWijkLabel',chips:'msWijkChips'};
+  return {dd:'msBuurtDropdown',opts:'msBuurtOptions',label:'msBuurtLabel',chips:'msBuurtChips'};
+}
+
 function toggleMsDropdown(wrapId){
-  var dd = document.getElementById(wrapId === 'msGemeente' ? 'msGemDropdown' : 'msBuurtDropdown');
+  var ids = getMsIds(wrapId);
+  var dd = document.getElementById(ids.dd);
   var wasOpen = dd.classList.contains('open');
   // Sluit alle dropdowns
   document.querySelectorAll('.ms-dropdown').forEach(function(d){ d.classList.remove('open'); });
@@ -2886,7 +3056,8 @@ function toggleMsDropdown(wrapId){
 }
 
 function filterMsOptions(wrapId, query){
-  var optsEl = document.getElementById(wrapId === 'msGemeente' ? 'msGemOptions' : 'msBuurtOptions');
+  var ids = getMsIds(wrapId);
+  var optsEl = document.getElementById(ids.opts);
   var q = query.toLowerCase().trim();
   var items = optsEl.children;
   for(var i = 0; i < items.length; i++){
@@ -2895,8 +3066,14 @@ function filterMsOptions(wrapId, query){
   }
 }
 
+function getMsArr(wrapId){
+  if(wrapId==='msGemeente') return _selectedGemeenten;
+  if(wrapId==='msWijk') return _selectedWijken;
+  return _selectedBuurten;
+}
+
 function toggleMsOption(wrapId, name){
-  var arr = wrapId === 'msGemeente' ? _selectedGemeenten : _selectedBuurten;
+  var arr = getMsArr(wrapId);
   var idx = arr.indexOf(name);
   if(idx >= 0) arr.splice(idx, 1);
   else arr.push(name);
@@ -2905,7 +3082,7 @@ function toggleMsOption(wrapId, name){
 }
 
 function removeMsChip(wrapId, name){
-  var arr = wrapId === 'msGemeente' ? _selectedGemeenten : _selectedBuurten;
+  var arr = getMsArr(wrapId);
   var idx = arr.indexOf(name);
   if(idx >= 0) arr.splice(idx, 1);
   updateMsUI(wrapId);
@@ -2913,16 +3090,17 @@ function removeMsChip(wrapId, name){
 }
 
 function updateMsUI(wrapId){
-  var isGem = wrapId === 'msGemeente';
-  var arr = isGem ? _selectedGemeenten : _selectedBuurten;
-  var label = document.getElementById(isGem ? 'msGemLabel' : 'msBuurtLabel');
-  var chipsEl = document.getElementById(isGem ? 'msGemChips' : 'msBuurtChips');
-  var optsEl = document.getElementById(isGem ? 'msGemOptions' : 'msBuurtOptions');
+  var ids = getMsIds(wrapId);
+  var arr = getMsArr(wrapId);
+  var label = document.getElementById(ids.label);
+  var chipsEl = document.getElementById(ids.chips);
+  var optsEl = document.getElementById(ids.opts);
+  var typeLabel = wrapId==='msGemeente'?'gemeenten':(wrapId==='msWijk'?'wijken':'buurten');
 
   // Label
-  if(arr.length === 0) label.textContent = isGem ? 'Alle gemeenten' : 'Alle buurten';
+  if(arr.length === 0) label.textContent = 'Alle '+typeLabel;
   else if(arr.length === 1) label.textContent = arr[0];
-  else label.textContent = arr.length + (isGem ? ' gemeenten' : ' buurten');
+  else label.textContent = arr.length + ' ' + typeLabel;
 
   // Chips
   var ch = '';
@@ -2938,9 +3116,12 @@ function updateMsUI(wrapId){
     items[i].classList.toggle('selected', arr.indexOf(n) >= 0);
   }
 
-  // Toon "Laad selectie" knop als er iets geselecteerd is
+  // Toon knoppen als er iets geselecteerd is
+  var hasSelection = _selectedGemeenten.length > 0 || _selectedWijken.length > 0 || _selectedBuurten.length > 0;
   var btn = document.getElementById('loadSelectionBtn');
-  if(btn) btn.style.display = (_selectedGemeenten.length > 0 || _selectedBuurten.length > 0) ? 'flex' : 'none';
+  if(btn) btn.style.display = hasSelection ? 'flex' : 'none';
+  var cmpBtn = document.getElementById('compareBtn');
+  if(cmpBtn) cmpBtn.style.display = (_selectedGemeenten.length >= 2) ? 'flex' : 'none';
 }
 
 function buildGemeenteFilter(){
@@ -2952,6 +3133,29 @@ function buildGemeenteFilter(){
     html += '<div class="ms-opt" data-name="'+g+'" onclick="toggleMsOption(\'msGemeente\',\''+g.replace(/'/g,"\\'")+'\')">';
     html += '<span class="ms-check"><span class="mi" style="font-size:10px">check</span></span>';
     html += '<span>'+g+'</span></div>';
+  });
+  optsEl.innerHTML = html;
+}
+
+function buildWijkFilter(){
+  if(!_wijkData) return;
+  var names = new Set();
+  _wijkData.features.forEach(function(f){
+    var n = f.properties.wijknaam;
+    var g = f.properties.gemeentenaam;
+    if(n){
+      if(_selectedGemeenten.length === 0 || _selectedGemeenten.indexOf(g) >= 0){
+        names.add(n + ' ('+g+')');
+      }
+    }
+  });
+  _allWijkNamen = Array.from(names).sort();
+  var optsEl = document.getElementById('msWijkOptions');
+  var html = '';
+  _allWijkNamen.forEach(function(n){
+    html += '<div class="ms-opt" data-name="'+n.replace(/"/g,'&quot;')+'" onclick="toggleMsOption(\'msWijk\',\''+n.replace(/'/g,"\\'")+'\')">';
+    html += '<span class="ms-check"><span class="mi" style="font-size:10px">check</span></span>';
+    html += '<span style="font-size:10px">'+n+'</span></div>';
   });
   optsEl.innerHTML = html;
 }
@@ -2986,6 +3190,17 @@ function getSelectedGemeenteFilter(){
   return new Set(_selectedGemeenten);
 }
 
+function getSelectedWijkFilter(){
+  if(_selectedWijken.length === 0) return 'all';
+  var names = new Set();
+  _selectedWijken.forEach(function(n){
+    var m = n.match(/^(.+?) \(/);
+    if(m) names.add(m[1]);
+    else names.add(n);
+  });
+  return names;
+}
+
 function getSelectedBuurtFilter(){
   if(_selectedBuurten.length === 0) return 'all';
   // Extract buurtnaam zonder ' (gemeente)' suffix
@@ -2999,7 +3214,8 @@ function getSelectedBuurtFilter(){
 }
 
 function onFilterChange(){
-  // Buurtfilter opnieuw opbouwen bij gemeente-wijziging
+  // Wijk- en buurtfilter opnieuw opbouwen bij gemeente-wijziging
+  if(_wijkData) buildWijkFilter();
   if(_buurtData) buildBuurtFilter();
   updateMap();
   updateActiveStats();
@@ -3224,6 +3440,348 @@ function clearLog(){
 }
 
 // ============================================================
+// ACHTERGROND CBS DATA LADEN (buurten + wijken)
+// ============================================================
+function loadBackgroundCbsData(){
+  var progEl = document.getElementById('cbsBgProgress');
+  var bgText = document.getElementById('cbsBgText');
+  var bgPct = document.getElementById('cbsBgPct');
+  var bgBar = document.getElementById('cbsBgBar');
+  var bgDetail = document.getElementById('cbsBgDetail');
+  progEl.style.display = 'block';
+
+  var steps = [];
+  if(!_buurtData) steps.push({type:'buurten', url:BUURTEN_URL, label:'Buurtdata'});
+  if(!_wijkData) steps.push({type:'wijken', url:WIJKEN_URL, label:'Wijkdata'});
+  if(steps.length === 0){
+    progEl.style.display = 'none';
+    return;
+  }
+
+  var totalSteps = steps.length;
+  var currentStep = 0;
+
+  function loadNext(){
+    if(currentStep >= steps.length){
+      bgText.textContent = 'Alle data geladen \u2714';
+      bgPct.textContent = '100%';
+      bgBar.style.width = '100%';
+      bgDetail.textContent = (_buurtData ? _buurtData.features.length : 0) + ' buurten + ' + (_wijkData ? _wijkData.features.length : 0) + ' wijken';
+      setTimeout(function(){ progEl.style.display = 'none'; }, 3000);
+      // Herbereken nationale stats en herbouw filters
+      computeNationalStats();
+      if(_buurtData) buildBuurtFilter();
+      if(_wijkData) buildWijkFilter();
+      // Render actieve lagen
+      if(_layerState.buurten && _buurtData) renderChoropleth('buurten');
+      if(_layerState.wijken && _wijkData) renderChoropleth('wijken');
+      updateActiveStats();
+      toast('Buurt- en wijkdata geladen op achtergrond \u2714');
+      return;
+    }
+    var step = steps[currentStep];
+    var pctBase = (currentStep / totalSteps) * 100;
+    bgText.textContent = step.label + ' laden...';
+    bgPct.textContent = Math.round(pctBase) + '%';
+    bgBar.style.width = pctBase + '%';
+    bgDetail.textContent = step.type === 'buurten' ? '~14 MB ophalen...' : '~4 MB ophalen...';
+
+    fetch(step.url).then(function(r){
+      if(!r.ok) throw new Error(step.type+' niet beschikbaar ('+r.status+')');
+      return r.json();
+    }).then(function(d){
+      if(step.type === 'buurten'){
+        _buurtData = d;
+        document.getElementById('dsBuurten').textContent = d.features.length.toLocaleString('nl-NL') + ' features';
+        buildBuurtFilter();
+      } else {
+        _wijkData = d;
+        document.getElementById('dsWijken').textContent = d.features.length.toLocaleString('nl-NL') + ' features';
+        buildWijkFilter();
+      }
+      currentStep++;
+      var pctDone = (currentStep / totalSteps) * 100;
+      bgPct.textContent = Math.round(pctDone) + '%';
+      bgBar.style.width = pctDone + '%';
+      bgDetail.textContent = d.features.length.toLocaleString('nl-NL') + ' ' + step.type + ' geladen';
+      loadNext();
+    }).catch(function(e){
+      console.warn('Achtergrond laden ' + step.type + ' mislukt:', e);
+      bgDetail.textContent = 'Fout: ' + e.message;
+      currentStep++;
+      loadNext();
+    });
+  }
+  loadNext();
+}
+
+// ============================================================
+// GEMEENTEN VERGELIJKINGSRAPPORT
+// ============================================================
+function showComparisonReport(){
+  if(_selectedGemeenten.length < 2){
+    toast('Selecteer minimaal 2 gemeenten om te vergelijken');
+    return;
+  }
+  if(!_gemeenteData){ toast('Geen gemeentedata geladen'); return; }
+
+  var gemeenten = [];
+  _selectedGemeenten.forEach(function(naam){
+    _gemeenteData.features.forEach(function(f){
+      if(f.properties.gemeentenaam === naam) gemeenten.push(f);
+    });
+  });
+  if(gemeenten.length < 2){ toast('Gemeentedata niet gevonden'); return; }
+
+  // Haal beschikbare indicatoren op
+  var yearInds = _yearIndicators[_activeYear];
+  var avSet = yearInds ? new Set(yearInds) : null;
+  var activeInds = INDICATORS.filter(function(fm){
+    return !avSet || avSet.has(fm.key);
+  });
+
+  // Bouw vergelijkingstabel
+  var html = '<!DOCTYPE html><html lang="nl"><head>';
+  html += '<meta charset="UTF-8"><title>GeoInzicht Vergelijking</title>';
+  html += '<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">';
+  html += '<style>';
+  html += 'body{font-family:"DM Sans",sans-serif;background:#f8fafc;color:#1e293b;padding:32px;max-width:1200px;margin:0 auto}';
+  html += 'h1{font:700 22px "Space Mono",monospace;color:#16a34a;margin-bottom:4px}';
+  html += '.subtitle{font-size:13px;color:#64748b;margin-bottom:24px}';
+  html += 'table{width:100%;border-collapse:collapse;margin:16px 0;font-size:12px}';
+  html += 'th{background:#f1f5f9;font-weight:600;text-align:left;padding:8px 10px;border-bottom:2px solid #e2e8f0;position:sticky;top:0}';
+  html += 'td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font:400 11px "Space Mono",monospace}';
+  html += 'tr:hover{background:#f8fafc}';
+  html += '.best{background:#dcfce7;color:#16a34a;font-weight:700}';
+  html += '.worst{background:#fef2f2;color:#dc2626}';
+  html += '.ind-name{font:500 12px "DM Sans",sans-serif;color:#1e293b;text-align:left}';
+  html += '.footer{margin-top:24px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;text-align:center}';
+  html += '.bar-bg{background:#e2e8f0;border-radius:4px;height:8px;width:100%;margin-top:2px}';
+  html += '.bar-fill{height:8px;border-radius:4px;transition:width .3s}';
+  html += '@media print{body{padding:16px}th{background:#f1f5f9 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.best,.worst{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  html += '</style></head><body>';
+  html += '<h1>Vergelijkingsrapport</h1>';
+  html += '<div class="subtitle">CBS Kerncijfers '+_activeYear+' \u00b7 '+gemeenten.length+' gemeenten \u00b7 '+activeInds.length+' indicatoren \u00b7 Gegenereerd: '+new Date().toLocaleString('nl-NL')+'</div>';
+
+  // Tabel
+  html += '<table><thead><tr><th style="min-width:160px">Indicator</th>';
+  gemeenten.forEach(function(g){
+    html += '<th style="min-width:100px">'+g.properties.gemeentenaam+'</th>';
+  });
+  html += '<th style="min-width:80px">Landelijk gem.</th></tr></thead><tbody>';
+
+  var reverseSet = new Set(REVERSE_KEYS);
+
+  activeInds.forEach(function(fm){
+    html += '<tr><td class="ind-name">'+fm.naam+' <span style="font-size:9px;color:#94a3b8">('+fm.eenheid+')</span></td>';
+    var vals = [];
+    gemeenten.forEach(function(g){
+      var v = g.properties[fm.key];
+      vals.push(v != null ? v : null);
+    });
+    // Bepaal best/worst
+    var numeric = vals.filter(function(v){return v != null});
+    var isReverse = reverseSet.has(fm.key);
+    var bestVal = numeric.length > 0 ? (isReverse ? Math.min.apply(null,numeric) : Math.max.apply(null,numeric)) : null;
+    var worstVal = numeric.length > 0 ? (isReverse ? Math.max.apply(null,numeric) : Math.min.apply(null,numeric)) : null;
+    var range = numeric.length > 0 ? (Math.max.apply(null,numeric) - Math.min.apply(null,numeric)) : 0;
+    var minVal = numeric.length > 0 ? Math.min.apply(null,numeric) : 0;
+    var maxVal = numeric.length > 0 ? Math.max.apply(null,numeric) : 1;
+
+    vals.forEach(function(v){
+      if(v == null){
+        html += '<td style="color:#94a3b8">\u2014</td>';
+      } else {
+        var cls = '';
+        if(numeric.length >= 2){
+          if(v === bestVal) cls = ' class="best"';
+          else if(v === worstVal) cls = ' class="worst"';
+        }
+        var pct = maxVal > minVal ? ((v - minVal) / (maxVal - minVal) * 100) : 50;
+        var barColor = v === bestVal ? '#22c55e' : (v === worstVal ? '#ef4444' : '#60a5fa');
+        html += '<td'+cls+'>' + formatCompareVal(v, fm.key) + '<div class="bar-bg"><div class="bar-fill" style="width:'+pct+'%;background:'+barColor+'"></div></div></td>';
+      }
+    });
+
+    // Landelijk gemiddelde
+    var ns = _nationalStats[fm.key];
+    html += '<td style="color:#64748b">'+(ns ? formatCompareVal(ns.avg, fm.key) : '\u2014')+'</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+
+  // Samenvatting per gemeente
+  html += '<div style="margin-top:16px;padding:16px;background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0">';
+  html += '<div style="font:600 13px \'DM Sans\',sans-serif;color:#16a34a;margin-bottom:8px">Samenvatting per gemeente</div>';
+  html += '<div style="font-size:11px;color:#475569;line-height:1.7">';
+  gemeenten.forEach(function(g){
+    var p = g.properties;
+    var sterke = [];
+    var zwakke = [];
+    activeInds.forEach(function(fm){
+      var v = p[fm.key];
+      var ns = _nationalStats[fm.key];
+      if(v == null || !ns || !ns.stddev) return;
+      var z = (v - ns.avg) / ns.stddev;
+      if(reverseSet.has(fm.key)) z = -z; // Bij afstand is lager beter
+      if(z > 1) sterke.push(fm.naam);
+      else if(z < -1) zwakke.push(fm.naam);
+    });
+    html += '<div style="margin-bottom:6px"><b style="color:#0f172a">'+p.gemeentenaam+'</b>';
+    if(sterke.length) html += ' \u2014 <span style="color:#16a34a">Sterk: '+sterke.join(', ')+'</span>';
+    if(zwakke.length) html += ' \u2014 <span style="color:#dc2626">Aandachtspunt: '+zwakke.join(', ')+'</span>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+
+  // Statistische interpretatie per gemeente
+  html += '<div style="margin-top:16px;padding:16px;background:#eff6ff;border-radius:12px;border:1px solid #bfdbfe">';
+  html += '<div style="font:600 13px \'DM Sans\',sans-serif;color:#2563eb;margin-bottom:8px">\ud83d\udd0d Interpretatie (statistische samenhang)</div>';
+  html += '<div style="font-size:11px;color:#475569;line-height:1.8">';
+  gemeenten.forEach(function(g){
+    var p = g.properties;
+    var insights = [];
+    // Welvarend: hoge WOZ + hoog inkomen
+    if(p.gem_woz_waarde && p.gem_inkomen_inwoner){
+      var wozNs = _nationalStats.gem_woz_waarde;
+      var inkNs = _nationalStats.gem_inkomen_inwoner;
+      if(wozNs && inkNs){
+        var wozZ = (p.gem_woz_waarde - wozNs.avg) / (wozNs.stddev||1);
+        var inkZ = (p.gem_inkomen_inwoner - inkNs.avg) / (inkNs.stddev||1);
+        if(wozZ > 0.5 && inkZ > 0.5) insights.push('\ud83d\udcb0 Hoge WOZ \u00e9n hoog inkomen \u2192 welvarend gebied');
+        else if(wozZ < -0.5 && inkZ < -0.5) insights.push('\u26a0\ufe0f Lage WOZ \u00e9n laag inkomen \u2192 sociaaleconomisch kwetsbaar');
+        else if(wozZ > 0.5 && inkZ < -0.5) insights.push('\ud83c\udfe0 Hoge WOZ maar laag inkomen \u2192 mogelijk gentrificatie');
+      }
+    }
+    // Isolatie: hoog gasverbruik
+    if(p.gem_aardgas){
+      var gasNs = _nationalStats.gem_aardgas;
+      if(gasNs){
+        var gasZ = (p.gem_aardgas - gasNs.avg) / (gasNs.stddev||1);
+        if(gasZ > 1) insights.push('\ud83d\udd25 Hoog gasverbruik \u2192 mogelijk slecht ge\u00efsoleerde woningen');
+        else if(gasZ < -0.8) insights.push('\u2744\ufe0f Laag gasverbruik \u2192 goed ge\u00efsoleerd of warmtenet');
+      }
+    }
+    // Vergrijzing
+    if(p['65plus']){
+      var oudNs = _nationalStats['65plus'];
+      if(oudNs){
+        var oudZ = (p['65plus'] - oudNs.avg) / (oudNs.stddev||1);
+        if(oudZ > 1) insights.push('\ud83d\udc74 Hoog % 65+ \u2192 vergrijzend gebied, druk op zorgvoorzieningen');
+      }
+    }
+    // Jong + huurwoningen
+    if(p['15_25'] && p.huurwoningen){
+      var jongNs = _nationalStats['15_25'];
+      var huurNs = _nationalStats.huurwoningen;
+      if(jongNs && huurNs){
+        var jongZ = (p['15_25'] - jongNs.avg) / (jongNs.stddev||1);
+        var huurZ = (p.huurwoningen - huurNs.avg) / (huurNs.stddev||1);
+        if(jongZ > 0.5 && huurZ > 0.5) insights.push('\ud83c\udf93 Veel jongeren + veel huurwoningen \u2192 studentengebied');
+      }
+    }
+    // Arbeidsparticipatie + inkomen
+    if(p.arbeidsparticipatie && p.gem_inkomen_inwoner){
+      var arbNs = _nationalStats.arbeidsparticipatie;
+      var inkNs2 = _nationalStats.gem_inkomen_inwoner;
+      if(arbNs && inkNs2){
+        var arbZ = (p.arbeidsparticipatie - arbNs.avg) / (arbNs.stddev||1);
+        var inkZ2 = (p.gem_inkomen_inwoner - inkNs2.avg) / (inkNs2.stddev||1);
+        if(arbZ > 0.5 && inkZ2 > 0.5) insights.push('\ud83d\udcbc Hoge arbeidsparticipatie + hoog inkomen \u2192 economisch sterk');
+        else if(arbZ < -0.5 && inkZ2 < -0.5) insights.push('\u26a0\ufe0f Lage participatie + laag inkomen \u2192 sociaal kwetsbaar');
+      }
+    }
+    // Bevolkingsdichtheid + eengezins
+    if(p.bevolkingsdichtheid && p.pct_eengezins){
+      var dichthNs = _nationalStats.bevolkingsdichtheid;
+      var eenNs = _nationalStats.pct_eengezins;
+      if(dichthNs && eenNs){
+        var dichthZ = (p.bevolkingsdichtheid - dichthNs.avg) / (dichthNs.stddev||1);
+        var eenZ = (p.pct_eengezins - eenNs.avg) / (eenNs.stddev||1);
+        if(dichthZ < -0.5 && eenZ > 0.5) insights.push('\ud83c\udfe1 Lage dichtheid + veel eengezins \u2192 suburbaan/landelijk');
+        else if(dichthZ > 1 && eenZ < -0.5) insights.push('\ud83c\udfd9\ufe0f Hoge dichtheid + weinig eengezins \u2192 stedelijk');
+      }
+    }
+    if(insights.length > 0){
+      html += '<div style="margin-bottom:8px;padding:6px 8px;background:rgba(37,99,235,.04);border-radius:6px"><b style="color:#1e40af">'+p.gemeentenaam+'</b><ul style="margin:4px 0 0 16px;padding:0">';
+      insights.forEach(function(ins){ html += '<li>'+ins+'</li>'; });
+      html += '</ul></div>';
+    }
+  });
+  html += '</div></div>';
+
+  html += '<div class="footer">GeoInzicht v7.0 \u00b7 Data Consultants \u00b7 CBS/PDOK '+_activeYear+' \u00b7 '+new Date().toLocaleDateString('nl-NL')+'</div>';
+  html += '</body></html>';
+
+  var w = window.open('','_blank','width=1000,height=700');
+  if(w){
+    w.document.write(html);
+    w.document.close();
+  } else {
+    toast('Popup geblokkeerd \u2014 sta popups toe');
+  }
+  logEvent('vergelijking_export', _selectedGemeenten.join(', '));
+}
+
+function formatCompareVal(v, key){
+  if(v == null) return '\u2014';
+  if(typeof v !== 'number') return v;
+  if(key === 'gem_woz_waarde') return '\u20ac ' + Math.round(v/1000) + 'k';
+  if(key === 'gem_inkomen_inwoner') return '\u20ac ' + Math.round(v/1000) + 'k';
+  if(v >= 10000) return v.toLocaleString('nl-NL');
+  if(v >= 100) return Math.round(v).toLocaleString('nl-NL');
+  if(v >= 10) return v.toFixed(1);
+  return v.toFixed(2);
+}
+
+// ============================================================
+// FEEDBACK POPUP (na 30 minuten)
+// ============================================================
+var FEEDBACK_KEY = 'geoinzicht_feedback';
+var FEEDBACK_SHOWN_KEY = 'geoinzicht_feedback_shown';
+
+function initFeedbackTimer(){
+  // Toon maar 1x
+  if(localStorage.getItem(FEEDBACK_SHOWN_KEY)) return;
+  // 30 minuten = 1800000 ms
+  setTimeout(function(){
+    if(!localStorage.getItem(FEEDBACK_SHOWN_KEY)){
+      document.getElementById('feedbackOverlay').style.display = 'block';
+      logEvent('feedback_getoond', '30 min timer');
+    }
+  }, 30 * 60 * 1000);
+}
+
+function submitFeedback(){
+  var text = document.getElementById('feedbackText').value.trim();
+  var email = document.getElementById('feedbackEmail').value.trim();
+  if(!text && !email){ toast('Vul een mening of e-mailadres in'); return; }
+  var feedback = {
+    ts: new Date().toISOString(),
+    text: text,
+    email: email,
+    year: _activeYear,
+    sessionDuration: Math.round((Date.now() - _appStartTime) / 60000) + ' min'
+  };
+  try {
+    var existing = JSON.parse(localStorage.getItem(FEEDBACK_KEY) || '[]');
+    existing.push(feedback);
+    localStorage.setItem(FEEDBACK_KEY, JSON.stringify(existing));
+  } catch(e){}
+  localStorage.setItem(FEEDBACK_SHOWN_KEY, '1');
+  logEvent('feedback_verstuurd', text.substring(0,100));
+  closeFeedback();
+  toast('Bedankt voor je feedback! \u2764');
+}
+
+function closeFeedback(){
+  document.getElementById('feedbackOverlay').style.display = 'none';
+  localStorage.setItem(FEEDBACK_SHOWN_KEY, '1');
+}
+
+var _appStartTime = Date.now();
+
+// ============================================================
 // RAPPORT EXPORT (PRINT/PDF)
 // ============================================================
 function printInfoPanel(){
@@ -3404,6 +3962,12 @@ async function init(){
     }
     toast(_gemeenteData.features.length.toLocaleString('nl-NL') + ' gemeenten geladen');
     logEvent('app_open', _gemeenteData.features.length + ' gemeenten');
+
+    // Start achtergrond laden van buurten en wijken na 1.5s
+    setTimeout(function(){ loadBackgroundCbsData(); }, 1500);
+
+    // Start feedback timer (30 min)
+    initFeedbackTimer();
   } catch(e){
     console.error('Init error:', e);
     loadMsg.textContent = 'Fout bij opstarten';
