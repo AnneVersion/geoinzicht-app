@@ -219,6 +219,7 @@ select option{background:var(--bg);color:var(--tx)}
 
 /* Loading dot animation for toasts */
 @keyframes dotPulse{0%,100%{opacity:.3}50%{opacity:1}}
+@keyframes logoSpin{0%{transform:scale(1) rotate(0deg);opacity:1}50%{transform:scale(1.08) rotate(180deg);opacity:.85}100%{transform:scale(1) rotate(360deg);opacity:1}}
 
 /* Leaflet overrides */
 .leaflet-control-zoom a{background:var(--glass) !important;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:var(--tx) !important;border-color:var(--glass-bd) !important;transition:all .2s !important}
@@ -284,7 +285,7 @@ select option{background:var(--bg);color:var(--tx)}
       <div id="bagCacheInfo" style="display:none;font:400 9px 'Space Mono',monospace;color:var(--mt);margin-bottom:8px;display:flex;align-items:center;gap:6px">
         <span class="mi mi-sm" style="color:var(--ai)">sd_storage</span>
         <span id="bagCacheText">Cache: 0 adressen</span>
-        <button class="btn btn-s" onclick="clearBagCache();toast('BAG cache gewist');loadBagVectors()" style="font-size:9px;padding:2px 8px;margin-left:auto"><span class="mi mi-sm" style="font-size:11px">delete</span> Wis cache</button>
+        <button class="btn btn-s" onclick="clearBagCache();_bagLastBbox='';toast('BAG cache gewist');loadBagVectors()" style="font-size:9px;padding:2px 8px;margin-left:auto"><span class="mi mi-sm" style="font-size:11px">delete</span> Wis cache</button>
       </div>
       <div id="bagLoadProgress" style="display:none;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
@@ -466,6 +467,17 @@ select option{background:var(--bg);color:var(--tx)}
 
   <div class="map-wrap">
     <div id="map"></div>
+    <!-- BAG laad-overlay met logo -->
+    <div id="bagLoadOverlay" style="display:none;position:absolute;inset:0;z-index:800;pointer-events:none;background:rgba(10,15,26,.45);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);transition:opacity .4s ease">
+      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center">
+        <img src="logo.svg" alt="Laden..." style="width:100px;height:100px;filter:drop-shadow(0 0 24px rgba(57,255,20,.4));animation:logoSpin 2.5s cubic-bezier(.4,0,.2,1) infinite">
+        <div style="margin-top:12px;font:600 13px 'DM Sans',sans-serif;color:var(--ac);text-shadow:0 0 12px rgba(57,255,20,.5)" id="bagOverlayText">BAG adressen laden...</div>
+        <div style="margin-top:6px;font:700 11px 'Space Mono',monospace;color:var(--ai)" id="bagOverlayPct">0%</div>
+        <div style="width:180px;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;margin:8px auto 0">
+          <div id="bagOverlayBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--ac),var(--ai));border-radius:2px;transition:width .3s ease"></div>
+        </div>
+      </div>
+    </div>
     <div class="info-panel" id="infoPanel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <h3 id="infoBuurtNaam" style="margin:0;flex:1"><span class="mi mi-sm">place</span> -</h3>
@@ -798,82 +810,140 @@ function updateBagWmsOpacity(){
   if(_pandWmsLayer) _pandWmsLayer.setOpacity(z >= 16 ? 0.6 : (z >= 14 ? 0.3 : (z >= 13 ? 0.15 : 0)));
 }
 
-// BAG cache key prefix
-var BAG_CACHE_KEY = 'geoinzicht_bag_cache';
-var BAG_CACHE_META = 'geoinzicht_bag_meta';
-var _bagCache = {}; // In-memory: tileKey -> features[]
-var _bagCacheLoaded = false;
+// ============================================================
+// BAG CACHE — IndexedDB (onbeperkt) + in-memory Map (snel)
+// ============================================================
+var BAG_IDB_NAME = 'geoinzicht_bag';
+var BAG_IDB_VERSION = 1;
+var BAG_IDB_STORE = 'adressen';
+var _bagIdb = null;        // IndexedDB database handle
+var _bagMem = {};          // In-memory: identificatie -> feature (snelle lookup)
+var _bagMemCount = 0;      // Aantal unieke adressen in memory
+var _bagCacheReady = false; // Is IDB klaar?
 
-// Laad cache uit localStorage bij startup
-function loadBagCache(){
-  if(_bagCacheLoaded) return;
-  try{
-    var meta = JSON.parse(localStorage.getItem(BAG_CACHE_META)||'{}');
-    // Cache max 24h oud
-    if(meta.ts && Date.now()-meta.ts < 86400000){
-      var raw = localStorage.getItem(BAG_CACHE_KEY);
-      if(raw){_bagCache = JSON.parse(raw);console.log('BAG cache geladen:',meta.count,'adressen uit',Object.keys(_bagCache).length,'tiles')}
-    } else {clearBagCache()}
-  }catch(e){clearBagCache()}
-  _bagCacheLoaded = true;
-}
-
-function saveBagCache(){
-  try{
-    var count = 0;
-    for(var k in _bagCache) count += _bagCache[k].length;
-    localStorage.setItem(BAG_CACHE_KEY, JSON.stringify(_bagCache));
-    localStorage.setItem(BAG_CACHE_META, JSON.stringify({ts:Date.now(),count:count}));
-    var el = document.getElementById('bagCacheText');
-    if(el) el.textContent = 'Cache: '+count.toLocaleString('nl-NL')+' adressen ('+Object.keys(_bagCache).length+' tiles)';
-  }catch(e){
-    // localStorage vol — verwijder oudste tiles
-    console.warn('BAG cache opslaan mislukt, cache opruimen...',e.message);
-    var keys = Object.keys(_bagCache);
-    if(keys.length > 10){
-      keys.slice(0, Math.floor(keys.length/2)).forEach(function(k){delete _bagCache[k]});
-      try{saveBagCache()}catch(e2){}
-    }
-  }
-}
-
-function clearBagCache(){
-  _bagCache = {};
-  try{localStorage.removeItem(BAG_CACHE_KEY);localStorage.removeItem(BAG_CACHE_META)}catch(e){}
-}
-
-// Genereer tile-key voor een viewport bbox (afgerond op ~200m grid)
-function bagTileKey(lat,lng){
-  return Math.round(lat*500)+','+Math.round(lng*300);
-}
-
-// Alle gecachte features ophalen die in de huidige viewport vallen
-function getCachedBagFeatures(){
-  loadBagCache();
-  var b = _map.getBounds();
-  var features = [];
-  var seen = {};
-  for(var key in _bagCache){
-    _bagCache[key].forEach(function(f){
-      var c = f.geometry.coordinates;
-      if(c[1] >= b.getSouth() && c[1] <= b.getNorth() && c[0] >= b.getWest() && c[0] <= b.getEast()){
-        var id = f.properties.identificatie;
-        if(!seen[id]){seen[id]=true;features.push(f)}
+// Open IndexedDB
+function openBagIDB(){
+  return new Promise(function(resolve, reject){
+    if(_bagIdb){ resolve(_bagIdb); return; }
+    var req = indexedDB.open(BAG_IDB_NAME, BAG_IDB_VERSION);
+    req.onupgradeneeded = function(e){
+      var db = e.target.result;
+      if(!db.objectStoreNames.contains(BAG_IDB_STORE)){
+        var store = db.createObjectStore(BAG_IDB_STORE, {keyPath:'id'});
+        store.createIndex('lat','lat',{unique:false});
+        store.createIndex('lng','lng',{unique:false});
       }
+    };
+    req.onsuccess = function(e){ _bagIdb = e.target.result; resolve(_bagIdb); };
+    req.onerror = function(e){ console.warn('IndexedDB open error:',e); reject(e); };
+  });
+}
+
+// Laad ALLE adressen uit IndexedDB naar in-memory cache
+function loadBagFromIDB(){
+  return openBagIDB().then(function(db){
+    return new Promise(function(resolve){
+      var tx = db.transaction(BAG_IDB_STORE, 'readonly');
+      var store = tx.objectStore(BAG_IDB_STORE);
+      var req = store.getAll();
+      req.onsuccess = function(){
+        var items = req.result || [];
+        _bagMem = {};
+        _bagMemCount = 0;
+        items.forEach(function(item){
+          _bagMem[item.id] = item.feature;
+          _bagMemCount++;
+        });
+        _bagCacheReady = true;
+        console.log('BAG cache geladen uit IndexedDB:', _bagMemCount, 'adressen');
+        updateBagCacheUI();
+        resolve(_bagMemCount);
+      };
+      req.onerror = function(){ _bagCacheReady = true; resolve(0); };
     });
+  }).catch(function(){ _bagCacheReady = true; return 0; });
+}
+
+// Sla features op in IndexedDB (batch put)
+function saveBagToIDB(features){
+  if(!features || !features.length) return Promise.resolve();
+  // Eerst in-memory opslaan
+  var newItems = [];
+  features.forEach(function(f){
+    var id = f.properties.identificatie || f.properties.id;
+    if(!id) return;
+    if(!_bagMem[id]){
+      _bagMem[id] = f;
+      _bagMemCount++;
+      var c = f.geometry.coordinates;
+      newItems.push({id:id, lat:c[1], lng:c[0], feature:f});
+    }
+  });
+  updateBagCacheUI();
+  if(newItems.length === 0) return Promise.resolve();
+
+  // Schrijf naar IndexedDB in batches van 5000
+  return openBagIDB().then(function(db){
+    return new Promise(function(resolve){
+      var batchSize = 5000;
+      var idx = 0;
+      function writeBatch(){
+        if(idx >= newItems.length){ resolve(); return; }
+        var batch = newItems.slice(idx, idx + batchSize);
+        idx += batchSize;
+        var tx = db.transaction(BAG_IDB_STORE, 'readwrite');
+        var store = tx.objectStore(BAG_IDB_STORE);
+        batch.forEach(function(item){ store.put(item); });
+        tx.oncomplete = writeBatch;
+        tx.onerror = function(e){ console.warn('IDB write error:',e); writeBatch(); };
+      }
+      writeBatch();
+    });
+  }).catch(function(e){ console.warn('IDB save error:',e); });
+}
+
+// Haal alle gecachte features in de huidige viewport uit memory
+function getCachedBagFeatures(){
+  if(!_map) return [];
+  var b = _map.getBounds();
+  var s = b.getSouth(), n = b.getNorth(), w = b.getWest(), e = b.getEast();
+  var features = [];
+  for(var id in _bagMem){
+    var f = _bagMem[id];
+    var c = f.geometry.coordinates;
+    if(c[1] >= s && c[1] <= n && c[0] >= w && c[0] <= e){
+      features.push(f);
+    }
   }
   return features;
 }
 
+// Wis de BAG cache
+function clearBagCache(){
+  _bagMem = {};
+  _bagMemCount = 0;
+  openBagIDB().then(function(db){
+    var tx = db.transaction(BAG_IDB_STORE, 'readwrite');
+    tx.objectStore(BAG_IDB_STORE).clear();
+  }).catch(function(){});
+  updateBagCacheUI();
+  // Oude localStorage cache ook opruimen
+  try{localStorage.removeItem('geoinzicht_bag_cache');localStorage.removeItem('geoinzicht_bag_meta')}catch(e){}
+}
+
+function updateBagCacheUI(){
+  var el = document.getElementById('bagCacheText');
+  if(el) el.textContent = 'Cache: '+_bagMemCount.toLocaleString('nl-NL')+' adressen';
+}
+
 // Laad BAG vectordata via WFS — altijd alles in viewport laden
-var BAG_MAX_FEATURES = 50000; // Max features om browser niet te crashen
+var BAG_MAX_FEATURES = 200000; // Max features per viewport (IndexedDB kan dit aan)
 var _bagLastBbox = ''; // Laatst geladen BBOX om dubbel laden te voorkomen
 var _bagAbort = null; // AbortController voor lopende requests
 function loadBagVectors(){
   if(!_map) return;
   // Als er al een load bezig is, annuleer die
   if(_bagLoading && _bagAbort){ _bagAbort.abort(); _bagAbort = null; _bagLoading = false; }
-  loadBagCache();
 
   // Altijd eerst cache tonen (instant)
   var cached = getCachedBagFeatures();
@@ -885,7 +955,6 @@ function loadBagVectors(){
 
   var b = _map.getBounds();
   var bbox = b.getSouth().toFixed(5)+','+b.getWest().toFixed(5)+','+b.getNorth().toFixed(5)+','+b.getEast().toFixed(5)+',EPSG:4326';
-  var key = bagTileKey(b.getCenter().lat, b.getCenter().lng);
 
   // Skip als we exact dezelfde BBOX al geladen hebben
   if(bbox === _bagLastBbox) return;
@@ -895,28 +964,35 @@ function loadBagVectors(){
   _bagAbort = new AbortController();
   var signal = _bagAbort.signal;
 
-  // UI: toon progress bar
+  // UI: toon progress bar + kaart-overlay met logo
   var progEl = document.getElementById('bagLoadProgress');
   var progText = document.getElementById('bagLoadText');
   var progPct = document.getElementById('bagLoadPct');
   var progBar = document.getElementById('bagLoadBar');
+  var overlay = document.getElementById('bagLoadOverlay');
+  var overlayText = document.getElementById('bagOverlayText');
+  var overlayPct = document.getElementById('bagOverlayPct');
+  var overlayBar = document.getElementById('bagOverlayBar');
   if(progEl) progEl.style.display = 'block';
+  if(overlay){ overlay.style.display = 'block'; overlay.style.opacity = '1'; }
   var pagesLoaded = 0;
   var totalPages = 0;
   var totalExpected = 0;
   var allFeatures = [];
 
   function updateProgress(loaded, total){
-    if(!progText) return;
     var pct = total > 0 ? Math.min(100, Math.round(loaded/total*100)) : 0;
-    progText.textContent = loaded.toLocaleString('nl-NL')+' / '+(total>0?total.toLocaleString('nl-NL'):'?')+' adressen';
-    progPct.textContent = pct+'%';
-    progBar.style.width = pct+'%';
+    var txt = loaded.toLocaleString('nl-NL')+' / '+(total>0?total.toLocaleString('nl-NL'):'?')+' adressen';
+    // Sidebar progress bar
+    if(progText){ progText.textContent = txt; progPct.textContent = pct+'%'; progBar.style.width = pct+'%'; }
+    // Kaart-overlay
+    if(overlayText){ overlayText.textContent = txt; overlayPct.textContent = pct+'%'; overlayBar.style.width = pct+'%'; }
   }
 
   function renderCurrent(){
-    _bagCache[key] = allFeatures;
-    saveBagCache();
+    // Sla op in IndexedDB + memory (async, non-blocking)
+    saveBagToIDB(allFeatures);
+    // Toon alles uit memory in viewport
     _bagVectorData = getCachedBagFeatures();
     renderBagVectors();
     updateBagStatusCountsFromData();
@@ -926,11 +1002,11 @@ function loadBagVectors(){
     _bagLoading = false;
     _bagLastBbox = bbox;
     if(progEl) progEl.style.display = 'none';
-    var totalCached = 0; for(var k in _bagCache) totalCached += _bagCache[k].length;
-    var cacheText = document.getElementById('bagCacheText');
-    if(cacheText) cacheText.textContent = 'Cache: '+totalCached.toLocaleString('nl-NL')+' adressen';
-    toast(allFeatures.length.toLocaleString('nl-NL')+' adressen geladen \u2714');
-    logEvent('bag_klaar', allFeatures.length + ' adressen, cache: ' + totalCached);
+    // Overlay uitfaden
+    if(overlay){ overlay.style.opacity = '0'; setTimeout(function(){ overlay.style.display = 'none'; }, 400); }
+    updateBagCacheUI();
+    toast(allFeatures.length.toLocaleString('nl-NL')+' nieuw geladen · '+_bagMemCount.toLocaleString('nl-NL')+' totaal gecacht \u2714');
+    logEvent('bag_klaar', allFeatures.length + ' adressen, cache: ' + _bagMemCount);
   }
 
   // Stap 1: Haal totaal op via hits (XML)
@@ -998,7 +1074,7 @@ function loadBagVectors(){
       allFeatures = d.features || [];
       renderCurrent();
       finishLoading();
-    }).catch(function(){ _bagLoading=false; if(progEl) progEl.style.display='none'; });
+    }).catch(function(){ _bagLoading=false; if(progEl) progEl.style.display='none'; if(overlay){overlay.style.opacity='0';setTimeout(function(){overlay.style.display='none'},400)} });
   });
 }
 
@@ -1347,6 +1423,8 @@ function toggleBagLayer(on){
     _bagLastBbox = '';
     var progEl = document.getElementById('bagLoadProgress');
     if(progEl) progEl.style.display = 'none';
+    var ov = document.getElementById('bagLoadOverlay');
+    if(ov){ ov.style.opacity = '0'; setTimeout(function(){ ov.style.display = 'none'; }, 400); }
     statusSection.style.display = 'none';
     statusBtns.style.display = 'none';
     document.getElementById('bagCacheInfo').style.display = 'none';
@@ -2299,6 +2377,11 @@ async function init(){
     buildBagStatusButtons();
     renderIndicatorDefs();
     setupSearch();
+
+    // BAG cache laden uit IndexedDB (parallel met gemeentedata)
+    loadBagFromIDB().then(function(n){
+      if(n > 0) console.log('BAG IndexedDB: '+n+' adressen in memory geladen');
+    });
 
     // Stap 1: Gemeenten laden (0.9 MB — snel)
     loadMsg.textContent = 'Gemeentedata laden...';
