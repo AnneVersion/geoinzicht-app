@@ -645,6 +645,21 @@ select option{background:var(--bg);color:var(--tx)}
         </div>
       </div>
 
+      <!-- Dataset info -->
+      <div id="uploadInfoSection" style="display:none">
+        <div class="sh"><span class="mi">edit_note</span> Dataset Informatie</div>
+        <div class="card">
+          <div style="margin-bottom:8px">
+            <label style="font:600 9px 'DM Sans',sans-serif;color:var(--mt);display:block;margin-bottom:3px">Naam *</label>
+            <input id="uploadDatasetName" type="text" placeholder="Bijv. Bijentellingen juni 2024" style="width:100%;font-size:11px;padding:7px 10px;background:var(--glass);color:var(--tx);border:1px solid var(--br);border-radius:6px;outline:none;box-sizing:border-box" onfocus="this.style.borderColor='#39ff14'" onblur="this.style.borderColor='var(--br)'">
+          </div>
+          <div>
+            <label style="font:600 9px 'DM Sans',sans-serif;color:var(--mt);display:block;margin-bottom:3px">Beschrijving</label>
+            <textarea id="uploadDatasetDesc" placeholder="Wat voor data is dit? Waar komt het vandaan? Wat is het doel?" rows="3" style="width:100%;font-size:10px;padding:7px 10px;background:var(--glass);color:var(--tx);border:1px solid var(--br);border-radius:6px;outline:none;resize:vertical;box-sizing:border-box;font-family:'DM Sans',sans-serif;line-height:1.5" onfocus="this.style.borderColor='#39ff14'" onblur="this.style.borderColor='var(--br)'"></textarea>
+          </div>
+        </div>
+      </div>
+
       <!-- Upload preview -->
       <div id="uploadPreview" style="display:none">
         <div style="display:flex;gap:6px;margin-bottom:8px">
@@ -934,6 +949,9 @@ function switchYear(year){
 
     // Herlaad buurten en wijken op achtergrond (altijd, voor filters en stats)
     setTimeout(function(){ loadBackgroundCbsData(); }, 500);
+
+    // BAG aantallen per gemeente prefetchen (lichtgewicht hits queries)
+    setTimeout(function(){ loadBagIndex().then(function(){ prefetchBagCounts(); }); }, 2000);
 
     document.getElementById('dsJaar').textContent = year;
     toast('CBS '+year+' geladen \u2714 ('+availableIndicators.length+' indicatoren)');
@@ -2211,8 +2229,89 @@ function loadBagIndex(){
   }).then(function(d){
     _bagIndex = d || {};
     console.log('BAG index geladen:', Object.keys(_bagIndex).length, 'gemeenten');
+    // Start prefetch als niet alle gemeenten in index zitten
+    if(_gemeenteData){
+      var missing = _gemeenteData.features.filter(function(f){
+        var code = f.properties.gemeentecode || '';
+        return code && !_bagIndex[code];
+      });
+      if(missing.length > 0){
+        console.log('BAG index mist', missing.length, 'gemeenten — start live prefetch');
+        prefetchBagCounts();
+      }
+    }
     return _bagIndex;
   }).catch(function(){ _bagIndex = {}; return _bagIndex; });
+}
+
+// Prefetch: haal BAG aantallen per gemeente op via WFS hits (snel, geen data)
+var _bagPrefetching = false;
+function prefetchBagCounts(){
+  if(_bagPrefetching || !_gemeenteData) return;
+  _bagPrefetching = true;
+
+  var features = _gemeenteData.features.filter(function(f){
+    var code = f.properties.gemeentecode || '';
+    return code && f.geometry && (!_bagIndex || !_bagIndex[code]);
+  });
+
+  if(features.length === 0){ _bagPrefetching = false; return; }
+
+  if(!_bagIndex) _bagIndex = {};
+  var total = features.length;
+  var done = 0;
+  var queue = features.slice();
+  var concurrency = 4; // 4 gelijktijdige hits queries
+  var running = 0;
+
+  function processNext(){
+    while(queue.length > 0 && running < concurrency){
+      var f = queue.shift();
+      running++;
+      (function(feat){
+        var code = feat.properties.gemeentecode || '';
+        var naam = feat.properties.gemeentenaam || '';
+        // Bereken bbox
+        var coords = [];
+        function ex(g){
+          if(!g) return;
+          if(g.type==='Polygon') g.coordinates.forEach(function(r){r.forEach(function(c){coords.push(c)})});
+          else if(g.type==='MultiPolygon') g.coordinates.forEach(function(p){p.forEach(function(r){r.forEach(function(c){coords.push(c)})})});
+        }
+        ex(feat.geometry);
+        if(coords.length === 0){ running--; done++; processNext(); return; }
+        var mnLng=Infinity,mxLng=-Infinity,mnLat=Infinity,mxLat=-Infinity;
+        coords.forEach(function(c){if(c[0]<mnLng)mnLng=c[0];if(c[0]>mxLng)mxLng=c[0];if(c[1]<mnLat)mnLat=c[1];if(c[1]>mxLat)mxLat=c[1]});
+        var bbox = mnLat.toFixed(5)+','+mnLng.toFixed(5)+','+mxLat.toFixed(5)+','+mxLng.toFixed(5)+',EPSG:4326';
+        var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&resultType=hits&srsName=EPSG:4326&BBOX='+bbox;
+
+        fetch(url).then(function(r){ return r.text(); }).then(function(xml){
+          var m = xml.match(/numberMatched="(\d+)"/);
+          var count = m ? parseInt(m[1]) : 0;
+          if(count > 0){
+            _bagIndex[code] = {naam: naam, count: count, source: 'live'};
+          }
+        }).catch(function(){}).finally(function(){
+          running--;
+          done++;
+          if(done % 20 === 0){
+            console.log('BAG prefetch: '+done+'/'+total+' gemeenten');
+            updateBagCacheUI();
+          }
+          processNext();
+        });
+      })(f);
+    }
+
+    // Klaar
+    if(queue.length === 0 && running === 0){
+      _bagPrefetching = false;
+      updateBagCacheUI();
+      console.log('BAG prefetch klaar:', Object.keys(_bagIndex).length, 'gemeenten in index');
+    }
+  }
+
+  processNext();
 }
 
 // Laad BAG adressen voor een specifieke gemeente uit pre-built bestand
@@ -5308,6 +5407,7 @@ async function refreshAdminData(){
                 (u.row_count||0)+' locaties \u00b7 '+tijd+syncBadge +
                 (onMap ? ' \u00b7 <span style="color:var(--ac)">op kaart</span>' : '') +
               '</div>' +
+              (u.description ? '<div style="font-size:9px;color:var(--st);margin-top:2px;font-style:italic">'+escapeHtml(u.description.substring(0,80))+'</div>' : '') +
               (u.visitor_id ? '<div style="font-size:8px;color:var(--mt);opacity:.6">Bezoeker: '+escapeHtml(u.visitor_id.substring(0,12))+'</div>' : '') +
             '</div>' +
             '<button class="btn btn-s" onclick="adminShowUploadData(\''+escapeHtml(u.upload_id)+'\')" style="font-size:9px;padding:2px 6px" title="Bekijk data">' +
@@ -5348,7 +5448,8 @@ function adminShowUploadData(uploadId){
     var cols = rec.columns || [];
     var data = rec.data || [];
     var html = '<div style="font-family:DM Sans,sans-serif;padding:16px;max-width:600px;max-height:500px;overflow:auto">';
-    html += '<div style="font:700 14px \'DM Sans\',sans-serif;color:var(--ac);margin-bottom:8px">'+escapeHtml(rec.name||rec.filename||'Upload')+'</div>';
+    html += '<div style="font:700 14px \'DM Sans\',sans-serif;color:var(--ac);margin-bottom:4px">'+escapeHtml(rec.name||rec.filename||'Upload')+'</div>';
+    if(rec.description) html += '<div style="font-size:10px;color:var(--st);margin-bottom:6px;font-style:italic">'+escapeHtml(rec.description)+'</div>';
     html += '<div style="font-size:10px;color:var(--mt);margin-bottom:10px">'+data.length+' rijen \u00b7 '+cols.length+' kolommen \u00b7 '+new Date(rec.uploaded_at).toLocaleString('nl-NL')+'</div>';
     html += '<table style="width:100%;font-size:9px;border-collapse:collapse">';
     html += '<tr>';
@@ -5588,8 +5689,16 @@ function parseCSV(text, fileName, separator){
 
   // Toon UI
   document.getElementById('uploadIconSection').style.display = '';
+  document.getElementById('uploadInfoSection').style.display = '';
   document.getElementById('uploadPreview').style.display = '';
   document.getElementById('uploadRowCount').textContent = validRows.length + ' van ' + rows.length + ' rijen met coördinaten';
+
+  // Vul naam voor met bestandsnaam (zonder extensie)
+  var nameEl = document.getElementById('uploadDatasetName');
+  if(nameEl && !nameEl.value){
+    var baseName = (_uploadFileName || '').replace(/\.[^.]+$/, '');
+    nameEl.value = baseName;
+  }
 
   // Label dropdown vullen
   var labelSel = document.getElementById('uploadLabelCol');
@@ -5657,7 +5766,16 @@ function addUploadToMap(){
   var labelCol = document.getElementById('uploadLabelCol').value;
   var icon = _uploadSelectedIcon;
   var color = _uploadSelectedColor;
-  var layerName = _uploadFileName || ('Upload ' + (_uploadLayers.length + 1));
+  var datasetName = (document.getElementById('uploadDatasetName').value || '').trim();
+  var datasetDesc = (document.getElementById('uploadDatasetDesc').value || '').trim();
+  // Naam is verplicht
+  if(!datasetName){
+    toast('Geef de dataset een naam');
+    document.getElementById('uploadDatasetName').focus();
+    document.getElementById('uploadDatasetName').style.borderColor = '#ef4444';
+    return;
+  }
+  var layerName = datasetName;
 
   // Check duplicaat: zelfde filename → overschrijf bestaande
   var existingId = null;
@@ -5682,6 +5800,7 @@ function addUploadToMap(){
   var uploadRecord = {
     upload_id: uploadId,
     name: layerName,
+    description: datasetDesc,
     filename: _uploadFileName || '',
     icon: icon,
     color: color,
@@ -5729,13 +5848,175 @@ function addUploadToMap(){
   toast(layerInfo.count + ' markers op kaart geplaatst \u00b7 ' + (isOverwrite ? 'Overschreven' : 'Data opgeslagen'));
   logEvent('upload_kaart', layerName + ': ' + layerInfo.count + ' markers' + (isOverwrite ? ' (overschreven)' : ''));
 
+  // Toon upload rapport
+  showUploadReport(uploadRecord);
+
   // Reset upload state (data is opgeslagen, preview kan weg)
   _uploadData = null;
   _uploadColumns = [];
   _uploadFileName = '';
   document.getElementById('uploadPreview').style.display = 'none';
   document.getElementById('uploadIconSection').style.display = 'none';
+  document.getElementById('uploadInfoSection').style.display = 'none';
   document.getElementById('uploadFileInput').value = '';
+  document.getElementById('uploadDatasetName').value = '';
+  document.getElementById('uploadDatasetDesc').value = '';
+  document.getElementById('uploadDatasetName').style.borderColor = '';
+}
+
+// Upload rapport — statistieken over geüploade dataset
+function showUploadReport(rec){
+  var data = rec.data || [];
+  var cols = rec.columns || [];
+  if(!data.length) return;
+
+  // Bereken statistieken
+  var numCols = [];
+  var catCols = [];
+  var dateCols = [];
+  cols.forEach(function(col){
+    if(col === '_lat' || col === '_lng') return;
+    var numCount = 0, total = 0, min = Infinity, max = -Infinity;
+    var vals = {};
+    var dateCount = 0;
+    data.forEach(function(r){
+      var v = r[col];
+      if(v === undefined || v === null || v === '') return;
+      var n = parseFloat(String(v).replace(',','.'));
+      if(!isNaN(n) && isFinite(n)){ numCount++; total += n; min = Math.min(min,n); max = Math.max(max,n); }
+      var sv = String(v).trim();
+      vals[sv] = (vals[sv]||0) + 1;
+      if(/^\d{4}-\d{2}-\d{2}/.test(sv)) dateCount++;
+    });
+    var nonEmpty = data.filter(function(r){ return r[col] !== undefined && r[col] !== null && r[col] !== ''; }).length;
+    var uniqueCount = Object.keys(vals).length;
+    if(dateCount > nonEmpty * 0.5){
+      dateCols.push({name:col, count:nonEmpty, unique:uniqueCount});
+    } else if(numCount > nonEmpty * 0.5 && numCount > 2){
+      numCols.push({name:col, count:numCount, avg:total/numCount, min:min, max:max, sum:total});
+    } else if(nonEmpty > 0){
+      // Top 5 waarden
+      var sorted = Object.entries(vals).sort(function(a,b){ return b[1]-a[1]; });
+      catCols.push({name:col, count:nonEmpty, unique:uniqueCount, top5:sorted.slice(0,5)});
+    }
+  });
+
+  // Geografische spreiding
+  var lats = data.map(function(r){ return r._lat; }).filter(Boolean);
+  var lngs = data.map(function(r){ return r._lng; }).filter(Boolean);
+  var minLat = Math.min.apply(null,lats), maxLat = Math.max.apply(null,lats);
+  var minLng = Math.min.apply(null,lngs), maxLng = Math.max.apply(null,lngs);
+  var centerLat = ((minLat+maxLat)/2).toFixed(4);
+  var centerLng = ((minLng+maxLng)/2).toFixed(4);
+
+  // Bouw rapport HTML
+  var h = '<div style="font-family:DM Sans,sans-serif;padding:20px;max-width:560px;max-height:70vh;overflow-y:auto">';
+  h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">';
+  h += '<div style="width:36px;height:36px;background:'+(rec.color||'var(--ac)')+';border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">';
+  h += '<span class="mi" style="font-size:20px;color:#fff;font-variation-settings:\'FILL\' 1">'+(rec.icon||'location_on')+'</span></div>';
+  h += '<div><div style="font:700 16px \'DM Sans\',sans-serif;color:var(--ac)">'+escapeHtml(rec.name||'Upload')+'</div>';
+  if(rec.description) h += '<div style="font-size:11px;color:var(--st);font-style:italic;margin-top:2px">'+escapeHtml(rec.description)+'</div>';
+  h += '</div></div>';
+
+  // Overzicht
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">';
+  h += '<div style="background:rgba(255,255,255,.03);border:1px solid var(--br);border-radius:8px;padding:10px;text-align:center">';
+  h += '<div style="font:700 18px \'Space Mono\',monospace;color:var(--ac)">'+data.length.toLocaleString('nl-NL')+'</div>';
+  h += '<div style="font-size:9px;color:var(--mt)">Locaties</div></div>';
+  h += '<div style="background:rgba(255,255,255,.03);border:1px solid var(--br);border-radius:8px;padding:10px;text-align:center">';
+  h += '<div style="font:700 18px \'Space Mono\',monospace;color:var(--st)">'+cols.filter(function(c){return c!=='_lat'&&c!=='_lng'}).length+'</div>';
+  h += '<div style="font-size:9px;color:var(--mt)">Kolommen</div></div>';
+  h += '<div style="background:rgba(255,255,255,.03);border:1px solid var(--br);border-radius:8px;padding:10px;text-align:center">';
+  h += '<div style="font:700 18px \'Space Mono\',monospace;color:var(--tx)">'+((maxLat-minLat).toFixed(2))+'°</div>';
+  h += '<div style="font-size:9px;color:var(--mt)">Lat-spreiding</div></div>';
+  h += '</div>';
+
+  // Geografisch
+  h += '<div style="margin-bottom:12px">';
+  h += '<div style="font:700 11px \'DM Sans\',sans-serif;color:var(--ac);margin-bottom:6px"><span class="mi" style="font-size:13px;vertical-align:-2px">map</span> Geografisch</div>';
+  h += '<div style="font-size:10px;color:var(--mt);line-height:1.6">';
+  h += 'Centrum: <span style="font-family:Space Mono,monospace;color:var(--tx)">'+centerLat+', '+centerLng+'</span><br>';
+  h += 'Bereik: <span style="font-family:Space Mono,monospace;color:var(--tx)">'+minLat.toFixed(4)+'–'+maxLat.toFixed(4)+' N, '+minLng.toFixed(4)+'–'+maxLng.toFixed(4)+' E</span>';
+  h += '</div></div>';
+
+  // Numerieke kolommen
+  if(numCols.length){
+    h += '<div style="margin-bottom:12px">';
+    h += '<div style="font:700 11px \'DM Sans\',sans-serif;color:var(--ac);margin-bottom:6px"><span class="mi" style="font-size:13px;vertical-align:-2px">calculate</span> Numerieke kolommen</div>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:9px">';
+    h += '<tr style="border-bottom:1px solid var(--br)">';
+    h += '<th style="padding:4px 6px;text-align:left;color:var(--mt)">Kolom</th>';
+    h += '<th style="padding:4px 6px;text-align:right;color:var(--mt)">Min</th>';
+    h += '<th style="padding:4px 6px;text-align:right;color:var(--mt)">Gem.</th>';
+    h += '<th style="padding:4px 6px;text-align:right;color:var(--mt)">Max</th>';
+    h += '<th style="padding:4px 6px;text-align:right;color:var(--mt)">Totaal</th></tr>';
+    numCols.forEach(function(nc){
+      h += '<tr style="border-bottom:1px solid rgba(255,255,255,.03)">';
+      h += '<td style="padding:3px 6px;color:var(--tx)">'+escapeHtml(nc.name)+'</td>';
+      h += '<td style="padding:3px 6px;text-align:right;font-family:Space Mono,monospace;color:var(--st)">'+nc.min.toLocaleString('nl-NL',{maximumFractionDigits:1})+'</td>';
+      h += '<td style="padding:3px 6px;text-align:right;font-family:Space Mono,monospace;color:var(--ac)">'+nc.avg.toLocaleString('nl-NL',{maximumFractionDigits:1})+'</td>';
+      h += '<td style="padding:3px 6px;text-align:right;font-family:Space Mono,monospace;color:var(--st)">'+nc.max.toLocaleString('nl-NL',{maximumFractionDigits:1})+'</td>';
+      h += '<td style="padding:3px 6px;text-align:right;font-family:Space Mono,monospace;color:var(--tx)">'+nc.sum.toLocaleString('nl-NL',{maximumFractionDigits:1})+'</td>';
+      h += '</tr>';
+    });
+    h += '</table></div>';
+  }
+
+  // Categorische kolommen (top waarden)
+  if(catCols.length){
+    h += '<div style="margin-bottom:12px">';
+    h += '<div style="font:700 11px \'DM Sans\',sans-serif;color:var(--ac);margin-bottom:6px"><span class="mi" style="font-size:13px;vertical-align:-2px">category</span> Categorieën</div>';
+    catCols.forEach(function(cc){
+      h += '<div style="margin-bottom:8px">';
+      h += '<div style="font:600 10px \'DM Sans\',sans-serif;color:var(--tx);margin-bottom:3px">'+escapeHtml(cc.name)+' <span style="color:var(--mt);font-weight:400">('+cc.unique+' uniek)</span></div>';
+      var maxVal = cc.top5.length ? cc.top5[0][1] : 1;
+      cc.top5.forEach(function(tv){
+        var pct = Math.round(tv[1]/data.length*100);
+        var barW = Math.max(4, Math.round(tv[1]/maxVal*100));
+        h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">';
+        h += '<div style="width:90px;font-size:9px;color:var(--st);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0" title="'+escapeHtml(tv[0])+'">'+escapeHtml(tv[0].substring(0,15))+'</div>';
+        h += '<div style="flex:1;height:12px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden"><div style="width:'+barW+'%;height:100%;background:var(--ac);border-radius:3px"></div></div>';
+        h += '<div style="font:500 9px \'Space Mono\',monospace;color:var(--mt);width:50px;text-align:right">'+tv[1]+' ('+pct+'%)</div>';
+        h += '</div>';
+      });
+      if(cc.unique > 5) h += '<div style="font-size:8px;color:var(--mt);margin-top:2px">... en '+(cc.unique-5)+' meer</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+
+  // Datum kolommen
+  if(dateCols.length){
+    h += '<div style="margin-bottom:12px">';
+    h += '<div style="font:700 11px \'DM Sans\',sans-serif;color:var(--ac);margin-bottom:4px"><span class="mi" style="font-size:13px;vertical-align:-2px">calendar_month</span> Datumkolommen</div>';
+    dateCols.forEach(function(dc){
+      h += '<div style="font-size:10px;color:var(--st)">'+escapeHtml(dc.name)+': '+dc.count+' waarden, '+dc.unique+' unieke datums</div>';
+    });
+    h += '</div>';
+  }
+
+  // Bestandsinfo
+  h += '<div style="border-top:1px solid var(--br);padding-top:8px;margin-top:8px;font-size:9px;color:var(--mt)">';
+  h += '<span class="mi" style="font-size:11px;vertical-align:-2px">info</span> ';
+  h += 'Bestand: '+escapeHtml(rec.filename||'—')+' · ';
+  h += 'Upload ID: '+escapeHtml(rec.upload_id.substring(0,16))+'... · ';
+  h += new Date(rec.uploaded_at).toLocaleString('nl-NL');
+  h += '</div>';
+
+  h += '</div>';
+
+  // Toon in overlay
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer;animation:fadeIn .2s';
+  overlay.onclick = function(){ document.body.removeChild(overlay); };
+  var card = document.createElement('div');
+  card.style.cssText = 'background:var(--p);border:1px solid var(--br);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.5);cursor:default;max-width:90vw';
+  card.onclick = function(e){ e.stopPropagation(); };
+  card.innerHTML = h;
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  logEvent('upload_rapport', rec.name + ': ' + data.length + ' loc, ' + numCols.length + ' num, ' + catCols.length + ' cat');
 }
 
 // Render markers op kaart vanuit een upload record
@@ -5812,6 +6093,8 @@ function syncUploadToServer(rec){
         upload_id: rec.upload_id,
         visitor_id: rec.visitor_id || '',
         session_id: rec.session_id || '',
+        name: rec.name || '',
+        description: rec.description || '',
         filename: rec.filename || '',
         icon: rec.icon,
         color: rec.color,
@@ -5976,9 +6259,13 @@ function deleteUploadPermanent(uploadId){
 function clearUploadData(){
   _uploadData = null;
   _uploadColumns = [];
+  _uploadFileName = '';
   document.getElementById('uploadPreview').style.display = 'none';
   document.getElementById('uploadIconSection').style.display = 'none';
+  document.getElementById('uploadInfoSection').style.display = 'none';
   document.getElementById('uploadFileInput').value = '';
+  document.getElementById('uploadDatasetName').value = '';
+  document.getElementById('uploadDatasetDesc').value = '';
 }
 
 // ============================================================
@@ -7221,6 +7508,9 @@ async function init(){
 
     // Start achtergrond laden van buurten en wijken na 1.5s
     setTimeout(function(){ loadBackgroundCbsData(); }, 1500);
+
+    // BAG aantallen prefetchen als de index niet compleet is
+    setTimeout(function(){ prefetchBagCounts(); }, 3000);
 
     // Start feedback timer (30 min)
     initFeedbackTimer();

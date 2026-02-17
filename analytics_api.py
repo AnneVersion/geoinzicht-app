@@ -50,6 +50,8 @@ def ensure_tables():
                     upload_id       VARCHAR(100) NOT NULL,
                     visitor_id      VARCHAR(100) DEFAULT '',
                     session_id      VARCHAR(100) DEFAULT '',
+                    name            NVARCHAR(500) DEFAULT '',
+                    description     NVARCHAR(2000) DEFAULT '',
                     filename        NVARCHAR(500) DEFAULT '',
                     icon            VARCHAR(50) DEFAULT 'location_on',
                     color           VARCHAR(20) DEFAULT '#e11d48',
@@ -63,6 +65,11 @@ def ensure_tables():
                 CREATE INDEX IX_uploads_uploaded_at ON analytics_uploads(uploaded_at);
                 PRINT 'Tabel analytics_uploads aangemaakt';
             END
+            -- Kolommen toevoegen als ze nog niet bestaan (bestaande tabellen)
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='analytics_uploads' AND COLUMN_NAME='name')
+                ALTER TABLE analytics_uploads ADD name NVARCHAR(500) DEFAULT '';
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='analytics_uploads' AND COLUMN_NAME='description')
+                ALTER TABLE analytics_uploads ADD description NVARCHAR(2000) DEFAULT '';
         """)
         conn.close()
     except Exception as e:
@@ -429,13 +436,14 @@ def save_upload():
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO analytics_uploads (
-                upload_id, visitor_id, session_id, filename,
-                icon, color, label_column, columns_json, data_json,
-                row_count, uploaded_at
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                upload_id, visitor_id, session_id, name, description,
+                filename, icon, color, label_column, columns_json,
+                data_json, row_count, uploaded_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             d.get('upload_id', ''), d.get('visitor_id', ''),
-            d.get('session_id', ''), d.get('filename', ''),
+            d.get('session_id', ''), d.get('name', ''),
+            d.get('description', ''), d.get('filename', ''),
             d.get('icon', 'location_on'), d.get('color', '#e11d48'),
             d.get('label_column', ''), d.get('columns_json', '[]'),
             d.get('data_json', '[]'), d.get('row_count', 0),
