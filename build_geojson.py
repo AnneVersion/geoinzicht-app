@@ -301,6 +301,19 @@ def build_year(feat_type, year, tolerance, output=None):
         if (i + 1) % 3000 == 0:
             log.info(f"  {i+1}/{len(raw)} verwerkt...")
 
+    # Dedupliceer: houd per ID de feature met de meeste properties
+    before_dedup = len(features)
+    best = {}
+    for f in features:
+        fid = f["properties"].get(id_field, "")
+        if not fid:
+            continue
+        if fid not in best or len(f["properties"]) > len(best[fid]["properties"]):
+            best[fid] = f
+    features = list(best.values())
+    if len(features) < before_dedup:
+        log.info(f"  Deduplicatie: {before_dedup} → {len(features)} ({before_dedup - len(features)} duplicaten verwijderd)")
+
     # Count features with actual CBS data (more than just admin fields)
     admin_count = len(admin_fields)
     with_data = sum(1 for f in features if len(f["properties"]) > admin_count)

@@ -1005,8 +1005,13 @@ function renderChoropleth(type){
         newLayer.resetStyle(e.target);
         if(!_infoPinned) document.getElementById('infoPanel').classList.remove('show');
       });
-      layer.on('click', function(){
-        // Click: toon info en pin het panel vast
+      layer.on('click', function(e){
+        // Ctrl+click of Shift+click: toevoegen/verwijderen aan selectie voor vergelijking
+        if(e.originalEvent && (e.originalEvent.ctrlKey || e.originalEvent.shiftKey || e.originalEvent.metaKey)){
+          toggleMapSelection(feature.properties, type);
+          return;
+        }
+        // Normale click: toon info en pin het panel vast
         _infoPinned = true;
         showFeatureInfo(feature.properties, cfg, type, true);
       });
@@ -3644,6 +3649,49 @@ function autoLoadForSelection(){
   }
 }
 
+// Klik op kaart om gemeente/buurt/wijk toe te voegen aan selectie (Ctrl+klik)
+function toggleMapSelection(props, type){
+  var name, arr, filterFn;
+  if(type === 'gemeenten'){
+    name = props.gemeentenaam;
+    arr = _selectedGemeenten;
+  } else if(type === 'buurten'){
+    name = props.buurtnaam;
+    if(props.gemeentenaam) name = props.buurtnaam + ' (' + props.gemeentenaam + ')';
+    arr = _selectedBuurten;
+  } else if(type === 'wijken'){
+    name = props.wijknaam;
+    if(props.gemeentenaam) name = props.wijknaam + ' (' + props.gemeentenaam + ')';
+    arr = _selectedWijken;
+  } else return;
+
+  if(!name) return;
+
+  var idx = arr.indexOf(name);
+  if(idx >= 0){
+    arr.splice(idx, 1);
+    toast(name + ' verwijderd uit selectie');
+  } else {
+    arr.push(name);
+    toast(name + ' toegevoegd aan selectie');
+  }
+
+  // Update UI: filters, chips, vergelijk-knop
+  if(type === 'gemeenten') buildGemeenteFilter();
+  else if(type === 'wijken') buildWijkFilter();
+  else if(type === 'buurten') buildBuurtFilter();
+
+  // Update vergelijk-knop zichtbaarheid
+  var cmpBtn = document.getElementById('compareBtn');
+  if(cmpBtn) cmpBtn.style.display = (_selectedGemeenten.length >= 2 || _selectedBuurten.length >= 2) ? 'flex' : 'none';
+
+  // Re-render choropleth om selectie visueel te tonen
+  var primaryType = _layerState.buurten ? 'buurten' : (_layerState.wijken ? 'wijken' : 'gemeenten');
+  renderChoropleth(primaryType);
+
+  logEvent('kaart_selectie', type + ': ' + name);
+}
+
 function zoomToSelection(){
   // Zoom naar meest specifieke niveau: buurt > wijk > gemeente
   var hasGem = _selectedGemeenten.length > 0;
@@ -4048,11 +4096,11 @@ function clearLog(){
 }
 
 // ============================================================
-// SUPABASE ANALYTICS — Bezoekersregistratie & Tracking
+// ANALYTICS — Bezoekersregistratie via lokale SQL Server API
 // ============================================================
-// Configuratie: vul hier je Supabase project URL en anon key in
-var SUPABASE_URL = 'https://bkgjlqdbhopjfmwytqtr.supabase.co';
-var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrZ2pscWRiaG9wamZtd3l0cXRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk4MjUyNTYsImV4cCI6MjA1NTQwMTI1Nn0.DPl7gMmVynl0-KVeD0nw6x0VIUJe_pSAoZJq5VlKf_c';
+// API endpoint: lokale Flask server (analytics_api.py)
+// Start met: python analytics_api.py
+var ANALYTICS_API = 'http://localhost:5000/api';
 var _visitorId = null;
 var _sessionId = null;
 var _supabaseReady = false;
@@ -4152,30 +4200,19 @@ function getGPUInfo(){
   } catch(e){ return ''; }
 }
 
-// Supabase REST API helper
-function supabasePost(table, data){
-  if(!SUPABASE_URL || !SUPABASE_ANON_KEY) return Promise.resolve(null);
-  return fetch(SUPABASE_URL + '/rest/v1/' + table, {
+// Analytics API helpers (lokale SQL Server via Flask)
+function analyticsPost(endpoint, data){
+  return fetch(ANALYTICS_API + '/' + endpoint, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
-      'Prefer': 'return=minimal'
-    },
+    headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(data)
-  }).catch(function(e){ console.warn('Supabase post error:', e.message); });
+  }).catch(function(e){ console.warn('Analytics post error:', e.message); });
 }
 
-function supabaseGet(table, query){
-  if(!SUPABASE_URL || !SUPABASE_ANON_KEY) return Promise.resolve([]);
-  var url = SUPABASE_URL + '/rest/v1/' + table + (query ? '?' + query : '');
-  return fetch(url, {
-    headers: {
-      'apikey': SUPABASE_ANON_KEY,
-      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
-    }
-  }).then(function(r){ return r.json(); }).catch(function(e){ console.warn('Supabase get error:', e.message); return []; });
+function analyticsGet(endpoint){
+  return fetch(ANALYTICS_API + '/' + endpoint)
+    .then(function(r){ return r.json(); })
+    .catch(function(e){ console.warn('Analytics get error:', e.message); return []; });
 }
 
 // IP adres ophalen via gratis API
@@ -4255,7 +4292,7 @@ async function initAnalytics(){
       started_at: new Date().toISOString()
     };
 
-    await supabasePost('sessions', session);
+    await analyticsPost('session', session);
     _supabaseReady = true;
     console.log('Analytics: sessie geregistreerd', _sessionId);
   } catch(e){
@@ -4263,7 +4300,7 @@ async function initAnalytics(){
   }
 }
 
-// Track events naar Supabase (naast localStorage)
+// Track events naar SQL Server (naast localStorage)
 function trackEvent(type, detail){
   if(!_supabaseReady) return;
   var evt = {
@@ -4276,30 +4313,27 @@ function trackEvent(type, detail){
     center_lng: _map ? parseFloat(_map.getCenter().lng.toFixed(5)) : null,
     timestamp: new Date().toISOString()
   };
-  supabasePost('events', evt);
+  analyticsPost('event', evt);
 }
 
 // Track sessie-einde (beforeunload)
 function trackSessionEnd(){
   if(!_supabaseReady) return;
   var duration = Math.round((Date.now() - _appStartTime) / 1000);
-  // Gebruik sendBeacon voor betrouwbare tracking bij pagina-sluiten
-  var url = SUPABASE_URL + '/rest/v1/session_ends';
+  var url = ANALYTICS_API + '/session-end';
   var data = JSON.stringify({
-    visitor_id: _visitorId,
     session_id: _sessionId,
     duration_seconds: duration,
-    events_count: getLog().length,
     ended_at: new Date().toISOString()
   });
   if(navigator.sendBeacon){
     navigator.sendBeacon(url, new Blob([data], {type:'application/json'}));
   } else {
-    fetch(url, {method:'POST', body:data, headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}, keepalive:true}).catch(function(){});
+    fetch(url, {method:'POST', body:data, headers:{'Content-Type':'application/json'}, keepalive:true}).catch(function(){});
   }
 }
 
-// Voeg Supabase tracking toe aan bestaand logEvent
+// Voeg analytics tracking toe aan bestaand logEvent
 var _origLogEvent = logEvent;
 logEvent = function(type, detail){
   _origLogEvent(type, detail);
@@ -4318,10 +4352,10 @@ document.addEventListener('visibilitychange', function(){
 // Track sessie-einde
 window.addEventListener('beforeunload', trackSessionEnd);
 
-// E-mail opslaan via Supabase
+// E-mail opslaan via Analytics API
 function saveEmailToSupabase(email){
   if(!email) return;
-  return supabasePost('emails', {
+  return analyticsPost('email', {
     visitor_id: _visitorId,
     session_id: _sessionId,
     email: email,
@@ -4372,21 +4406,19 @@ async function refreshAdminData(){
   if(!statsEl) return;
 
   try {
-    // Haal sessies op (laatste 100)
-    var sessions = await supabaseGet('sessions', 'order=started_at.desc&limit=100');
-    var emails = await supabaseGet('emails', 'order=collected_at.desc&limit=50');
-    var events = await supabaseGet('events', 'order=timestamp.desc&limit=200');
+    // Haal data op via lokale API
+    var stats = await analyticsGet('admin/stats');
+    var sessions = await analyticsGet('admin/sessions?limit=100');
+    var emails = await analyticsGet('admin/emails');
+    var events = await analyticsGet('admin/events?limit=200');
 
-    // Stats
-    var uniqueVisitors = new Set(sessions.map(function(s){ return s.visitor_id; })).size;
-    var today = new Date().toISOString().substring(0,10);
-    var todaySessions = sessions.filter(function(s){ return s.started_at && s.started_at.substring(0,10) === today; }).length;
+    // Stats uit API
+    var uniqueVisitors = stats.unique_visitors || 0;
+    var todaySessions = stats.today_sessions || 0;
     var countries = {};
     var cities = {};
-    sessions.forEach(function(s){
-      if(s.country) countries[s.country] = (countries[s.country]||0) + 1;
-      if(s.city) cities[s.city] = (cities[s.city]||0) + 1;
-    });
+    (stats.top_countries || []).forEach(function(c){ countries[c.country] = c.count; });
+    (stats.top_cities || []).forEach(function(c){ cities[c.city] = c.count; });
 
     statsEl.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
       '<div style="background:rgba(57,255,20,.08);border-radius:8px;padding:10px;text-align:center"><div style="font:700 18px \'Space Mono\',monospace;color:var(--ac)">'+uniqueVisitors+'</div><div style="font-size:9px;color:var(--mt)">Unieke bezoekers</div></div>' +
@@ -4455,7 +4487,7 @@ function parseBrowser(ua){
 
 async function exportAdminCSV(){
   try {
-    var sessions = await supabaseGet('sessions', 'order=started_at.desc&limit=1000');
+    var sessions = await analyticsGet('admin/sessions?limit=1000');
     if(!sessions.length){ toast('Geen data'); return; }
     var keys = Object.keys(sessions[0]);
     var csv = keys.join(';') + '\n';
@@ -4999,9 +5031,9 @@ function submitFeedback(){
     existing.push(feedback);
     localStorage.setItem(FEEDBACK_KEY, JSON.stringify(existing));
   } catch(e){}
-  // Sla op in Supabase
+  // Sla op in SQL Server
   if(email) saveEmailToSupabase(email);
-  supabasePost('feedback', {
+  analyticsPost('feedback', {
     visitor_id: _visitorId || getVisitorId(),
     session_id: _sessionId || getSessionId(),
     text: text,
