@@ -1201,6 +1201,8 @@ function renderBagVectors(){
 }
 
 function showBagFeatureInfo(p, latlng){
+  // Zorg dat nationalStats berekend is voor AI interpretatie
+  if(!_nationalStats || Object.keys(_nationalStats).length === 0) computeNationalStats();
   var straat = p.openbare_ruimte || '';
   var hnr = (p.huisnummer||'') + (p.huisletter||'') + (p.toevoeging?' '+p.toevoeging:'');
   document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">location_on</span> '+((straat+' '+hnr).trim() || 'BAG Object');
@@ -2002,6 +2004,9 @@ function selectSearchResult(id, label){
 // FEATURE INFO PANEL (hover + click)
 // ============================================================
 function showFeatureInfo(p, cfg, type, isClick){
+  // Zorg dat nationalStats altijd berekend is (nodig voor AI interpretatie)
+  if(!_nationalStats || Object.keys(_nationalStats).length === 0) computeNationalStats();
+
   var name = p[cfg.nameField] || p[cfg.codeField] || '-';
   var typeIcon = type === 'buurten' ? 'grid_on' : (type === 'wijken' ? 'grid_view' : 'domain');
   var typeLabel = type === 'buurten' ? 'Buurt' : (type === 'wijken' ? 'Wijk' : 'Gemeente');
@@ -2146,11 +2151,11 @@ function setPrimaryIndicator(key){
 }
 
 function getActiveData(){
-  // Meest gedetailleerde actieve laag
-  if(_layerState.buurten && _buurtData) return _buurtData;
-  if(_layerState.wijken && _wijkData) return _wijkData;
-  if(_layerState.gemeenten && _gemeenteData) return _gemeenteData;
-  return _gemeenteData || _buurtData;
+  // Meest gedetailleerde beschikbare data (ongeacht of laag actief is)
+  // Dit zorgt dat nationalStats altijd berekend kan worden
+  if(_buurtData) return _buurtData;
+  if(_wijkData) return _wijkData;
+  return _gemeenteData;
 }
 
 // Bereken landelijke stats per indicator voor de actieve data
