@@ -2559,6 +2559,142 @@ function buildEducationalAnalysis(findings){
   return h;
 }
 
+// Uitgebreide AI analyse — beschrijft de situatie als een verhaal
+function buildFullAnalysis(findings, props, typeLabel, name){
+  var h = '<div style="margin-top:14px;padding-top:12px;border-top:2px solid rgba(57,255,20,.2)">';
+  h += '<div style="font:700 13px Space Mono,monospace;color:var(--ac);margin-bottom:10px;display:flex;align-items:center;gap:6px">';
+  h += '<span class="mi" style="font-size:20px;color:var(--ac)">psychology</span> AI Gebiedsanalyse';
+  h += '</div>';
+
+  // Verzamel alle data
+  var f = function(k){return findings.find(function(x){return x.key===k})};
+  var fWoz=f('gem_woz_waarde'),fInk=f('gem_inkomen_inwoner'),fDicht=f('bevolkingsdichtheid');
+  var fKoop=f('koopwoningen'),fHuur=f('huurwoningen'),fGas=f('gem_aardgas'),fElek=f('gem_elektriciteit');
+  var f65=f('65plus'),f015=f('0_15'),f1525=f('15_25'),f2545=f('25_45');
+  var fArb=f('arbeidsparticipatie'),fBedr=f('bedrijfsvestigingen'),fAuto=f('personenautos');
+  var fHuis=f('afstand_huisarts'),fSuper=f('afstand_supermarkt'),fEen=f('pct_eengezins');
+  var fInw=f('aantal_inwoners'),fHh=f('huishoudens'),fHhg=f('gem_huishouden_grootte');
+  var fWv=f('woningvoorraad');
+
+  // === GEBIEDSPROFIEL ===
+  h += '<div style="padding:12px 14px;background:rgba(57,255,20,.03);border-radius:10px;border-left:3px solid var(--ac);margin-bottom:10px">';
+  h += '<div style="font:600 12px DM Sans,sans-serif;color:var(--ac);margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi mi-sm" style="font-size:15px">place</span> Gebiedsprofiel: '+name+'</div>';
+  h += '<div style="font-size:11px;color:var(--tx);line-height:1.9">';
+
+  // Beschrijf het type gebied
+  var gebiedType = '';
+  if(fDicht && fDicht.z > 1.5) gebiedType = 'een zeer stedelijk, dichtbebouwd';
+  else if(fDicht && fDicht.z > 0.5) gebiedType = 'een stedelijk';
+  else if(fDicht && fDicht.z < -1) gebiedType = 'een landelijk, ruim opgezet';
+  else if(fDicht && fDicht.z < -0.5) gebiedType = 'een suburbaan';
+  else gebiedType = 'een gemiddeld';
+
+  var woningType = '';
+  if(fKoop && fKoop.z > 0.5 && fEen && fEen.z > 0.5) woningType = 'voornamelijk eengezinskoopwoningen';
+  else if(fHuur && fHuur.z > 0.5) woningType = 'overwegend huurwoningen';
+  else if(fKoop && fKoop.z > 0.5) woningType = 'veel koopwoningen';
+  else if(fEen && fEen.z < -0.5) woningType = 'veel appartementen en meergezinswoningen';
+  else woningType = 'een gemengd woningaanbod';
+
+  h += '<b>'+name+'</b> is '+gebiedType+' gebied met '+woningType+'.';
+
+  // Demografisch profiel
+  if(fInw && fInw.val) h += ' Er wonen <b>'+fInw.val.toLocaleString('nl-NL')+'</b> inwoners';
+  if(fHh && fHh.val) h += ' in <b>'+fHh.val.toLocaleString('nl-NL')+'</b> huishoudens';
+  if(fHhg && fHhg.val) h += ' (gemiddeld '+fHhg.val.toFixed(1)+' personen per huishouden)';
+  h += '.<br><br>';
+
+  // Bevolkingsopbouw
+  var bevolking = [];
+  if(f65 && f65.z > 1) bevolking.push('het gebied is <b style="color:var(--wn)">vergrijsd</b> ('+(f65.val).toFixed(0)+'% is 65+)');
+  if(f015 && f015.z > 0.8) bevolking.push('er wonen relatief <b>veel kinderen</b> (0-15 jaar: '+f015.val.toFixed(0)+'%)');
+  if(f1525 && f1525.z > 1) bevolking.push('er zijn veel <b>jongeren/studenten</b> (15-25: '+f1525.val.toFixed(0)+'%)');
+  if(f2545 && f2545.z > 0.8) bevolking.push('er wonen veel <b>jonge gezinnen/starters</b> (25-45: '+f2545.val.toFixed(0)+'%)');
+  if(f65 && f65.z < -1) bevolking.push('het is een <b style="color:var(--ac)">jong gebied</b> (weinig 65+)');
+  if(bevolking.length > 0) h += 'Qua demografie: '+bevolking.join('; ')+'. ';
+
+  h += '</div></div>';
+
+  // === WELVAART & WONINGMARKT ===
+  var welvaartItems = [];
+  if(fWoz) welvaartItems.push(fWoz.z>1?'De <b>WOZ-waarde</b> is fors boven het landelijk gemiddelde (\u20ac'+Math.round(fWoz.val/1000)+'k vs. \u20ac'+Math.round(fWoz.avg/1000)+'k) \u2014 dit is een dure woonomgeving.':(fWoz.z<-1?'De <b>WOZ-waarde</b> is laag (\u20ac'+Math.round(fWoz.val/1000)+'k vs. landelijk \u20ac'+Math.round(fWoz.avg/1000)+'k) \u2014 woningen zijn hier relatief betaalbaar.':'De <b>WOZ-waarde</b> (\u20ac'+Math.round(fWoz.val/1000)+'k) ligt rond het landelijk gemiddelde.'));
+  if(fInk) welvaartItems.push(fInk.z>1?'Het <b>gemiddeld inkomen</b> is hoog (\u20ac'+Math.round(fInk.val/1000)+'k vs. landelijk \u20ac'+Math.round(fInk.avg/1000)+'k).':(fInk.z<-1?'Het <b>gemiddeld inkomen</b> is laag (\u20ac'+Math.round(fInk.val/1000)+'k vs. landelijk \u20ac'+Math.round(fInk.avg/1000)+'k).':'Het <b>inkomen</b> is gemiddeld.'));
+  if(fArb) welvaartItems.push(fArb.z>0.5?'De <b>arbeidsparticipatie</b> is hoog ('+fArb.val.toFixed(0)+'%).':'');
+  if(fArb && fArb.z<-0.5) welvaartItems.push('De <b>arbeidsparticipatie</b> is laag ('+fArb.val.toFixed(0)+'%)'+(f65&&f65.z>0.5?' \u2014 mogelijk verklaard door het hoge aandeel gepensioneerden.':'.'));
+
+  if(welvaartItems.filter(function(x){return x}).length > 0){
+    h += '<div style="padding:12px 14px;background:rgba(56,189,248,.03);border-radius:10px;border-left:3px solid var(--ai);margin-bottom:10px">';
+    h += '<div style="font:600 12px DM Sans,sans-serif;color:var(--ai);margin-bottom:6px;display:flex;align-items:center;gap:5px"><span class="mi mi-sm" style="font-size:15px">payments</span> Welvaart & Woningmarkt</div>';
+    h += '<div style="font-size:11px;color:var(--tx);line-height:1.9">';
+    welvaartItems.forEach(function(item){if(item) h+= item + '<br>';});
+    // Samenhang WOZ-inkomen
+    if(fWoz && fInk){
+      if(fWoz.z>0.5 && fInk.z>0.5) h += '<br><span style="color:var(--ac)">Samenhang:</span> Hoge woningwaarde \u00e9n hoog inkomen passen bij elkaar \u2014 dit is een <b>welvarend gebied</b>.';
+      else if(fWoz.z<-0.5 && fInk.z<-0.5) h += '<br><span style="color:var(--wn)">Samenhang:</span> Lage woningwaarde \u00e9n laag inkomen \u2014 dit wijst op een <b>sociaal-economisch kwetsbaar gebied</b>.';
+      else if(fWoz.z>1 && fInk.z<0) h += '<br><span style="color:var(--wn)">Let op:</span> Hoge WOZ maar laag inkomen \u2014 mogelijk <b>gentrificatie</b>: woningen worden duurder maar bewoners verdienen minder.';
+    }
+    h += '</div></div>';
+  }
+
+  // === ENERGIE & DUURZAAMHEID ===
+  if(fGas || fElek){
+    h += '<div style="padding:12px 14px;background:rgba(6,182,212,.03);border-radius:10px;border-left:3px solid var(--cyan);margin-bottom:10px">';
+    h += '<div style="font:600 12px DM Sans,sans-serif;color:var(--cyan);margin-bottom:6px;display:flex;align-items:center;gap:5px"><span class="mi mi-sm" style="font-size:15px">bolt</span> Energie & Duurzaamheid</div>';
+    h += '<div style="font-size:11px;color:var(--tx);line-height:1.9">';
+    if(fGas){
+      h += '<b>Gasverbruik:</b> '+formatVal(fGas.val)+' m\u00b3/woning (landelijk gem. '+formatVal(fGas.avg)+' m\u00b3). ';
+      if(fGas.z>1) h += '<span style="color:var(--wn)">Fors bovengemiddeld</span> \u2014 wijst op oudere, slecht ge\u00efsoleerde woningen of grotere woningen.<br>';
+      else if(fGas.z<-1) h += '<span style="color:var(--ac)">Fors ondergemiddeld</span> \u2014 wijst op nieuwbouw, goede isolatie of aansluiting op warmtenet.<br>';
+      else h += 'Rond het gemiddelde.<br>';
+    }
+    if(fElek){
+      h += '<b>Elektriciteit:</b> '+formatVal(fElek.val)+' kWh/woning (landelijk gem. '+formatVal(fElek.avg)+' kWh). ';
+      if(fElek.z>1) h += '<span style="color:var(--wn)">Hoog</span> \u2014 mogelijk veel elektrische verwarming of grotere huishoudens.';
+      else if(fElek.z<-1) h += '<span style="color:var(--ac)">Laag</span> \u2014 zuinig energieverbruik.';
+      else h += 'Rond het gemiddelde.';
+    }
+    h += '</div></div>';
+  }
+
+  // === VOORZIENINGEN ===
+  if(fHuis || fSuper){
+    h += '<div style="padding:12px 14px;background:rgba(245,158,11,.03);border-radius:10px;border-left:3px solid #f59e0b;margin-bottom:10px">';
+    h += '<div style="font:600 12px DM Sans,sans-serif;color:#f59e0b;margin-bottom:6px;display:flex;align-items:center;gap:5px"><span class="mi mi-sm" style="font-size:15px">local_hospital</span> Voorzieningen & Bereikbaarheid</div>';
+    h += '<div style="font-size:11px;color:var(--tx);line-height:1.9">';
+    if(fHuis) h += '<b>Huisarts:</b> gemiddeld '+fHuis.val.toFixed(1)+' km afstand (landelijk '+fHuis.avg.toFixed(1)+' km). '+(fHuis.z>1?'<span style="color:var(--wn)">Relatief ver.</span>':'<span style="color:var(--ac)">Goed bereikbaar.</span>')+'<br>';
+    if(fSuper) h += '<b>Supermarkt:</b> gemiddeld '+fSuper.val.toFixed(1)+' km afstand (landelijk '+fSuper.avg.toFixed(1)+' km). '+(fSuper.z>1?'<span style="color:var(--wn)">Relatief ver.</span>':'<span style="color:var(--ac)">Goed bereikbaar.</span>');
+    h += '</div></div>';
+  }
+
+  // === CONCLUSIE ===
+  var opvallend = findings.filter(function(x){return Math.abs(x.z)>1});
+  var sterk = opvallend.filter(function(x){var rev=REVERSE_KEYS.indexOf(x.key)>=0; return rev?x.z<-1:x.z>1});
+  var zwak = opvallend.filter(function(x){var rev=REVERSE_KEYS.indexOf(x.key)>=0; return rev?x.z>1:x.z<-1});
+
+  h += '<div style="padding:12px 14px;background:rgba(251,191,36,.04);border-radius:10px;border-left:3px solid var(--wn);margin-bottom:6px">';
+  h += '<div style="font:600 12px DM Sans,sans-serif;color:var(--wn);margin-bottom:6px;display:flex;align-items:center;gap:5px"><span class="mi mi-sm" style="font-size:15px">summarize</span> Samenvatting</div>';
+  h += '<div style="font-size:11px;color:var(--tx);line-height:1.9">';
+
+  if(sterk.length > 0){
+    h += '<span style="color:var(--ac)">Sterke punten:</span> '+sterk.map(function(x){return '<b>'+getIndicator(x.key).naam+'</b>'}).join(', ')+'.<br>';
+  }
+  if(zwak.length > 0){
+    h += '<span style="color:var(--dn)">Aandachtspunten:</span> '+zwak.map(function(x){return '<b>'+getIndicator(x.key).naam+'</b>'}).join(', ')+'.<br>';
+  }
+  var gemiddeld = findings.filter(function(x){return Math.abs(x.z)<0.5});
+  if(gemiddeld.length > 0){
+    h += '<span style="color:var(--ai)">Gemiddeld:</span> '+gemiddeld.map(function(x){return getIndicator(x.key).naam}).join(', ')+'.';
+  }
+
+  h += '</div></div>';
+
+  // Disclaimer
+  h += '<div style="padding:4px 10px;font-size:9px;color:var(--mt)"><span class="mi mi-sm" style="font-size:10px;vertical-align:-1px">info</span> Analyse op basis van CBS open data '+_activeYear+'. Vergelijking t.o.v. landelijk gemiddelde van alle '+typeLabel.toLowerCase()+'. Z-scores > |1| zijn opvallend, > |2| uitzonderlijk.</div>';
+
+  h += '</div>';
+  return h;
+}
+
 // Backwards compat — oude aanroepen
 function buildAreaStatsHtml(latlng){
   return buildMultiLevelStatsHtml(latlng);
@@ -2738,25 +2874,61 @@ function showFeatureInfo(p, cfg, type, isClick){
   });
   html += '</div>';
 
-  // Geselecteerde indicatoren met z-score + AI uitleg
-  html += '<div style="padding-top:6px;border-top:1px solid var(--glass-bd)">';
+  // Bij hover: toon actieve indicatoren
+  // Bij klik: toon ALLE beschikbare indicatoren
+  var indicatorKeys = isClick ? INDICATORS.map(function(fm){return fm.key}) : _activeIndicators;
   var findings = [];
-  _activeIndicators.forEach(function(k){
-    var v = p[k];
-    if(v !== undefined && v !== null){
-      html += buildCompareHtml(k, v);
-      // Verzamel voor AI analyse
-      var ns = _nationalStats[k];
-      if(ns && ns.stddev > 0){
-        findings.push({level:typeLabel, naam:name, key:k, val:v, z:(v-ns.avg)/ns.stddev, avg:ns.avg, stddev:ns.stddev});
-      }
-    }
-  });
-  html += '</div>';
 
-  // AI Data-analyse bij klik (niet bij hover)
+  // Groepeer indicatoren per categorie
+  var categories = [
+    {label:'Bevolking', icon:'groups', color:'var(--ac)', keys:['aantal_inwoners','mannen','vrouwen','0_15','15_25','25_45','45_65','65plus','bevolkingsdichtheid','huishoudens','gem_huishouden_grootte']},
+    {label:'Woningen', icon:'home', color:'var(--wn)', keys:['woningvoorraad','gem_woz_waarde','koopwoningen','huurwoningen','pct_eengezins']},
+    {label:'Energie', icon:'bolt', color:'var(--cyan)', keys:['gem_aardgas','gem_elektriciteit']},
+    {label:'Economie', icon:'payments', color:'var(--ai)', keys:['gem_inkomen_inwoner','arbeidsparticipatie','bedrijfsvestigingen','personenautos']},
+    {label:'Voorzieningen', icon:'local_hospital', color:'#f59e0b', keys:['afstand_huisarts','afstand_supermarkt']}
+  ];
+
+  if(isClick){
+    // UITGEBREID: alle indicatoren per categorie
+    categories.forEach(function(cat){
+      var catHtml = '';
+      var catCount = 0;
+      cat.keys.forEach(function(k){
+        var v = p[k];
+        if(v !== undefined && v !== null){
+          catHtml += buildCompareHtml(k, v);
+          catCount++;
+          var ns = _nationalStats[k];
+          if(ns && ns.stddev > 0){
+            findings.push({level:typeLabel, naam:name, key:k, val:v, z:(v-ns.avg)/ns.stddev, avg:ns.avg, stddev:ns.stddev});
+          }
+        }
+      });
+      if(catCount > 0){
+        html += '<div style="padding-top:6px;border-top:1px solid var(--glass-bd);margin-top:4px">';
+        html += '<div style="font:600 10px DM Sans,sans-serif;color:'+cat.color+';margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">'+cat.icon+'</span> '+cat.label+' <span style="font-weight:400;color:var(--mt)">('+catCount+')</span></div>';
+        html += catHtml + '</div>';
+      }
+    });
+  } else {
+    // Hover: alleen actieve indicatoren
+    html += '<div style="padding-top:6px;border-top:1px solid var(--glass-bd)">';
+    _activeIndicators.forEach(function(k){
+      var v = p[k];
+      if(v !== undefined && v !== null){
+        html += buildCompareHtml(k, v);
+        var ns = _nationalStats[k];
+        if(ns && ns.stddev > 0){
+          findings.push({level:typeLabel, naam:name, key:k, val:v, z:(v-ns.avg)/ns.stddev, avg:ns.avg, stddev:ns.stddev});
+        }
+      }
+    });
+    html += '</div>';
+  }
+
+  // AI Data-analyse bij klik
   if(isClick && findings.length > 0){
-    html += buildEducationalAnalysis(findings);
+    html += buildFullAnalysis(findings, p, typeLabel, name);
   }
 
   document.getElementById('infoContent').innerHTML = html;
@@ -3412,34 +3584,78 @@ function getSelectedBuurtFilter(){
 }
 
 function onFilterChange(){
-  // Wijk- en buurtfilter opnieuw opbouwen bij gemeente-wijziging
+  // Cascade: wijk- en buurtfilter opnieuw opbouwen bij gemeente-wijziging
   if(_wijkData) buildWijkFilter();
   if(_buurtData) buildBuurtFilter();
   updateMap();
   updateActiveStats();
+  // Zoom naar meest specifieke selectie
   zoomToSelection();
+  // Laad data automatisch als het kan
+  autoLoadForSelection();
+}
+
+function autoLoadForSelection(){
+  // Automatisch buurt/wijkdata laden als er een gemeente geselecteerd is
+  if(_selectedGemeenten.length > 0 && !_buurtData){
+    fetch(BUURTEN_URL).then(function(r){return r.json()}).then(function(d){
+      _buurtData = d;
+      document.getElementById('dsBuurten').textContent = d.features.length.toLocaleString('nl-NL') + ' features';
+      buildBuurtFilter();
+    }).catch(function(){});
+  }
+  if(_selectedGemeenten.length > 0 && !_wijkData){
+    fetch(WIJKEN_URL).then(function(r){return r.json()}).then(function(d){
+      _wijkData = d;
+      document.getElementById('dsWijken').textContent = d.features.length.toLocaleString('nl-NL') + ' features';
+      buildWijkFilter();
+    }).catch(function(){});
+  }
 }
 
 function zoomToSelection(){
-  if(_selectedGemeenten.length === 0 && _selectedBuurten.length === 0) return;
-  var src = _buurtData || _wijkData || _gemeenteData;
-  if(!src) return;
-  var bounds = [];
-  var gemSet = _selectedGemeenten.length > 0 ? new Set(_selectedGemeenten) : null;
-  var buurtSet = getSelectedBuurtFilter();
+  // Zoom naar meest specifieke niveau: buurt > wijk > gemeente
+  var hasGem = _selectedGemeenten.length > 0;
+  var hasWijk = _selectedWijken.length > 0;
+  var hasBuurt = _selectedBuurten.length > 0;
+  if(!hasGem && !hasWijk && !hasBuurt) return;
 
-  src.features.forEach(function(f){
-    var p = f.properties;
-    var match = false;
-    if(buurtSet !== 'all' && p.buurtnaam && buurtSet.has(p.buurtnaam)){
-      if(!gemSet || gemSet.has(p.gemeentenaam)) match = true;
-    } else if(gemSet && gemSet.has(p.gemeentenaam)){
-      match = true;
-    }
-    if(match && f.geometry){
-      try{ bounds.push(L.geoJSON(f).getBounds()); }catch(e){}
-    }
-  });
+  var bounds = [];
+
+  // Buurt-niveau: meest specifiek
+  if(hasBuurt && _buurtData){
+    var buurtSet = getSelectedBuurtFilter();
+    var gemSet = hasGem ? new Set(_selectedGemeenten) : null;
+    _buurtData.features.forEach(function(f){
+      var p = f.properties;
+      if(!p.buurtnaam || !buurtSet.has(p.buurtnaam)) return;
+      if(gemSet && !gemSet.has(p.gemeentenaam)) return;
+      if(f.geometry) try{ bounds.push(L.geoJSON(f).getBounds()); }catch(e){}
+    });
+  }
+  // Wijk-niveau
+  else if(hasWijk && _wijkData){
+    var wijkSet = getSelectedWijkFilter();
+    var gemSet2 = hasGem ? new Set(_selectedGemeenten) : null;
+    _wijkData.features.forEach(function(f){
+      var p = f.properties;
+      if(!p.wijknaam || wijkSet === 'all') return;
+      // Wijk namen bevatten ' (gemeente)' suffix — match raw naam
+      if(!wijkSet.has(p.wijknaam)) return;
+      if(gemSet2 && !gemSet2.has(p.gemeentenaam)) return;
+      if(f.geometry) try{ bounds.push(L.geoJSON(f).getBounds()); }catch(e){}
+    });
+  }
+  // Gemeente-niveau
+  else if(hasGem && _gemeenteData){
+    var gemNames = new Set(_selectedGemeenten);
+    _gemeenteData.features.forEach(function(f){
+      if(gemNames.has(f.properties.gemeentenaam) && f.geometry){
+        try{ bounds.push(L.geoJSON(f).getBounds()); }catch(e){}
+      }
+    });
+  }
+
   if(bounds.length){
     var combined = bounds[0];
     bounds.forEach(function(b){ combined.extend(b); });
