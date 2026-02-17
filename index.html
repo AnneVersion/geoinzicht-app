@@ -54,6 +54,30 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);overf
 .search-item:hover{background:rgba(57,255,20,.08);padding-left:16px}
 .search-item:last-child{border:none}
 
+/* Multi-select dropdowns */
+.ms-wrap{position:relative}
+.ms-box{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--glass);border-radius:8px;cursor:pointer;transition:all .2s;font-size:12px;color:var(--tx);border:1px solid transparent}
+.ms-box:hover{border-color:rgba(57,255,20,.2)}
+.ms-dropdown{display:none;position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--p);backdrop-filter:blur(20px);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:500;max-height:260px;overflow:hidden;border:1px solid var(--glass-bd);animation:slideDown .15s ease-out}
+.ms-dropdown.open{display:block}
+.ms-search{width:100%;padding:8px 12px;background:rgba(255,255,255,.04);border:none;border-bottom:1px solid var(--glass-bd);font:400 12px 'DM Sans',sans-serif;color:var(--tx);outline:none}
+.ms-search::placeholder{color:var(--mt)}
+.ms-search:focus{background:rgba(57,255,20,.04)}
+.ms-options{max-height:200px;overflow-y:auto}
+.ms-options::-webkit-scrollbar{width:4px}
+.ms-options::-webkit-scrollbar-thumb{background:var(--glass-bd);border-radius:4px}
+.ms-opt{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:11px;color:var(--tx);transition:background .1s;border-bottom:1px solid rgba(255,255,255,.03)}
+.ms-opt:hover{background:rgba(57,255,20,.06)}
+.ms-opt.selected{background:rgba(57,255,20,.1);color:var(--ac)}
+.ms-opt .ms-check{width:14px;height:14px;border:1.5px solid var(--mt);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;transition:all .15s}
+.ms-opt.selected .ms-check{border-color:var(--ac);background:var(--ac);color:var(--bg)}
+.ms-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.ms-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;background:rgba(57,255,20,.1);color:var(--ac);font:600 10px 'DM Sans',sans-serif;border-radius:12px;cursor:pointer;transition:background .15s}
+.ms-chip:hover{background:rgba(57,255,20,.2)}
+.ms-chip .mi{font-size:12px}
+.ms-loadbtn{width:100%;margin-top:8px;padding:9px 12px;background:linear-gradient(135deg,rgba(57,255,20,.15),rgba(6,182,212,.1));color:var(--ac);border:1px solid rgba(57,255,20,.2);border-radius:8px;font:600 12px 'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s}
+.ms-loadbtn:hover{background:linear-gradient(135deg,rgba(57,255,20,.25),rgba(6,182,212,.15));transform:translateY(-1px)}
+
 /* Tabs */
 .tabs{display:flex;background:rgba(10,15,26,.3)}
 .tab{flex:1;padding:12px 8px;text-align:center;font-size:11px;font-weight:600;color:var(--mt);cursor:pointer;border-bottom:2px solid transparent;transition:all .3s cubic-bezier(.4,0,.2,1);letter-spacing:.3px;text-transform:uppercase;position:relative}
@@ -297,10 +321,32 @@ select option{background:var(--bg);color:var(--tx)}
         </div>
       </div>
 
-      <div class="sh"><span class="mi">filter_alt</span> Filter gemeente</div>
-      <select id="gemeenteFilter" onchange="filterGemeente()">
-        <option value="all">Alle gemeenten</option>
-      </select>
+      <div class="sh"><span class="mi">filter_alt</span> Filter</div>
+      <!-- Multi-select Gemeente -->
+      <div class="ms-wrap" id="msGemeente">
+        <div class="ms-box" onclick="toggleMsDropdown('msGemeente')">
+          <span class="ms-label" id="msGemLabel">Alle gemeenten</span>
+          <span class="mi mi-sm" style="color:var(--mt)">expand_more</span>
+        </div>
+        <div class="ms-dropdown" id="msGemDropdown">
+          <input class="ms-search" placeholder="Zoek gemeente..." oninput="filterMsOptions('msGemeente',this.value)">
+          <div class="ms-options" id="msGemOptions"></div>
+        </div>
+        <div class="ms-chips" id="msGemChips"></div>
+      </div>
+      <!-- Multi-select Buurt -->
+      <div class="ms-wrap" id="msBuurt" style="margin-top:6px">
+        <div class="ms-box" onclick="toggleMsDropdown('msBuurt')">
+          <span class="ms-label" id="msBuurtLabel">Alle buurten</span>
+          <span class="mi mi-sm" style="color:var(--mt)">expand_more</span>
+        </div>
+        <div class="ms-dropdown" id="msBuurtDropdown">
+          <input class="ms-search" placeholder="Zoek buurt..." oninput="filterMsOptions('msBuurt',this.value)">
+          <div class="ms-options" id="msBuurtOptions"></div>
+        </div>
+        <div class="ms-chips" id="msBuurtChips"></div>
+      </div>
+      <button class="ms-loadbtn" id="loadSelectionBtn" onclick="loadSelection()" style="display:none"><span class="mi mi-sm">download</span> Laad selectie (BAG + CBS)</button>
 
       <div class="sh"><span class="mi">palette</span> Basemap</div>
       <div style="display:flex;gap:5px;flex-wrap:wrap" id="basemapBtns"></div>
@@ -641,12 +687,19 @@ function renderChoropleth(type){
   if(type === 'wijken' && _wijkLayer){ _map.removeLayer(_wijkLayer); _wijkLayer = null; }
 
   var indicator = _activeIndicators.length > 0 ? _activeIndicators[0] : 'aantal_inwoners';
-  var gemFilter = document.getElementById('gemeenteFilter').value;
+  var gemFilter = getSelectedGemeenteFilter();
+  var buurtFilter = getSelectedBuurtFilter();
+
+  function featureMatchesFilter(p){
+    if(gemFilter !== 'all' && !gemFilter.has(p.gemeentenaam)) return false;
+    if(buurtFilter !== 'all' && p.buurtnaam && !buurtFilter.has(p.buurtnaam)) return false;
+    return true;
+  }
 
   var vals = [];
   data.features.forEach(function(f){
     var p = f.properties;
-    if(gemFilter !== 'all' && p.gemeentenaam !== gemFilter) return;
+    if(!featureMatchesFilter(p)) return;
     var v = p[indicator];
     if(v !== undefined && v !== null && v >= 0) vals.push(v);
   });
@@ -660,7 +713,7 @@ function renderChoropleth(type){
   var newLayer = L.geoJSON(data, {
     style: function(feature){
       var p = feature.properties;
-      if(gemFilter !== 'all' && p.gemeentenaam !== gemFilter)
+      if(!featureMatchesFilter(p))
         return {fillColor:'#111',fillOpacity:0.05,weight:0.2,color:'#222',opacity:0.2};
       var v = p[indicator];
       if(v === undefined || v === null || v < 0)
@@ -2414,46 +2467,218 @@ function updateMap(){
   updateActiveStats();
 }
 
-function filterGemeente(){
-  updateMap();
-  updateActiveStats();
-  var gem = document.getElementById('gemeenteFilter').value;
-  if(gem !== 'all'){
-    // Gebruik beschikbare data voor bounds (buurt > wijk > gemeente)
-    var src = _buurtData || _wijkData || _gemeenteData;
-    if(src){
-      var bounds = [];
-      src.features.forEach(function(f){
-        if(f.properties.gemeentenaam === gem && f.geometry){
-          try{ bounds.push(L.geoJSON(f).getBounds()); }catch(e){}
-        }
-      });
-      if(bounds.length){
-        var combined = bounds[0];
-        bounds.forEach(function(b){combined.extend(b)});
-        _map.fitBounds(combined,{padding:[20,20]});
-      }
-    }
+// ============================================================
+// MULTI-SELECT DROPDOWNS
+// ============================================================
+var _selectedGemeenten = [];  // Geselecteerde gemeentenamen
+var _selectedBuurten = [];    // Geselecteerde buurtnamen
+var _allBuurtNamen = [];      // Alle beschikbare buurtnamen
+
+function toggleMsDropdown(wrapId){
+  var dd = document.getElementById(wrapId === 'msGemeente' ? 'msGemDropdown' : 'msBuurtDropdown');
+  var wasOpen = dd.classList.contains('open');
+  // Sluit alle dropdowns
+  document.querySelectorAll('.ms-dropdown').forEach(function(d){ d.classList.remove('open'); });
+  if(!wasOpen){
+    dd.classList.add('open');
+    dd.querySelector('.ms-search').focus();
   }
 }
 
-function buildGemeenteFilter(){
-  var sel = document.getElementById('gemeenteFilter');
-  var sorted = Array.from(_gemeenteNamen).sort();
-  // Gebruik DOM API i.p.v. innerHTML+= om issues met speciale tekens te voorkomen
-  sel.innerHTML = '';
-  var allOpt = document.createElement('option');
-  allOpt.value = 'all';
-  allOpt.textContent = 'Alle gemeenten ('+sorted.length+')';
-  sel.appendChild(allOpt);
-  sorted.forEach(function(g){
-    var opt = document.createElement('option');
-    opt.value = g;
-    opt.textContent = g;
-    sel.appendChild(opt);
-  });
-  document.getElementById('sGemeenten').textContent = sorted.length;
+function filterMsOptions(wrapId, query){
+  var optsEl = document.getElementById(wrapId === 'msGemeente' ? 'msGemOptions' : 'msBuurtOptions');
+  var q = query.toLowerCase().trim();
+  var items = optsEl.children;
+  for(var i = 0; i < items.length; i++){
+    var text = items[i].getAttribute('data-name').toLowerCase();
+    items[i].style.display = (!q || text.indexOf(q) >= 0) ? '' : 'none';
+  }
 }
+
+function toggleMsOption(wrapId, name){
+  var arr = wrapId === 'msGemeente' ? _selectedGemeenten : _selectedBuurten;
+  var idx = arr.indexOf(name);
+  if(idx >= 0) arr.splice(idx, 1);
+  else arr.push(name);
+  updateMsUI(wrapId);
+  onFilterChange();
+}
+
+function removeMsChip(wrapId, name){
+  var arr = wrapId === 'msGemeente' ? _selectedGemeenten : _selectedBuurten;
+  var idx = arr.indexOf(name);
+  if(idx >= 0) arr.splice(idx, 1);
+  updateMsUI(wrapId);
+  onFilterChange();
+}
+
+function updateMsUI(wrapId){
+  var isGem = wrapId === 'msGemeente';
+  var arr = isGem ? _selectedGemeenten : _selectedBuurten;
+  var label = document.getElementById(isGem ? 'msGemLabel' : 'msBuurtLabel');
+  var chipsEl = document.getElementById(isGem ? 'msGemChips' : 'msBuurtChips');
+  var optsEl = document.getElementById(isGem ? 'msGemOptions' : 'msBuurtOptions');
+
+  // Label
+  if(arr.length === 0) label.textContent = isGem ? 'Alle gemeenten' : 'Alle buurten';
+  else if(arr.length === 1) label.textContent = arr[0];
+  else label.textContent = arr.length + (isGem ? ' gemeenten' : ' buurten');
+
+  // Chips
+  var ch = '';
+  arr.forEach(function(n){
+    ch += '<span class="ms-chip" onclick="removeMsChip(\''+wrapId+'\',\''+n.replace(/'/g,"\\'")+'\')">' + n + ' <span class="mi">close</span></span>';
+  });
+  chipsEl.innerHTML = ch;
+
+  // Options selected state
+  var items = optsEl.children;
+  for(var i = 0; i < items.length; i++){
+    var n = items[i].getAttribute('data-name');
+    items[i].classList.toggle('selected', arr.indexOf(n) >= 0);
+  }
+
+  // Toon "Laad selectie" knop als er iets geselecteerd is
+  var btn = document.getElementById('loadSelectionBtn');
+  if(btn) btn.style.display = (_selectedGemeenten.length > 0 || _selectedBuurten.length > 0) ? 'flex' : 'none';
+}
+
+function buildGemeenteFilter(){
+  var sorted = Array.from(_gemeenteNamen).sort();
+  document.getElementById('sGemeenten').textContent = sorted.length;
+  var optsEl = document.getElementById('msGemOptions');
+  var html = '';
+  sorted.forEach(function(g){
+    html += '<div class="ms-opt" data-name="'+g+'" onclick="toggleMsOption(\'msGemeente\',\''+g.replace(/'/g,"\\'")+'\')">';
+    html += '<span class="ms-check"><span class="mi" style="font-size:10px">check</span></span>';
+    html += '<span>'+g+'</span></div>';
+  });
+  optsEl.innerHTML = html;
+}
+
+function buildBuurtFilter(){
+  if(!_buurtData) return;
+  var names = new Set();
+  _buurtData.features.forEach(function(f){
+    var n = f.properties.buurtnaam;
+    var g = f.properties.gemeentenaam;
+    if(n){
+      // Filter op geselecteerde gemeenten als er een selectie is
+      if(_selectedGemeenten.length === 0 || _selectedGemeenten.indexOf(g) >= 0){
+        names.add(n + ' ('+g+')');
+      }
+    }
+  });
+  _allBuurtNamen = Array.from(names).sort();
+  var optsEl = document.getElementById('msBuurtOptions');
+  var html = '';
+  _allBuurtNamen.forEach(function(n){
+    html += '<div class="ms-opt" data-name="'+n.replace(/"/g,'&quot;')+'" onclick="toggleMsOption(\'msBuurt\',\''+n.replace(/'/g,"\\'")+'\')">';
+    html += '<span class="ms-check"><span class="mi" style="font-size:10px">check</span></span>';
+    html += '<span style="font-size:10px">'+n+'</span></div>';
+  });
+  optsEl.innerHTML = html;
+}
+
+function getSelectedGemeenteFilter(){
+  // Retourneert 'all' of Set van gemeentenamen
+  if(_selectedGemeenten.length === 0) return 'all';
+  return new Set(_selectedGemeenten);
+}
+
+function getSelectedBuurtFilter(){
+  if(_selectedBuurten.length === 0) return 'all';
+  // Extract buurtnaam zonder ' (gemeente)' suffix
+  var names = new Set();
+  _selectedBuurten.forEach(function(n){
+    var m = n.match(/^(.+?) \(/);
+    if(m) names.add(m[1]);
+    else names.add(n);
+  });
+  return names;
+}
+
+function onFilterChange(){
+  // Buurtfilter opnieuw opbouwen bij gemeente-wijziging
+  if(_buurtData) buildBuurtFilter();
+  updateMap();
+  updateActiveStats();
+  zoomToSelection();
+}
+
+function zoomToSelection(){
+  if(_selectedGemeenten.length === 0 && _selectedBuurten.length === 0) return;
+  var src = _buurtData || _wijkData || _gemeenteData;
+  if(!src) return;
+  var bounds = [];
+  var gemSet = _selectedGemeenten.length > 0 ? new Set(_selectedGemeenten) : null;
+  var buurtSet = getSelectedBuurtFilter();
+
+  src.features.forEach(function(f){
+    var p = f.properties;
+    var match = false;
+    if(buurtSet !== 'all' && p.buurtnaam && buurtSet.has(p.buurtnaam)){
+      if(!gemSet || gemSet.has(p.gemeentenaam)) match = true;
+    } else if(gemSet && gemSet.has(p.gemeentenaam)){
+      match = true;
+    }
+    if(match && f.geometry){
+      try{ bounds.push(L.geoJSON(f).getBounds()); }catch(e){}
+    }
+  });
+  if(bounds.length){
+    var combined = bounds[0];
+    bounds.forEach(function(b){ combined.extend(b); });
+    _map.fitBounds(combined,{padding:[20,20]});
+  }
+}
+
+// Laad alle data voor de selectie
+function loadSelection(){
+  toast('Data laden voor selectie...');
+  // 1. Buurtdata laden als dat nog niet is gebeurd
+  var p1 = _buurtData ? Promise.resolve() : fetch(BUURTEN_URL).then(function(r){return r.json()}).then(function(d){
+    _buurtData = d;
+    document.getElementById('dsBuurten').textContent = d.features.length.toLocaleString('nl-NL') + ' features';
+    buildBuurtFilter();
+  });
+  // 2. Wijkdata laden
+  var p2 = _wijkData ? Promise.resolve() : fetch(WIJKEN_URL).then(function(r){return r.json()}).then(function(d){
+    _wijkData = d;
+    document.getElementById('dsWijken').textContent = d.features.length.toLocaleString('nl-NL') + ' features';
+  });
+
+  Promise.all([p1, p2]).then(function(){
+    // Render choropleth met alle data
+    if(!_layerState.buurten){
+      _layerState.buurten = true;
+      document.querySelector('[data-layer="buurten"]').classList.add('active');
+    }
+    renderChoropleth('buurten');
+    updateActiveStats();
+    // BAG laden als actief
+    if(_layerState.bag){
+      _bagLastBbox = '';
+      loadBagVectors();
+    }
+    // Zoom naar selectie
+    zoomToSelection();
+    toast('Data geladen \u2714');
+  }).catch(function(e){
+    toast('Fout bij laden: '+e.message);
+    console.error('loadSelection error:', e);
+  });
+}
+
+// Sluit dropdowns bij klik buiten
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.ms-wrap')){
+    document.querySelectorAll('.ms-dropdown').forEach(function(d){ d.classList.remove('open'); });
+  }
+});
+
+// Compat wrapper voor oude code
+function filterGemeente(){ onFilterChange(); }
 
 function switchTab(tab){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.tab===tab)});
