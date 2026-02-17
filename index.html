@@ -860,27 +860,43 @@ function loadBagVectors(){
     updateBagStatusCountsFromData();
   }
 
-  // Altijd ophalen voor het huidige viewport (verse data)
+  // Ophalen met paginering — doorladen tot alle features binnen zijn
   _bagLoading = true;
   var bbox = b.getSouth()+','+b.getWest()+','+b.getNorth()+','+b.getEast()+',EPSG:4326';
-  var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count=2000&srsName=EPSG:4326&BBOX='+bbox;
-  fetch(url).then(function(r){return r.json()}).then(function(d){
-    var features = d.features || [];
-    // Sla op in cache per tile
-    var key = bagTileKey(b.getCenter().lat, b.getCenter().lng);
-    _bagCache[key] = features;
-    saveBagCache();
-    // Combineer met alle gecachte data in viewport
-    _bagVectorData = getCachedBagFeatures();
-    renderBagVectors();
-    updateBagStatusCountsFromData();
-    _bagLoading = false;
-    var totalCached = 0; for(var k in _bagCache) totalCached += _bagCache[k].length;
-    toast(_bagVectorData.length+' adressen in beeld ('+totalCached+' in cache)');
-  }).catch(function(e){
-    console.warn('BAG WFS error:',e);
-    _bagLoading = false;
-  });
+  var key = bagTileKey(b.getCenter().lat, b.getCenter().lng);
+  var pageSize = 2000;
+  var allFeatures = [];
+
+  function fetchPage(startIndex){
+    var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+pageSize+'&startIndex='+startIndex+'&srsName=EPSG:4326&BBOX='+bbox;
+    fetch(url).then(function(r){return r.json()}).then(function(d){
+      var features = d.features || [];
+      allFeatures = allFeatures.concat(features);
+      // Tussentijds renderen (eerste batch meteen tonen)
+      _bagCache[key] = allFeatures;
+      saveBagCache();
+      _bagVectorData = getCachedBagFeatures();
+      renderBagVectors();
+      updateBagStatusCountsFromData();
+      if(features.length >= pageSize){
+        // Er zijn mogelijk meer features — volgende pagina laden
+        toast(allFeatures.length+' adressen geladen, meer ophalen\u2026');
+        fetchPage(startIndex + pageSize);
+      } else {
+        // Klaar — alle features binnen
+        _bagLoading = false;
+        var totalCached = 0; for(var k in _bagCache) totalCached += _bagCache[k].length;
+        toast(allFeatures.length+' adressen geladen ('+totalCached+' in cache)');
+      }
+    }).catch(function(e){
+      console.warn('BAG WFS error (page '+startIndex+'):',e);
+      _bagLoading = false;
+      if(allFeatures.length > 0){
+        toast(allFeatures.length+' adressen geladen (fout bij verdere pagina)');
+      }
+    });
+  }
+  fetchPage(0);
 }
 
 function updateBagStatusCountsFromData(){
@@ -941,8 +957,8 @@ function showBagFeatureInfo(p, latlng){
   if(p.status) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">info</span> Status</span><span class="info-val" style="color:'+bagStatusToColor(p.status)+'">'+p.status+'</span></div>';
   if(p.pandstatus) html += '<div class="info-row"><span><span class="mi mi-sm" style="vertical-align:-3px">apartment</span> Pand</span><span class="info-val" style="font-size:10px">'+p.pandstatus+'</span></div>';
 
-  // === VERGELIJKING: dit adres vs buurt/viewport ===
-  html += buildBagCompareHtml(p);
+  // === VERGELIJKING: dit adres vs buurt ===
+  html += buildBagCompareHtml(p, latlng);
 
   // === CBS STATISTIEKEN: alle niveaus (buurt, wijk, gemeente, landelijk) ===
   html += buildMultiLevelStatsHtml(latlng);
@@ -978,36 +994,108 @@ function percentileRank(sorted, val){
   return Math.round(count/sorted.length*100);
 }
 
-// Vergelijk BAG-specifieke waarden met uitgebreide statistieken
-function buildBagCompareHtml(p){
-  if(!_bagVectorData || !_bagVectorData.length) return '';
-  var html = '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
-  html += '<div style="font:700 12px \'Space Mono\',monospace;color:var(--ac);margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">compare_arrows</span> Statistische analyse ('+_bagVectorData.length+' adressen)</div>';
+// Controleer of een punt in een polygoon valt (ray-casting)
+function pointInPolygon(lat, lng, latlngs){
+  var inside = false;
+  // latlngs kan genest zijn (multipolygon), pak de buitenste ring
+  var ring = latlngs;
+  if(ring[0] && ring[0][0] && typeof ring[0][0] !== 'number' && ring[0][0].lat !== undefined) ring = ring[0];
+  for(var i=0,j=ring.length-1; i<ring.length; j=i++){
+    var yi = ring[i].lat, xi = ring[i].lng;
+    var yj = ring[j].lat, xj = ring[j].lng;
+    if(((yi>lat)!==(yj>lat))&&(lng<(xj-xi)*(lat-yi)/(yj-yi)+xi)) inside=!inside;
+  }
+  return inside;
+}
 
-  var bouwjaren = [], oppervlaktes = [];
+// Filter BAG features die in een buurt-polygoon vallen
+function getBagFeaturesInBuurt(buurtLayer){
+  if(!buurtLayer || !_bagVectorData || !_bagVectorData.length) return [];
+  var latlngs;
+  try{ latlngs = buurtLayer.getLatLngs ? buurtLayer.getLatLngs() : null; }catch(e){ return []; }
+  if(!latlngs) return [];
+  // Snelle bounding-box pre-filter
+  var bounds;
+  try{ bounds = buurtLayer.getBounds(); }catch(e){ return []; }
+  var result = [];
   _bagVectorData.forEach(function(f){
-    var fp = f.properties;
-    if(fp.bouwjaar && fp.bouwjaar > 1000) bouwjaren.push(fp.bouwjaar);
-    if(fp.oppervlakte && fp.oppervlakte > 0) oppervlaktes.push(fp.oppervlakte);
+    var c = f.geometry.coordinates;
+    var lng = c[0], lat = c[1];
+    if(lat >= bounds.getSouth() && lat <= bounds.getNorth() && lng >= bounds.getWest() && lng <= bounds.getEast()){
+      if(pointInPolygon(lat, lng, latlngs)) result.push(f);
+    }
+  });
+  return result;
+}
+
+// Vergelijk BAG adres met statistieken — eerst buurt, dan alle geladen
+function buildBagCompareHtml(p, latlng){
+  if(!_bagVectorData || !_bagVectorData.length) return '';
+  var html = '';
+
+  // Zoek de buurt waar dit adres in ligt
+  var buurtFeature = findFeatureAtPoint(_buurtLayer, latlng);
+  var buurtLayerObj = null;
+  var buurtNaam = null;
+  var buurtFeatures = null;
+
+  if(_buurtLayer && buurtFeature){
+    buurtNaam = buurtFeature.properties.buurtnaam || buurtFeature.properties.buurtcode || 'buurt';
+    // Vind de Leaflet layer voor deze buurt
+    _buurtLayer.eachLayer(function(sub){
+      if(sub.feature === buurtFeature) buurtLayerObj = sub;
+    });
+    if(buurtLayerObj){
+      buurtFeatures = getBagFeaturesInBuurt(buurtLayerObj);
+    }
+  }
+
+  // Bouw de vergelijking: buurt-niveau als beschikbaar, anders viewport
+  var levels = [];
+  if(buurtFeatures && buurtFeatures.length > 5){
+    levels.push({name:'Buurt: '+buurtNaam, features:buurtFeatures, icon:'grid_on', color:'var(--ac)'});
+  }
+  if(_bagVectorData.length > (buurtFeatures ? buurtFeatures.length : 0) + 10){
+    levels.push({name:'Alle geladen adressen ('+_bagVectorData.length+')', features:_bagVectorData, icon:'map', color:'var(--ai)'});
+  }
+  if(!levels.length){
+    levels.push({name:'Geladen adressen ('+_bagVectorData.length+')', features:_bagVectorData, icon:'map', color:'var(--ac)'});
+  }
+
+  levels.forEach(function(level){
+    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
+    html += '<div style="font:700 12px \'Space Mono\',monospace;color:'+level.color+';margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">'+level.icon+'</span> '+level.name+'</div>';
+
+    var bouwjaren = [], oppervlaktes = [];
+    level.features.forEach(function(f){
+      var fp = f.properties;
+      if(fp.bouwjaar && fp.bouwjaar > 1000) bouwjaren.push(fp.bouwjaar);
+      if(fp.oppervlakte && fp.oppervlakte > 0) oppervlaktes.push(fp.oppervlakte);
+    });
+
+    if(p.bouwjaar && bouwjaren.length > 5){
+      bouwjaren.sort(function(a,b){return a-b});
+      var st = calcStats(bouwjaren);
+      var z = st.stddev > 0 ? (p.bouwjaar - st.mean)/st.stddev : 0;
+      var pRank = percentileRank(bouwjaren, p.bouwjaar);
+      html += buildFullStatCard('event','Bouwjaar',p.bouwjaar,'',st,z,pRank,'bouwjaar');
+    }
+
+    if(p.oppervlakte && oppervlaktes.length > 5){
+      oppervlaktes.sort(function(a,b){return a-b});
+      var st = calcStats(oppervlaktes);
+      var z = st.stddev > 0 ? (p.oppervlakte - st.mean)/st.stddev : 0;
+      var pRank = percentileRank(oppervlaktes, p.oppervlakte);
+      html += buildFullStatCard('square_foot','Oppervlakte',p.oppervlakte,'m\u00b2',st,z,pRank,'oppervlakte');
+    }
+
+    if(bouwjaren.length <= 5 && oppervlaktes.length <= 5){
+      html += '<div style="font-size:11px;color:var(--mt);padding:6px 0">Te weinig adressen (' +level.features.length+ ') voor betrouwbare statistiek. Laad meer adressen door in te zoomen op dit gebied.</div>';
+    }
+
+    html += '</div>';
   });
 
-  if(p.bouwjaar && bouwjaren.length > 5){
-    bouwjaren.sort(function(a,b){return a-b});
-    var st = calcStats(bouwjaren);
-    var z = st.stddev > 0 ? (p.bouwjaar - st.mean)/st.stddev : 0;
-    var pRank = percentileRank(bouwjaren, p.bouwjaar);
-    html += buildFullStatCard('event','Bouwjaar',p.bouwjaar,'',st,z,pRank,'bouwjaar');
-  }
-
-  if(p.oppervlakte && oppervlaktes.length > 5){
-    oppervlaktes.sort(function(a,b){return a-b});
-    var st = calcStats(oppervlaktes);
-    var z = st.stddev > 0 ? (p.oppervlakte - st.mean)/st.stddev : 0;
-    var pRank = percentileRank(oppervlaktes, p.oppervlakte);
-    html += buildFullStatCard('square_foot','Oppervlakte',p.oppervlakte,'m\u00b2',st,z,pRank,'oppervlakte');
-  }
-
-  html += '</div>';
   return html;
 }
 
