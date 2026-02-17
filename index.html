@@ -869,12 +869,11 @@ function loadBagVectors(){
     updateBagStatusCountsFromData();
   }
 
-  // Stap 1: Vraag totaal aantal features op via resultType=hits (XML)
+  // Laad ALLE adressen parallel — eerst totaal opvragen, dan alle pagina's tegelijk
   _bagLoading = true;
   var bbox = b.getSouth()+','+b.getWest()+','+b.getNorth()+','+b.getEast()+',EPSG:4326';
   var key = bagTileKey(b.getCenter().lat, b.getCenter().lng);
   var pageSize = 2000;
-  var allFeatures = [];
 
   // UI: toon progress bar
   var progEl = document.getElementById('bagLoadProgress');
@@ -882,6 +881,10 @@ function loadBagVectors(){
   var progPct = document.getElementById('bagLoadPct');
   var progBar = document.getElementById('bagLoadBar');
   if(progEl) progEl.style.display = 'block';
+  var pagesLoaded = 0;
+  var totalPages = 0;
+  var totalExpected = 0;
+  var allFeatures = [];
 
   function updateProgress(loaded, total){
     if(!progText) return;
@@ -891,62 +894,82 @@ function loadBagVectors(){
     progBar.style.width = pct+'%';
   }
 
+  function renderCurrent(){
+    _bagCache[key] = allFeatures;
+    saveBagCache();
+    _bagVectorData = getCachedBagFeatures();
+    renderBagVectors();
+    updateBagStatusCountsFromData();
+  }
+
   function finishLoading(){
     _bagLoading = false;
     if(progEl) progEl.style.display = 'none';
     var totalCached = 0; for(var k in _bagCache) totalCached += _bagCache[k].length;
-    // Update cache info tekst
     var cacheText = document.getElementById('bagCacheText');
     if(cacheText) cacheText.textContent = 'Cache: '+totalCached.toLocaleString('nl-NL')+' adressen';
     toast(allFeatures.length.toLocaleString('nl-NL')+' adressen geladen \u2714');
   }
 
-  // Haal totaal op via hits request (XML)
+  // Stap 1: Haal totaal op via hits (XML)
   var hitsUrl = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&resultType=hits&srsName=EPSG:4326&BBOX='+bbox;
-  var totalExpected = 0;
+  updateProgress(0, 0);
 
   fetch(hitsUrl).then(function(r){return r.text()}).then(function(xml){
-    // Parse numberMatched uit de XML
-    var match = xml.match(/numberMatched="(\d+)"/);
-    totalExpected = match ? parseInt(match[1]) : 0;
+    var m = xml.match(/numberMatched="(\d+)"/);
+    totalExpected = m ? parseInt(m[1]) : 0;
+    if(totalExpected === 0){ finishLoading(); return; }
+    totalPages = Math.ceil(totalExpected / pageSize);
     updateProgress(0, totalExpected);
-    // Start het laden van de features
-    fetchPage(0);
-  }).catch(function(){
-    // Kon totaal niet ophalen, laad gewoon door
-    fetchPage(0);
-  });
+    progText.textContent = '0 / '+totalExpected.toLocaleString('nl-NL')+' adressen ('+totalPages+' pagina\u2019s parallel)';
 
-  function fetchPage(startIndex){
-    var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+pageSize+'&startIndex='+startIndex+'&srsName=EPSG:4326&BBOX='+bbox;
-    fetch(url).then(function(r){return r.json()}).then(function(d){
-      var features = d.features || [];
-      allFeatures = allFeatures.concat(features);
-      // Update progress
-      updateProgress(allFeatures.length, totalExpected);
-      // Cache opslaan en tussentijds renderen
-      _bagCache[key] = allFeatures;
-      saveBagCache();
-      _bagVectorData = getCachedBagFeatures();
-      renderBagVectors();
-      updateBagStatusCountsFromData();
-      if(features.length >= pageSize){
-        // Meer pagina's beschikbaar — doorladen
-        fetchPage(startIndex + pageSize);
-      } else {
-        // Klaar
-        finishLoading();
-      }
-    }).catch(function(e){
-      console.warn('BAG WFS error (page '+startIndex+'):',e);
-      if(allFeatures.length > 0){
-        finishLoading();
-      } else {
-        _bagLoading = false;
-        if(progEl) progEl.style.display = 'none';
-      }
+    // Stap 2: Alle pagina's parallel fetchen
+    var pageResults = new Array(totalPages);
+    var promises = [];
+    for(var i = 0; i < totalPages; i++){
+      (function(pageIdx){
+        var startIdx = pageIdx * pageSize;
+        var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+pageSize+'&startIndex='+startIdx+'&srsName=EPSG:4326&BBOX='+bbox;
+        var p = fetch(url).then(function(r){return r.json()}).then(function(d){
+          pageResults[pageIdx] = d.features || [];
+          pagesLoaded++;
+          // Tel alle tot nu toe ontvangen features
+          var loadedSoFar = 0;
+          for(var j=0;j<pageResults.length;j++) if(pageResults[j]) loadedSoFar += pageResults[j].length;
+          updateProgress(loadedSoFar, totalExpected);
+          // Tussentijds renderen elke 2 pagina's of bij laatste
+          if(pagesLoaded % 2 === 0 || pagesLoaded === totalPages){
+            allFeatures = [];
+            for(var j=0;j<pageResults.length;j++) if(pageResults[j]) allFeatures = allFeatures.concat(pageResults[j]);
+            renderCurrent();
+          }
+        }).catch(function(e){
+          console.warn('BAG WFS pagina '+pageIdx+' error:',e);
+          pageResults[pageIdx] = [];
+          pagesLoaded++;
+        });
+        promises.push(p);
+      })(i);
+    }
+
+    // Stap 3: Wacht tot alles klaar is
+    Promise.all(promises).then(function(){
+      allFeatures = [];
+      for(var j=0;j<pageResults.length;j++) if(pageResults[j]) allFeatures = allFeatures.concat(pageResults[j]);
+      renderCurrent();
+      finishLoading();
     });
-  }
+
+  }).catch(function(e){
+    console.warn('BAG WFS hits error:',e);
+    // Fallback: laad gewoon de eerste pagina
+    var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+pageSize+'&srsName=EPSG:4326&BBOX='+bbox;
+    fetch(url).then(function(r){return r.json()}).then(function(d){
+      allFeatures = d.features || [];
+      renderCurrent();
+      finishLoading();
+    }).catch(function(){ _bagLoading=false; if(progEl) progEl.style.display='none'; });
+  });
 }
 
 function updateBagStatusCountsFromData(){
