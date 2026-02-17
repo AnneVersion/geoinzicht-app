@@ -119,11 +119,15 @@ select option{background:var(--bg);color:var(--tx)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* Info panel */
-.info-panel{position:absolute;top:12px;right:12px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border:none;border-radius:var(--radius);padding:16px;z-index:500;min-width:280px;max-width:380px;max-height:calc(100vh - 40px);overflow-y:auto;display:none;box-shadow:var(--shadow);animation:slideIn .3s cubic-bezier(.4,0,.2,1)}
+.info-panel{position:absolute;top:12px;right:12px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border:none;border-radius:var(--radius);padding:18px;z-index:500;min-width:320px;max-width:420px;max-height:calc(100vh - 40px);overflow-y:auto;display:none;box-shadow:var(--shadow);animation:slideIn .3s cubic-bezier(.4,0,.2,1)}
 @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 .info-panel.show{display:block}
+.info-panel::-webkit-scrollbar{width:6px}
+.info-panel::-webkit-scrollbar-track{background:transparent}
+.info-panel::-webkit-scrollbar-thumb{background:rgba(57,255,20,.15);border-radius:3px}
+.info-panel::-webkit-scrollbar-thumb:hover{background:rgba(57,255,20,.3)}
 .info-panel h3{font:700 14px 'Space Mono',monospace;color:var(--ac);margin-bottom:10px;display:flex;align-items:center;gap:6px}
-.info-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px;border-bottom:1px solid rgba(55,65,90,.3);transition:background .15s}
+.info-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid rgba(55,65,90,.3);transition:background .15s}
 .info-row:hover{background:rgba(255,255,255,.02);padding-left:4px}
 .info-row:last-child{border:none}
 .info-val{font:700 12px 'Space Mono',monospace;color:var(--ai)}
@@ -978,7 +982,7 @@ function percentileRank(sorted, val){
 function buildBagCompareHtml(p){
   if(!_bagVectorData || !_bagVectorData.length) return '';
   var html = '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
-  html += '<div style="font:700 11px \'Space Mono\',monospace;color:var(--ac);margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm">compare_arrows</span> Statistische analyse ('+_bagVectorData.length+' adressen)</div>';
+  html += '<div style="font:700 12px \'Space Mono\',monospace;color:var(--ac);margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">compare_arrows</span> Statistische analyse ('+_bagVectorData.length+' adressen)</div>';
 
   var bouwjaren = [], oppervlaktes = [];
   _bagVectorData.forEach(function(f){
@@ -1009,11 +1013,11 @@ function buildBagCompareHtml(p){
 
 // Uitgebreide statistiekkaart
 function buildFullStatCard(icon,label,val,unit,st,z,pRank,type){
-  var h = '<div style="margin-bottom:12px;padding:10px;background:rgba(15,20,35,.5);border-radius:8px;border-left:3px solid '+getBarColor(z)+'">';
+  var h = '<div style="margin-bottom:14px;padding:12px;background:rgba(15,20,35,.5);border-radius:10px;border-left:3px solid '+getBarColor(z)+'">';
   // Header: naam + waarde
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
-  h += '<span style="font:600 12px \'DM Sans\',sans-serif;color:var(--tx);display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:15px;color:var(--ai)">'+icon+'</span>'+label+'</span>';
-  h += '<span style="font:700 16px \'Space Mono\',monospace;color:var(--ac)">'+val+' <span style="font-size:10px;color:var(--mt)">'+unit+'</span></span>';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+  h += '<span style="font:600 13px \'DM Sans\',sans-serif;color:var(--tx);display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px;color:var(--ai)">'+icon+'</span>'+label+'</span>';
+  h += '<span style="font:700 17px \'Space Mono\',monospace;color:var(--ac)">'+val+' <span style="font-size:11px;color:var(--mt)">'+unit+'</span></span>';
   h += '</div>';
 
   // Normaalverdeling SVG
@@ -1021,9 +1025,9 @@ function buildFullStatCard(icon,label,val,unit,st,z,pRank,type){
   h += buildDistSvg(z, distType);
 
   // Percentiel + z-score badges
-  h += '<div style="display:flex;gap:6px;margin:4px 0;align-items:center">';
-  h += '<div style="padding:3px 8px;border-radius:6px;background:rgba(57,255,20,.08);font:700 11px Space Mono,monospace;color:var(--ac)">P'+pRank+'</div>';
-  h += '<div style="font-size:10px;color:var(--mt)">';
+  h += '<div style="display:flex;gap:8px;margin:6px 0;align-items:center">';
+  h += '<div style="padding:4px 10px;border-radius:6px;background:rgba(57,255,20,.08);font:700 12px Space Mono,monospace;color:var(--ac)">P'+pRank+'</div>';
+  h += '<div style="font-size:11px;color:var(--mt);line-height:1.4">';
   if(type==='bouwjaar'){
     h += pRank>=50 ? 'Nieuwer dan '+pRank+'% van de panden' : 'Ouder dan '+(100-pRank)+'% van de panden';
   } else {
@@ -1032,7 +1036,7 @@ function buildFullStatCard(icon,label,val,unit,st,z,pRank,type){
   h += '</div></div>';
 
   // Statistieken tabel
-  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:6px 0;font-size:9px">';
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:8px 0;font-size:10px">';
   var cells = [
     {l:'Gemiddeld',v:Math.round(st.mean),c:'var(--ai)'},
     {l:'Mediaan',v:Math.round(st.median),c:'var(--ai)'},
@@ -1048,16 +1052,16 @@ function buildFullStatCard(icon,label,val,unit,st,z,pRank,type){
     {l:'CV',v:st.cv.toFixed(0)+'%',c:'var(--mt)'}
   ];
   cells.forEach(function(c){
-    h += '<div style="text-align:center;padding:3px 2px;background:rgba(255,255,255,.03);border-radius:4px">';
-    h += '<div style="color:var(--mt);font-size:8px;white-space:nowrap">'+c.l+'</div>';
-    h += '<div style="font:700 10px Space Mono,monospace;color:'+c.c+'">'+c.v+'</div></div>';
+    h += '<div style="text-align:center;padding:4px 3px;background:rgba(255,255,255,.03);border-radius:5px">';
+    h += '<div style="color:var(--mt);font-size:9px;white-space:nowrap">'+c.l+'</div>';
+    h += '<div style="font:700 11px Space Mono,monospace;color:'+c.c+'">'+c.v+'</div></div>';
   });
   h += '</div>';
 
   // Interpretatie blok
-  h += '<div style="padding:6px 8px;background:rgba(56,189,248,.04);border-radius:6px;border-left:2px solid var(--ai);margin-top:4px">';
-  h += '<div style="font:600 10px \'DM Sans\',sans-serif;color:var(--ai);margin-bottom:3px;display:flex;align-items:center;gap:3px"><span class="mi mi-sm" style="font-size:13px">school</span> Wat betekent dit?</div>';
-  h += '<div style="font-size:10px;color:var(--mt);line-height:1.6">';
+  h += '<div style="padding:8px 10px;background:rgba(56,189,248,.04);border-radius:8px;border-left:2px solid var(--ai);margin-top:6px">';
+  h += '<div style="font:600 11px \'DM Sans\',sans-serif;color:var(--ai);margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:15px">school</span> Wat betekent dit?</div>';
+  h += '<div style="font-size:11px;color:var(--mt);line-height:1.7">';
 
   // Z-score uitleg
   h += '<b style="color:var(--tx)">z-score = '+z.toFixed(2)+'</b>: ';
@@ -1197,7 +1201,7 @@ function buildMultiLevelStatsHtml(latlng){
     var p = feature.properties;
     var naam = p[l.cfg.nameField] || p[l.cfg.codeField] || '-';
     html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
-    html += '<div style="font:700 11px \'Space Mono\',monospace;color:'+l.color+';margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="color:'+l.color+'">'+l.icon+'</span> '+l.name+': '+naam+'</div>';
+    html += '<div style="font:700 12px \'Space Mono\',monospace;color:'+l.color+';margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px;color:'+l.color+'">'+l.icon+'</span> '+l.name+': '+naam+'</div>';
     _activeIndicators.forEach(function(k){
       var v = p[k];
       if(v === undefined || v === null) return;
@@ -1220,10 +1224,10 @@ function buildMultiLevelStatsHtml(latlng){
 
 // Genereer educatieve data-interpretatie
 function buildEducationalAnalysis(findings){
-  var h = '<div style="margin-top:12px;padding-top:10px;border-top:2px solid rgba(57,255,20,.2)">';
-  h += '<div style="font:700 12px \'Space Mono\',monospace;color:var(--ac);margin-bottom:8px;display:flex;align-items:center;gap:6px">';
-  h += '<span class="mi" style="font-size:18px;color:var(--ac)">psychology</span> Data-analyse';
-  h += '<span style="font:400 9px DM Sans,sans-serif;color:var(--mt);text-transform:none;letter-spacing:0">(automatisch afgeleid uit statistiek)</span>';
+  var h = '<div style="margin-top:14px;padding-top:12px;border-top:2px solid rgba(57,255,20,.2)">';
+  h += '<div style="font:700 13px \'Space Mono\',monospace;color:var(--ac);margin-bottom:10px;display:flex;align-items:center;gap:6px">';
+  h += '<span class="mi" style="font-size:20px;color:var(--ac)">psychology</span> Data-analyse';
+  h += '<span style="font:400 10px DM Sans,sans-serif;color:var(--mt);text-transform:none;letter-spacing:0">(automatisch afgeleid uit statistiek)</span>';
   h += '</div>';
 
   // Stap 1: Opvallende waarden identificeren
@@ -1231,9 +1235,9 @@ function buildEducationalAnalysis(findings){
   var gemiddeld = findings.filter(function(f){return Math.abs(f.z)<=0.5});
   var licht = findings.filter(function(f){return Math.abs(f.z)>0.5 && Math.abs(f.z)<=1});
 
-  h += '<div style="padding:8px 10px;background:rgba(57,255,20,.03);border-radius:8px;border-left:3px solid var(--ac);margin-bottom:8px">';
-  h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--ac);margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">looks_one</span> Stap 1: Opvallende waarden identificeren</div>';
-  h += '<div style="font-size:10px;color:var(--mt);line-height:1.7">';
+  h += '<div style="padding:10px 12px;background:rgba(57,255,20,.03);border-radius:10px;border-left:3px solid var(--ac);margin-bottom:10px">';
+  h += '<div style="font:600 12px DM Sans,sans-serif;color:var(--ac);margin-bottom:6px;display:flex;align-items:center;gap:5px"><span class="mi mi-sm" style="font-size:15px">looks_one</span> Stap 1: Opvallende waarden identificeren</div>';
+  h += '<div style="font-size:11px;color:var(--mt);line-height:1.8">';
   h += 'We vergelijken elke indicator met het <b style="color:var(--tx)">landelijk gemiddelde</b> en berekenen de <b style="color:var(--ai)">z-score</b> = (waarde \u2212 gemiddelde) \u00f7 standaarddeviatie.<br>';
   if(opvallend.length > 0){
     h += '<br><b style="color:var(--wn)">'+opvallend.length+' opvallende waarde'+(opvallend.length>1?'n':'')+'</b> gevonden (|z| > 1):';
@@ -1253,9 +1257,9 @@ function buildEducationalAnalysis(findings){
   h += '</div></div>';
 
   // Stap 2: Patroonherkenning
-  h += '<div style="padding:8px 10px;background:rgba(56,189,248,.03);border-radius:8px;border-left:3px solid var(--ai);margin-bottom:8px">';
-  h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--ai);margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">looks_two</span> Stap 2: Patronen herkennen</div>';
-  h += '<div style="font-size:10px;color:var(--mt);line-height:1.7">';
+  h += '<div style="padding:10px 12px;background:rgba(56,189,248,.03);border-radius:10px;border-left:3px solid var(--ai);margin-bottom:10px">';
+  h += '<div style="font:600 12px DM Sans,sans-serif;color:var(--ai);margin-bottom:6px;display:flex;align-items:center;gap:5px"><span class="mi mi-sm" style="font-size:15px">looks_two</span> Stap 2: Patronen herkennen</div>';
+  h += '<div style="font-size:11px;color:var(--mt);line-height:1.8">';
 
   // Zoek correlaties/patronen
   var hWoz = findings.find(function(f){return f.key==='gem_woz_waarde'});
@@ -1296,9 +1300,9 @@ function buildEducationalAnalysis(findings){
   h += '</div></div>';
 
   // Stap 3: Conclusie
-  h += '<div style="padding:8px 10px;background:rgba(251,191,36,.03);border-radius:8px;border-left:3px solid var(--wn);margin-bottom:8px">';
-  h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--wn);margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">looks_3</span> Stap 3: Conclusie formuleren</div>';
-  h += '<div style="font-size:10px;color:var(--mt);line-height:1.7">';
+  h += '<div style="padding:10px 12px;background:rgba(251,191,36,.03);border-radius:10px;border-left:3px solid var(--wn);margin-bottom:10px">';
+  h += '<div style="font:600 12px DM Sans,sans-serif;color:var(--wn);margin-bottom:6px;display:flex;align-items:center;gap:5px"><span class="mi mi-sm" style="font-size:15px">looks_3</span> Stap 3: Conclusie formuleren</div>';
+  h += '<div style="font-size:11px;color:var(--mt);line-height:1.8">';
 
   // Gebiedsprofiel samenstellen
   var level = findings[0] ? findings[0].level : 'Gebied';
@@ -1333,9 +1337,9 @@ function buildEducationalAnalysis(findings){
   h += '</div></div>';
 
   // Methode-uitleg (educatief)
-  h += '<div style="padding:8px 10px;background:rgba(100,116,139,.05);border-radius:8px;border-left:3px solid var(--mt)">';
-  h += '<div style="font:600 10px DM Sans,sans-serif;color:var(--mt);margin-bottom:3px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">help</span> Hoe werkt deze analyse?</div>';
-  h += '<div style="font-size:9px;color:var(--mt);line-height:1.6">';
+  h += '<div style="padding:10px 12px;background:rgba(100,116,139,.05);border-radius:10px;border-left:3px solid var(--mt)">';
+  h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--mt);margin-bottom:5px;display:flex;align-items:center;gap:5px"><span class="mi mi-sm" style="font-size:15px">help</span> Hoe werkt deze analyse?</div>';
+  h += '<div style="font-size:10px;color:var(--mt);line-height:1.7">';
   h += 'Deze analyse is <b style="color:var(--tx)">geen AI</b> maar <b style="color:var(--tx)">regelgebaseerde statistiek</b>:<br>';
   h += '1. <b>Data verzamelen</b>: CBS kerncijfers van alle '+(_nationalStats[_activeIndicators[0]]?_nationalStats[_activeIndicators[0]].count:'')+' gebieden in Nederland<br>';
   h += '2. <b>Normaliseren</b>: z-score = (waarde \u2212 \u03bc) \u00f7 \u03c3 vertelt hoeveel standaarddeviaties van het gemiddelde<br>';
@@ -1626,7 +1630,7 @@ function computeNationalStats(){
 
 // Genereer SVG normaalverdeling curve met positie-marker
 function buildDistSvg(zScore, distType){
-  var w=180,h=48,pad=4;
+  var w=220,h=56,pad=5;
   var pts=[];
   // Bel-curve genereren (of scheef als distType aangeeft)
   var skew = distType==='rechts scheef'?0.6:(distType==='links scheef'?-0.6:0);
@@ -1664,8 +1668,8 @@ function buildDistSvg(zScore, distType){
   svg += '<line x1="'+mx+'" y1="2" x2="'+mx+'" y2="'+(h-2)+'" stroke="#39ff14" stroke-width="2"/>';
   svg += '<circle cx="'+mx+'" cy="6" r="3" fill="#39ff14"/>';
   // Sigma labels
-  svg += '<text x="'+pad+'" y="'+(h-1)+'" font-size="7" fill="rgba(226,232,240,0.4)" font-family="Space Mono,monospace">-3\u03c3</text>';
-  svg += '<text x="'+(w-pad-16)+'" y="'+(h-1)+'" font-size="7" fill="rgba(226,232,240,0.4)" font-family="Space Mono,monospace">+3\u03c3</text>';
+  svg += '<text x="'+pad+'" y="'+(h-1)+'" font-size="8" fill="rgba(226,232,240,0.5)" font-family="Space Mono,monospace">-3\u03c3</text>';
+  svg += '<text x="'+(w-pad-18)+'" y="'+(h-1)+'" font-size="8" fill="rgba(226,232,240,0.5)" font-family="Space Mono,monospace">+3\u03c3</text>';
   svg += '</svg>';
   return svg;
 }
@@ -1701,31 +1705,31 @@ function buildCompareHtml(key, val){
   var pos = range > 0 ? Math.min(100, Math.max(0, (val - ns.min) / range * 100)) : 50;
   var avgPos = range > 0 ? Math.min(100, Math.max(0, (ns.avg - ns.min) / range * 100)) : 50;
 
-  var html = '<div style="margin-bottom:10px;padding:8px 10px;background:rgba(15,20,35,.5);border-radius:8px;border-left:3px solid '+getBarColor(zScore)+'">';
+  var html = '<div style="margin-bottom:12px;padding:10px 12px;background:rgba(15,20,35,.5);border-radius:10px;border-left:3px solid '+getBarColor(zScore)+'">';
   // Regel 1: naam + waarde
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
-  html += '<span style="font:600 12px \'DM Sans\',sans-serif;color:var(--tx);display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:15px;color:var(--ai)">'+fm.icon+'</span>'+fm.naam+'</span>';
-  html += '<span style="font:700 14px \'Space Mono\',monospace;color:var(--ac)">'+formatVal(val)+'</span>';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+  html += '<span style="font:600 13px \'DM Sans\',sans-serif;color:var(--tx);display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px;color:var(--ai)">'+fm.icon+'</span>'+fm.naam+'</span>';
+  html += '<span style="font:700 15px \'Space Mono\',monospace;color:var(--ac)">'+formatVal(val)+' <span style="font-size:10px;font-weight:400;color:var(--mt)">'+fm.eenheid+'</span></span>';
   html += '</div>';
   // Regel 2: vergelijking
-  html += '<div style="font-size:11px;color:var(--mt);margin-bottom:2px">';
-  html += '<span class="'+diffClass+'" style="font-weight:700">'+pctSign+pctDiff.toFixed(0)+'%</span> '+diffLabel+' gem.';
-  html += ' <span style="opacity:.5">('+formatVal(ns.avg)+' '+fm.eenheid+')</span>';
-  html += ' &middot; <span style="opacity:.5">z='+zScore.toFixed(1)+'</span>';
+  html += '<div style="font-size:12px;color:var(--mt);margin-bottom:4px;line-height:1.5">';
+  html += '<span class="'+diffClass+'" style="font-weight:700">'+pctSign+pctDiff.toFixed(0)+'%</span> '+diffLabel+' gemiddeld';
+  html += ' <span style="opacity:.6">(gem. '+formatVal(ns.avg)+' '+fm.eenheid+')</span>';
+  html += ' &middot; <span style="opacity:.6">z = '+zScore.toFixed(1)+'</span>';
   html += '</div>';
   // Normaalverdeling SVG
   html += buildDistSvg(zScore, ns.distType);
   // Interpretatie
-  html += '<div style="font-size:10px;color:var(--mt);margin-top:1px">'+interpretZScore(zScore, key, fm)+'</div>';
+  html += '<div style="font-size:11px;color:var(--mt);margin-top:3px;line-height:1.5">'+interpretZScore(zScore, key, fm)+'</div>';
   // Bar met positie
-  html += '<div class="info-bar" style="height:5px;margin:4px 0 0;border-radius:3px">';
+  html += '<div class="info-bar" style="height:6px;margin:6px 0 0;border-radius:3px">';
   html += '<div class="info-bar-fill" style="width:'+pos+'%;background:'+getBarColor(zScore)+';border-radius:3px"></div>';
-  html += '<div class="info-bar-marker" style="left:'+avgPos+'%;top:-2px;height:9px;width:1.5px;background:var(--tx);opacity:.5" title="Gem: '+formatVal(ns.avg)+'"></div>';
+  html += '<div class="info-bar-marker" style="left:'+avgPos+'%;top:-2px;height:10px;width:2px;background:var(--tx);opacity:.5" title="Gem: '+formatVal(ns.avg)+'"></div>';
   html += '</div>';
   // min — max
-  html += '<div style="display:flex;justify-content:space-between;margin-top:2px">';
-  html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.6">'+formatVal(ns.min)+'</span>';
-  html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.6">'+formatVal(ns.max)+'</span>';
+  html += '<div style="display:flex;justify-content:space-between;margin-top:3px">';
+  html += '<span style="font:400 9px \'Space Mono\',monospace;color:var(--mt);opacity:.6">'+formatVal(ns.min)+'</span>';
+  html += '<span style="font:400 9px \'Space Mono\',monospace;color:var(--mt);opacity:.6">'+formatVal(ns.max)+'</span>';
   html += '</div>';
   html += '</div>';
   return html;
