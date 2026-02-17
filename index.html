@@ -119,7 +119,7 @@ select option{background:var(--bg);color:var(--tx)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* Info panel */
-.info-panel{position:absolute;top:12px;right:12px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border:none;border-radius:var(--radius);padding:18px;z-index:500;min-width:320px;max-width:420px;max-height:calc(100vh - 40px);overflow-y:auto;display:none;box-shadow:var(--shadow);animation:slideIn .3s cubic-bezier(.4,0,.2,1)}
+.info-panel{position:absolute;top:12px;right:12px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.5);-webkit-backdrop-filter:blur(20px) saturate(1.5);border:none;border-radius:var(--radius);padding:18px;z-index:500;min-width:320px;max-width:420px;max-height:calc(100vh - 40px);overflow-y:scroll;display:none;box-shadow:var(--shadow);animation:slideIn .3s cubic-bezier(.4,0,.2,1);overscroll-behavior:contain}
 @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 .info-panel.show{display:block}
 .info-panel::-webkit-scrollbar{width:6px}
@@ -455,7 +455,7 @@ select option{background:var(--bg);color:var(--tx)}
         <h3 id="infoBuurtNaam" style="margin:0;flex:1"><span class="mi mi-sm">place</span> -</h3>
         <div style="display:flex;gap:4px;flex-shrink:0">
           <button class="btn-s" onclick="printInfoPanel()" title="Exporteer als rapport" style="padding:4px 10px;font-size:10px;cursor:pointer;border:1px solid var(--glass-bd);background:var(--glass);color:var(--tx);border-radius:6px;display:flex;align-items:center;gap:3px"><span class="mi" style="font-size:14px">print</span>Rapport</button>
-          <button class="btn-s" onclick="document.getElementById('infoPanel').classList.remove('show')" title="Sluiten" style="padding:4px 8px;cursor:pointer;border:1px solid var(--glass-bd);background:var(--glass);color:var(--mt);border-radius:6px"><span class="mi" style="font-size:14px">close</span></button>
+          <button class="btn-s" onclick="_infoPinned=false;document.getElementById('infoPanel').classList.remove('show')" title="Sluiten" style="padding:4px 8px;cursor:pointer;border:1px solid var(--glass-bd);background:var(--glass);color:var(--mt);border-radius:6px"><span class="mi" style="font-size:14px">close</span></button>
         </div>
       </div>
       <div id="infoContent"></div>
@@ -532,6 +532,7 @@ var _bagVectorData = null; // raw WFS features cache
 var _bagLoading = false;
 var _pandWmsLayer = null;
 var _searchMarker = null;
+var _infoPinned = false; // Panel vastzetten bij klik
 var _gemeenteNamen = new Set();
 var _layerState = {gemeenten: true, buurten: false, wijken: false, bag: false, panden: false};
 var _nationalStats = {}; // Cache: {key: {min, max, avg, median, stddev, count, skewness, distType}}
@@ -543,9 +544,14 @@ function initMap(){
   _map = L.map('map',{center:[52.1,5.1],zoom:8,zoomControl:false,preferCanvas:true});
   L.control.zoom({position:'bottomright'}).addTo(_map);
   setBasemap('dark');
+  // Voorkom dat scrollen in het infopanel de kaart zoomt
+  var infoPanel = document.getElementById('infoPanel');
+  L.DomEvent.disableScrollPropagation(infoPanel);
+  L.DomEvent.disableClickPropagation(infoPanel);
 
   _map.on('click', function(e){
     if(_map.getZoom() >= 16 && _pandWmsLayer && !_bagVectorLayer){
+      _infoPinned = true;
       pandGetFeatureInfo(e);
     }
   });
@@ -643,10 +649,11 @@ function renderChoropleth(type){
       layer.on('mouseout', function(e){
         if(_layerState.bag || _layerState.panden) return;
         newLayer.resetStyle(e.target);
-        document.getElementById('infoPanel').classList.remove('show');
+        if(!_infoPinned) document.getElementById('infoPanel').classList.remove('show');
       });
       layer.on('click', function(){
-        // Click altijd toestaan (ook gedimd), toon info
+        // Click: toon info en pin het panel vast
+        _infoPinned = true;
         showFeatureInfo(feature.properties, cfg, type, true);
       });
     }
@@ -841,39 +848,29 @@ function getCachedBagFeatures(){
   return features;
 }
 
-// Laad BAG vectordata via WFS voor het huidige viewport
+// Laad BAG vectordata via WFS — altijd alles in viewport laden
+var BAG_MAX_FEATURES = 50000; // Max features om browser niet te crashen
 function loadBagVectors(){
   if(!_map || _bagLoading) return;
   loadBagCache();
 
-  // Bij laag zoomniveau: toon alleen gecachte data
-  if(_map.getZoom() < 16){
-    var cached = getCachedBagFeatures();
-    if(cached.length > 0){
-      _bagVectorData = cached;
-      renderBagVectors();
-      updateBagStatusCountsFromData();
-    } else if(_bagVectorLayer){
-      _map.removeLayer(_bagVectorLayer);_bagVectorLayer=null;
-    }
-    return;
-  }
-
-  // Check of we al data hebben voor dit viewport
-  var b = _map.getBounds();
-  var centerKey = bagTileKey(b.getCenter().lat, b.getCenter().lng);
-  if(_bagCache[centerKey]){
-    // Gebruik cache + eventueel aanvullen
-    _bagVectorData = getCachedBagFeatures();
+  // Altijd eerst cache tonen (instant)
+  var cached = getCachedBagFeatures();
+  if(cached.length > 0){
+    _bagVectorData = cached;
     renderBagVectors();
     updateBagStatusCountsFromData();
   }
 
-  // Laad ALLE adressen parallel — eerst totaal opvragen, dan alle pagina's tegelijk
-  _bagLoading = true;
+  var b = _map.getBounds();
   var bbox = b.getSouth()+','+b.getWest()+','+b.getNorth()+','+b.getEast()+',EPSG:4326';
   var key = bagTileKey(b.getCenter().lat, b.getCenter().lng);
+
+  // Als deze tile al in cache zit, niet opnieuw laden
+  if(_bagCache[key] && _bagCache[key].length > 0) return;
+
   var pageSize = 2000;
+  _bagLoading = true;
 
   // UI: toon progress bar
   var progEl = document.getElementById('bagLoadProgress');
@@ -919,9 +916,17 @@ function loadBagVectors(){
     var m = xml.match(/numberMatched="(\d+)"/);
     totalExpected = m ? parseInt(m[1]) : 0;
     if(totalExpected === 0){ finishLoading(); return; }
-    totalPages = Math.ceil(totalExpected / pageSize);
-    updateProgress(0, totalExpected);
-    progText.textContent = '0 / '+totalExpected.toLocaleString('nl-NL')+' adressen ('+totalPages+' pagina\u2019s parallel)';
+
+    // Te veel features? Begrens en waarschuw
+    var loadTotal = totalExpected;
+    if(totalExpected > BAG_MAX_FEATURES){
+      loadTotal = BAG_MAX_FEATURES;
+      toast(totalExpected.toLocaleString('nl-NL')+' adressen in beeld \u2014 laadt eerste '+BAG_MAX_FEATURES.toLocaleString('nl-NL')+', zoom in voor alles');
+    }
+
+    totalPages = Math.ceil(loadTotal / pageSize);
+    updateProgress(0, loadTotal);
+    progText.textContent = '0 / '+loadTotal.toLocaleString('nl-NL')+' adressen ('+totalPages+' pagina\u2019s parallel)';
 
     // Stap 2: Alle pagina's parallel fetchen
     var pageResults = new Array(totalPages);
@@ -936,9 +941,9 @@ function loadBagVectors(){
           // Tel alle tot nu toe ontvangen features
           var loadedSoFar = 0;
           for(var j=0;j<pageResults.length;j++) if(pageResults[j]) loadedSoFar += pageResults[j].length;
-          updateProgress(loadedSoFar, totalExpected);
-          // Tussentijds renderen elke 2 pagina's of bij laatste
-          if(pagesLoaded % 2 === 0 || pagesLoaded === totalPages){
+          updateProgress(loadedSoFar, loadTotal);
+          // Tussentijds renderen elke 3 pagina's of bij laatste
+          if(pagesLoaded % 3 === 0 || pagesLoaded === totalPages){
             allFeatures = [];
             for(var j=0;j<pageResults.length;j++) if(pageResults[j]) allFeatures = allFeatures.concat(pageResults[j]);
             renderCurrent();
@@ -962,7 +967,7 @@ function loadBagVectors(){
 
   }).catch(function(e){
     console.warn('BAG WFS hits error:',e);
-    // Fallback: laad gewoon de eerste pagina
+    // Fallback: laad de eerste pagina
     var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+pageSize+'&srsName=EPSG:4326&BBOX='+bbox;
     fetch(url).then(function(r){return r.json()}).then(function(d){
       allFeatures = d.features || [];
@@ -1011,6 +1016,7 @@ function renderBagVectors(){
     onEachFeature: function(feature, layer){
       layer.on('click', function(e){
         L.DomEvent.stopPropagation(e);
+        _infoPinned = true;
         showBagFeatureInfo(feature.properties, e.latlng);
       });
     }
