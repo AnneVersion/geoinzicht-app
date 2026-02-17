@@ -850,8 +850,12 @@ function getCachedBagFeatures(){
 
 // Laad BAG vectordata via WFS — altijd alles in viewport laden
 var BAG_MAX_FEATURES = 50000; // Max features om browser niet te crashen
+var _bagLastBbox = ''; // Laatst geladen BBOX om dubbel laden te voorkomen
+var _bagAbort = null; // AbortController voor lopende requests
 function loadBagVectors(){
-  if(!_map || _bagLoading) return;
+  if(!_map) return;
+  // Als er al een load bezig is, annuleer die
+  if(_bagLoading && _bagAbort){ _bagAbort.abort(); _bagAbort = null; _bagLoading = false; }
   loadBagCache();
 
   // Altijd eerst cache tonen (instant)
@@ -863,14 +867,16 @@ function loadBagVectors(){
   }
 
   var b = _map.getBounds();
-  var bbox = b.getSouth()+','+b.getWest()+','+b.getNorth()+','+b.getEast()+',EPSG:4326';
+  var bbox = b.getSouth().toFixed(5)+','+b.getWest().toFixed(5)+','+b.getNorth().toFixed(5)+','+b.getEast().toFixed(5)+',EPSG:4326';
   var key = bagTileKey(b.getCenter().lat, b.getCenter().lng);
 
-  // Als deze tile al in cache zit, niet opnieuw laden
-  if(_bagCache[key] && _bagCache[key].length > 0) return;
+  // Skip als we exact dezelfde BBOX al geladen hebben
+  if(bbox === _bagLastBbox) return;
 
   var pageSize = 2000;
   _bagLoading = true;
+  _bagAbort = new AbortController();
+  var signal = _bagAbort.signal;
 
   // UI: toon progress bar
   var progEl = document.getElementById('bagLoadProgress');
@@ -901,6 +907,7 @@ function loadBagVectors(){
 
   function finishLoading(){
     _bagLoading = false;
+    _bagLastBbox = bbox;
     if(progEl) progEl.style.display = 'none';
     var totalCached = 0; for(var k in _bagCache) totalCached += _bagCache[k].length;
     var cacheText = document.getElementById('bagCacheText');
@@ -912,7 +919,7 @@ function loadBagVectors(){
   var hitsUrl = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&resultType=hits&srsName=EPSG:4326&BBOX='+bbox;
   updateProgress(0, 0);
 
-  fetch(hitsUrl).then(function(r){return r.text()}).then(function(xml){
+  fetch(hitsUrl,{signal:signal}).then(function(r){return r.text()}).then(function(xml){
     var m = xml.match(/numberMatched="(\d+)"/);
     totalExpected = m ? parseInt(m[1]) : 0;
     if(totalExpected === 0){ finishLoading(); return; }
@@ -935,7 +942,7 @@ function loadBagVectors(){
       (function(pageIdx){
         var startIdx = pageIdx * pageSize;
         var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+pageSize+'&startIndex='+startIdx+'&srsName=EPSG:4326&BBOX='+bbox;
-        var p = fetch(url).then(function(r){return r.json()}).then(function(d){
+        var p = fetch(url,{signal:signal}).then(function(r){return r.json()}).then(function(d){
           pageResults[pageIdx] = d.features || [];
           pagesLoaded++;
           // Tel alle tot nu toe ontvangen features
@@ -969,7 +976,7 @@ function loadBagVectors(){
     console.warn('BAG WFS hits error:',e);
     // Fallback: laad de eerste pagina
     var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+pageSize+'&srsName=EPSG:4326&BBOX='+bbox;
-    fetch(url).then(function(r){return r.json()}).then(function(d){
+    fetch(url,{signal:signal}).then(function(r){return r.json()}).then(function(d){
       allFeatures = d.features || [];
       renderCurrent();
       finishLoading();
@@ -1496,17 +1503,66 @@ function buildEducationalAnalysis(findings){
 
   h += '</div></div>';
 
-  // Methode-uitleg (educatief)
-  h += '<div style="padding:10px 12px;background:rgba(100,116,139,.05);border-radius:10px;border-left:3px solid var(--mt)">';
-  h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--mt);margin-bottom:5px;display:flex;align-items:center;gap:5px"><span class="mi mi-sm" style="font-size:15px">help</span> Hoe werkt deze analyse?</div>';
-  h += '<div style="font-size:10px;color:var(--mt);line-height:1.7">';
-  h += 'Deze analyse is <b style="color:var(--tx)">geen AI</b> maar <b style="color:var(--tx)">regelgebaseerde statistiek</b>:<br>';
-  h += '1. <b>Data verzamelen</b>: CBS kerncijfers van alle '+(_nationalStats[_activeIndicators[0]]?_nationalStats[_activeIndicators[0]].count:'')+' gebieden in Nederland<br>';
-  h += '2. <b>Normaliseren</b>: z-score = (waarde \u2212 \u03bc) \u00f7 \u03c3 vertelt hoeveel standaarddeviaties van het gemiddelde<br>';
-  h += '3. <b>Classificeren</b>: |z| < 0.5 = gemiddeld, |z| 0.5\u20131 = licht afwijkend, |z| > 1 = opvallend, |z| > 2 = uitzonderlijk<br>';
-  h += '4. <b>Patronen zoeken</b>: bekende correlaties (WOZ\u2194inkomen, dichtheid\u2194huur, gas\u2194isolatie) controleren<br>';
-  h += '5. <b>Conclusie</b>: sterke/zwakke punten afleiden uit de richting van z-scores<br>';
-  h += '<br>Je kunt dit <b style="color:var(--tx)">zelf narekenen</b>: pak de waarde, trek het gemiddelde eraf, deel door \u03c3. Is het resultaat > 1 of < \u22121? Dan is het opvallend.';
+  // Methode-uitleg (educatief) — met concreet rekenvoorbeeld
+  h += '<div style="padding:12px 14px;background:rgba(100,116,139,.05);border-radius:10px;border-left:3px solid var(--mt)">';
+  h += '<div style="font:600 12px DM Sans,sans-serif;color:var(--mt);margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">school</span> Hoe werkt deze analyse? (uitleg voor beginners)</div>';
+  h += '<div style="font-size:11px;color:var(--mt);line-height:1.8">';
+
+  // Stap 1: Wat is een gemiddelde
+  h += '<b style="color:var(--tx)">\u2776 Wat is een gemiddelde?</b><br>';
+  h += 'Stel je voor: je hebt de WOZ-waarde van <b>alle</b> buurten in Nederland. Tel ze bij elkaar op en deel door het aantal buurten. Dat is het <b style="color:var(--ai)">gemiddelde</b> (\u03bc). Het vertelt je wat \u201cnormaal\u201d is.<br><br>';
+
+  // Stap 2: Wat is spreiding
+  h += '<b style="color:var(--tx)">\u2777 Hoe ver wijken buurten af?</b><br>';
+  h += 'Sommige buurten zitten dicht bij het gemiddelde, andere ver ervandaan. De <b style="color:var(--wn)">standaarddeviatie</b> (\u03c3) meet hoe ver waarden gemiddeld afwijken. Een kleine \u03c3 = alles lijkt op elkaar. Een grote \u03c3 = veel verschil.<br><br>';
+
+  // Stap 3: z-score uitleg + echt rekenvoorbeeld
+  h += '<b style="color:var(--tx)">\u2778 De z-score: hoe bijzonder is dit gebied?</b><br>';
+  h += 'De formule is simpel: <b style="color:var(--ai)">z = (jouw waarde \u2212 gemiddelde) \u00f7 standaarddeviatie</b><br><br>';
+
+  // Pak het eerste opvallende finding als echt voorbeeld, of anders het eerste finding
+  var voorbeeld = opvallend.length > 0 ? opvallend[0] : findings[0];
+  if(voorbeeld){
+    var vfm = getIndicator(voorbeeld.key);
+    h += '<div style="padding:10px 12px;background:rgba(56,189,248,.06);border-radius:8px;margin:4px 0 8px;border:1px dashed rgba(56,189,248,.2)">';
+    h += '<div style="font:600 11px DM Sans,sans-serif;color:var(--ai);margin-bottom:4px">\ud83d\udcdd Rekenvoorbeeld met echte data:</div>';
+    h += '<div style="font-size:11px;line-height:1.9;color:var(--tx)">';
+    h += 'Indicator: <b>'+vfm.naam+'</b><br>';
+    h += 'Waarde van dit gebied: <b style="color:var(--ac)">'+formatVal(voorbeeld.val)+' '+vfm.eenheid+'</b><br>';
+    h += 'Landelijk gemiddelde (\u03bc): <b>'+formatVal(voorbeeld.avg)+' '+vfm.eenheid+'</b><br>';
+    h += 'Standaarddeviatie (\u03c3): <b>'+formatVal(voorbeeld.stddev)+' '+vfm.eenheid+'</b><br><br>';
+    h += '<b>Berekening:</b><br>';
+    h += '<div style="padding:8px 12px;background:rgba(57,255,20,.06);border-radius:6px;font:700 12px Space Mono,monospace;color:var(--ac);margin:4px 0">';
+    h += 'z = ('+formatVal(voorbeeld.val)+' \u2212 '+formatVal(voorbeeld.avg)+') \u00f7 '+formatVal(voorbeeld.stddev);
+    h += ' = '+(voorbeeld.val - voorbeeld.avg >= 0 ? '+' : '')+formatVal(voorbeeld.val - voorbeeld.avg)+' \u00f7 '+formatVal(voorbeeld.stddev);
+    h += ' = <span style="color:'+(Math.abs(voorbeeld.z)>1?'var(--wn)':'var(--ai)')+'">'+voorbeeld.z.toFixed(2)+'</span>';
+    h += '</div>';
+    h += '<b>Betekenis:</b> ';
+    if(Math.abs(voorbeeld.z) < 0.5) h += 'De z-score is bijna 0 \u2192 dit gebied is <b style="color:var(--ai)">heel gemiddeld</b> voor deze indicator.';
+    else if(Math.abs(voorbeeld.z) < 1) h += 'De z-score zit tussen -1 en +1 \u2192 <b style="color:var(--ai)">normaal</b>, 68% van alle gebieden valt hierin.';
+    else if(Math.abs(voorbeeld.z) < 2) h += 'De z-score is '+(voorbeeld.z>0?'boven':'onder')+' de 1 \u2192 <b style="color:var(--wn)">opvallend</b>! Dit gebied zit buiten de middelste 68% van Nederland.';
+    else h += 'De z-score is '+(voorbeeld.z>0?'boven':'onder')+' de 2 \u2192 <b style="color:var(--dn)">uitzonderlijk</b>! Slechts 5% van alle gebieden wijkt zo ver af.';
+    h += '</div></div>';
+  }
+
+  // Stap 4: De vuistregels
+  h += '<b style="color:var(--tx)">\u2779 Vuistregels om te onthouden:</b><br>';
+  h += '<div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:4px 0 6px;font-size:11px">';
+  h += '<b style="color:var(--ai)">|z| < 0.5</b><span>\u2192 Gemiddeld \u2014 niets bijzonders</span>';
+  h += '<b style="color:var(--ai)">|z| 0.5 \u2013 1</b><span>\u2192 Iets afwijkend, maar nog normaal</span>';
+  h += '<b style="color:var(--wn)">|z| 1 \u2013 2</b><span>\u2192 Opvallend \u2014 valt buiten de \u201cnormale\u201d 68%</span>';
+  h += '<b style="color:var(--dn)">|z| > 2</b><span>\u2192 Uitzonderlijk \u2014 slechts 5% wijkt zo ver af</span>';
+  h += '</div>';
+
+  // Stap 5: Patronen
+  h += '<br><b style="color:var(--tx)">\u277a Patronen herkennen:</b><br>';
+  h += 'Als meerdere indicatoren samen hoog of laag zijn, is er een <b>patroon</b>. Bijvoorbeeld: hoge WOZ \u00e9n hoog inkomen \u2192 welvarend gebied. Hoog gas \u2192 slecht ge\u00efsoleerd. Dit is geen AI maar bekende statistische samenhang.<br>';
+
+  // Disclaimer
+  h += '<br><div style="padding:6px 10px;background:rgba(251,191,36,.05);border-radius:6px;border-left:2px solid var(--wn)">';
+  h += '<b style="color:var(--wn);font-size:10px">\u26a0 Let op:</b> <span style="font-size:10px">Dit zijn automatische berekeningen op CBS-data. De conclusies zijn indicatief \u2014 voor een volledig beeld is lokale kennis nodig.</span>';
+  h += '</div>';
+
   h += '</div></div>';
 
   h += '</div>';
