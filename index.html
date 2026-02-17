@@ -305,7 +305,7 @@ select option{background:var(--bg);color:var(--tx)}
         <button class="btn btn-s active" data-layer="gemeenten" onclick="toggleLayer('gemeenten')"><span class="mi mi-sm">domain</span> Gemeenten</button>
         <button class="btn btn-s" data-layer="buurten" onclick="toggleLayer('buurten')"><span class="mi mi-sm">grid_on</span> Buurten</button>
         <button class="btn btn-s" data-layer="wijken" onclick="toggleLayer('wijken')"><span class="mi mi-sm">grid_view</span> Wijken</button>
-        <button class="btn btn-s" data-layer="bag" onclick="toggleLayer('bag')"><span class="mi mi-sm">location_on</span> BAG Adressen</button>
+        <button class="btn btn-s" data-layer="bag" onclick="toggleLayer('bag')"><span class="mi mi-sm">location_on</span> BAG Adressen <span id="bagBtnCount" style="font:700 9px 'Space Mono',monospace;color:var(--ai)"></span></button>
       </div>
 
       <div class="sh" id="bagStatusSection" style="display:none"><span class="mi">filter_alt</span> BAG Status filter</div>
@@ -1386,6 +1386,7 @@ function getCachedBagFeatures(){
 function clearBagCache(){
   _bagMem = {};
   _bagMemCount = 0;
+  _bagBgLoaded = {};  // Reset geladen gemeenten tracker
   openBagIDB().then(function(db){
     var tx = db.transaction(BAG_IDB_STORE, 'readwrite');
     tx.objectStore(BAG_IDB_STORE).clear();
@@ -1397,7 +1398,7 @@ function clearBagCache(){
 
 function updateBagCacheUI(){
   var el = document.getElementById('bagCacheText');
-  if(!el) return;
+  var btnEl = document.getElementById('bagBtnCount');
   var txt = 'Cache: '+_bagMemCount.toLocaleString('nl-NL')+' adressen';
   // Toon totaal beschikbaar als we dat weten vanuit de index
   if(_bagIndex && Object.keys(_bagIndex).length > 0){
@@ -1408,7 +1409,12 @@ function updateBagCacheUI(){
       txt = 'Cache: '+_bagMemCount.toLocaleString('nl-NL')+'/'+totalAvail.toLocaleString('nl-NL')+' ('+pct+'%)';
     }
   }
-  el.textContent = txt;
+  if(el) el.textContent = txt;
+  // Update badge op BAG knop
+  if(btnEl){
+    if(_bagMemCount > 0) btnEl.textContent = '('+_bagMemCount.toLocaleString('nl-NL')+')';
+    else btnEl.textContent = '';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2294,6 +2300,7 @@ function loadBagForSelection(){
 // ============================================================
 var _bagBgAbort = null;
 var _bagBgRunning = false;
+var _bagBgLoaded = {};  // Gemeentenamen die al geladen zijn in deze sessie
 
 function cancelBagBackgroundLoad(){
   if(_bagBgAbort){ _bagBgAbort.abort(); _bagBgAbort = null; }
@@ -2315,6 +2322,8 @@ function startBagBackgroundLoad(){
     if(!f.geometry) return;
     var naam = f.properties.gemeentenaam;
     if(gemFilter !== 'all' && !gemFilter.has(naam)) return;
+    // Skip al geladen gemeenten
+    if(_bagBgLoaded[naam]) return;
     // Bereken bbox van de gemeente-geometrie
     var coords = [];
     function extractCoords(geom){
@@ -2333,23 +2342,20 @@ function startBagBackgroundLoad(){
   });
 
   if(gemeenteGeoms.length === 0){
-    toast('Geen gemeenten geselecteerd');
+    // Alle gemeenten in scope zijn al geladen
     return;
   }
 
-  // Als geen selectie (alle gemeenten) en meer dan 20, waarschuw
+  // Als geen selectie (alle gemeenten) en meer dan 20, gebruik viewport als filter
   if(gemFilter === 'all' && gemeenteGeoms.length > 20){
-    // Gebruik viewport als filter
     var b = _map.getBounds();
     gemeenteGeoms = gemeenteGeoms.filter(function(g){
       var parts = g.bbox.split(',');
       var s = parseFloat(parts[0]), w = parseFloat(parts[1]), n = parseFloat(parts[2]), e = parseFloat(parts[3]);
-      // Check overlap met viewport
       return !(n < b.getSouth() || s > b.getNorth() || e < b.getWest() || w > b.getEast());
     });
     if(gemeenteGeoms.length === 0){
-      toast('Geen gemeenten in viewport — selecteer gemeenten of zoom in');
-      return;
+      return; // Niets nieuws in viewport — doorladen stopt vanzelf
     }
   }
 
@@ -2444,6 +2450,7 @@ function startBagBackgroundLoad(){
       var count = await loadGemeente(gem);
       totalAddresses += count;
       completedGemeenten++;
+      if(count > 0) _bagBgLoaded[gem.naam] = true;
 
       var pct = Math.round(completedGemeenten / totalGemeenten * 100);
       var elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
@@ -2468,15 +2475,24 @@ function startBagBackgroundLoad(){
     renderBagVectors();
     updateBagStatusCountsFromData();
 
-    toast(totalAddresses.toLocaleString('nl-NL')+' BAG adressen geladen voor '+completedGemeenten+' gemeenten ✔');
+    toast(totalAddresses.toLocaleString('nl-NL')+' BAG adressen geladen voor '+completedGemeenten+' gemeenten \u2714');
 
     // Verberg progress na 5 seconden
     setTimeout(function(){
       if(!_bagBgRunning){
         progEl.style.display = 'none';
-        // knop verwijderd — achtergrond laden gaat automatisch
       }
     }, 5000);
+
+    // Doorladen: als BAG layer nog actief is en er nog gemeenten te laden zijn
+    if(_layerState.bag && totalAddresses > 0){
+      setTimeout(function(){
+        if(_layerState.bag && !_bagBgRunning){
+          // Herstart voor de volgende batch gemeenten (viewport is mogelijk veranderd)
+          startBagBackgroundLoad();
+        }
+      }, 3000);
+    }
   })();
 }
 
@@ -3087,10 +3103,15 @@ function showFeatureInfo(p, cfg, type, isClick, geoFeature){
           kernRows.push({icon:'straighten', label:'\u00a0\u00a0\u00d8 Oppervlakte', val:bagStats.avgOpp + ' m\u00b2', color:'var(--ai)'});
         }
       }
-    } else if(!isClick && type === 'gemeenten' && _bagIndex && gemCode && _bagIndex[gemCode]){
-      // Hover: alleen totaal uit index (geen scan)
+    } else if(!isClick && _bagIndex && gemCode && _bagIndex[gemCode]){
+      // Hover: snelle info uit _bagIndex
       var idxInfo = _bagIndex[gemCode];
-      kernRows.push({icon:'location_on', label:'BAG Adressen', val:idxInfo.count.toLocaleString('nl-NL')+' totaal', color:'var(--ai)'});
+      if(type === 'gemeenten'){
+        kernRows.push({icon:'location_on', label:'BAG Adressen', val:_bagMemCount > 0 ? _bagMemCount.toLocaleString('nl-NL')+'/'+idxInfo.count.toLocaleString('nl-NL')+' geladen' : idxInfo.count.toLocaleString('nl-NL')+' totaal', color:'var(--ai)'});
+      } else {
+        // Buurten/wijken: toon gemeente-totaal als context
+        kernRows.push({icon:'location_on', label:'BAG Gem. Totaal', val:idxInfo.count.toLocaleString('nl-NL')+' ('+escapeHtml(idxInfo.naam||gemCode)+')', color:'var(--ai)'});
+      }
     }
   }
 
@@ -5636,8 +5657,26 @@ function addUploadToMap(){
   var labelCol = document.getElementById('uploadLabelCol').value;
   var icon = _uploadSelectedIcon;
   var color = _uploadSelectedColor;
-  var uploadId = 'upl_' + Date.now() + '_' + Math.random().toString(36).substring(2,8);
   var layerName = _uploadFileName || ('Upload ' + (_uploadLayers.length + 1));
+
+  // Check duplicaat: zelfde filename → overschrijf bestaande
+  var existingId = null;
+  var isOverwrite = false;
+  if(_uploadFileName){
+    // Zoek in huidige layers op kaart
+    for(var i = _uploadLayers.length - 1; i >= 0; i--){
+      if(_uploadLayers[i].name === _uploadFileName || _uploadLayers[i].name === layerName){
+        existingId = _uploadLayers[i].upload_id;
+        // Verwijder oude kaartlaag
+        if(_map.hasLayer(_uploadLayers[i].layer)) _map.removeLayer(_uploadLayers[i].layer);
+        _uploadLayers.splice(i, 1);
+        isOverwrite = true;
+        break;
+      }
+    }
+  }
+
+  var uploadId = existingId || ('upl_' + Date.now() + '_' + Math.random().toString(36).substring(2,8));
 
   // Bewaar data persistent in IndexedDB
   var uploadRecord = {
@@ -5662,11 +5701,16 @@ function addUploadToMap(){
     synced: 0
   };
 
-  // Sla op in IndexedDB
+  // Sla op in IndexedDB (put overschrijft bij zelfde upload_id)
   idbPut('uploads', uploadRecord).then(function(){
     // Sync naar server
     syncUploadToServer(uploadRecord);
   });
+
+  // Log het overschrijven
+  if(isOverwrite){
+    logEvent('upload_overschreven', layerName + ': ' + _uploadData.length + ' rijen (was: ' + uploadId + ')');
+  }
 
   // Render de markers op de kaart
   var layerInfo = renderUploadMarkers(uploadRecord);
@@ -5682,8 +5726,8 @@ function addUploadToMap(){
   updateUploadLayerList();
   updateSavedUploadsList();
 
-  toast(layerInfo.count + ' markers op kaart geplaatst \u00b7 Data opgeslagen');
-  logEvent('upload_kaart', layerName + ': ' + layerInfo.count + ' markers');
+  toast(layerInfo.count + ' markers op kaart geplaatst \u00b7 ' + (isOverwrite ? 'Overschreven' : 'Data opgeslagen'));
+  logEvent('upload_kaart', layerName + ': ' + layerInfo.count + ' markers' + (isOverwrite ? ' (overschreven)' : ''));
 
   // Reset upload state (data is opgeslagen, preview kan weg)
   _uploadData = null;
