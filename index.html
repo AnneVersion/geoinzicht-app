@@ -1330,19 +1330,23 @@ function toggleBagLayer(on){
       document.querySelector('[data-layer="panden"]').classList.add('active');
       togglePandLayer(true);
     }
-    if(_map.getZoom() < 16){
-      toast('BAG adressen actief \u2014 zoom in voor individuele adressen');
-    }
-    // WFS vectordata laden voor het viewport
+    // Forceer verse load (reset bbox check)
+    _bagLastBbox = '';
+    // WFS vectordata laden voor het viewport — altijd met progress bar
     loadBagVectors();
     // Herlaad bij pan/zoom
     _map.on('moveend', onBagMoveEnd);
     logEvent('bag_toggle', 'aan');
   } else {
     _map.off('moveend', onBagMoveEnd);
+    // Annuleer lopende loads
+    if(_bagLoading && _bagAbort){ _bagAbort.abort(); _bagAbort = null; _bagLoading = false; }
     if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
     if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null}
     _bagVectorData = null;
+    _bagLastBbox = '';
+    var progEl = document.getElementById('bagLoadProgress');
+    if(progEl) progEl.style.display = 'none';
     statusSection.style.display = 'none';
     statusBtns.style.display = 'none';
     document.getElementById('bagCacheInfo').style.display = 'none';
