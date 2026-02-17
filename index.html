@@ -959,7 +959,7 @@ function loadBagVectors(){
   // Skip als we exact dezelfde BBOX al geladen hebben
   if(bbox === _bagLastBbox) return;
 
-  var pageSize = 2000;
+  var pageSize = 1000; // PDOK server-limiet is 1000 per request
   _bagLoading = true;
   _bagAbort = new AbortController();
   var signal = _bagAbort.signal;
@@ -1035,7 +1035,7 @@ function loadBagVectors(){
     for(var i = 0; i < totalPages; i++){
       (function(pageIdx){
         var startIdx = pageIdx * pageSize;
-        var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+pageSize+'&startIndex='+startIdx+'&srsName=EPSG:4326&BBOX='+bbox;
+        var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+pageSize+'&startIndex='+startIdx+'&sortBy=identificatie&srsName=EPSG:4326&BBOX='+bbox;
         var p = fetch(url,{signal:signal}).then(function(r){return r.json()}).then(function(d){
           pageResults[pageIdx] = d.features || [];
           pagesLoaded++;
@@ -1069,7 +1069,7 @@ function loadBagVectors(){
   }).catch(function(e){
     console.warn('BAG WFS hits error:',e);
     // Fallback: laad de eerste pagina
-    var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+pageSize+'&srsName=EPSG:4326&BBOX='+bbox;
+    var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+pageSize+'&sortBy=identificatie&srsName=EPSG:4326&BBOX='+bbox;
     fetch(url,{signal:signal}).then(function(r){return r.json()}).then(function(d){
       allFeatures = d.features || [];
       renderCurrent();
@@ -1190,29 +1190,43 @@ function pointInPolygon(lat, lng, latlngs){
 }
 
 // Filter BAG features die in een buurt-polygoon vallen
+// Gebruikt zowel viewport data als de volledige in-memory cache
 function getBagFeaturesInBuurt(buurtLayer){
-  if(!buurtLayer || !_bagVectorData || !_bagVectorData.length) return [];
+  if(!buurtLayer) return [];
   var latlngs;
   try{ latlngs = buurtLayer.getLatLngs ? buurtLayer.getLatLngs() : null; }catch(e){ return []; }
   if(!latlngs) return [];
-  // Snelle bounding-box pre-filter
   var bounds;
   try{ bounds = buurtLayer.getBounds(); }catch(e){ return []; }
+  var s = bounds.getSouth(), n = bounds.getNorth(), w = bounds.getWest(), e = bounds.getEast();
   var result = [];
-  _bagVectorData.forEach(function(f){
+  var seen = {};
+  // Bron 1: volledige in-memory cache (alle ooit geladen adressen)
+  for(var id in _bagMem){
+    var f = _bagMem[id];
     var c = f.geometry.coordinates;
-    var lng = c[0], lat = c[1];
-    if(lat >= bounds.getSouth() && lat <= bounds.getNorth() && lng >= bounds.getWest() && lng <= bounds.getEast()){
-      if(pointInPolygon(lat, lng, latlngs)) result.push(f);
+    if(c[1] >= s && c[1] <= n && c[0] >= w && c[0] <= e){
+      if(pointInPolygon(c[1], c[0], latlngs)){ result.push(f); seen[id] = true; }
     }
-  });
+  }
+  // Bron 2: viewport data (bevat mogelijk nog niet gecachte features)
+  if(_bagVectorData && _bagVectorData.length){
+    _bagVectorData.forEach(function(f){
+      var fid = f.properties.identificatie || f.properties.id;
+      if(fid && seen[fid]) return;
+      var c = f.geometry.coordinates;
+      if(c[1] >= s && c[1] <= n && c[0] >= w && c[0] <= e){
+        if(pointInPolygon(c[1], c[0], latlngs)) result.push(f);
+      }
+    });
+  }
   return result;
 }
 
 // Vergelijk BAG adres met statistieken — eerst buurt, dan alle geladen
 function buildBagCompareHtml(p, latlng){
-  if(!_bagVectorData || !_bagVectorData.length) return '';
   var html = '';
+  var hasBagData = (_bagVectorData && _bagVectorData.length) || _bagMemCount > 0;
 
   // Zoek de buurt waar dit adres in ligt — zoek in buurtlaag OF in buurtdata
   var buurtFeature = null;
@@ -1233,7 +1247,6 @@ function buildBagCompareHtml(p, latlng){
   if(!buurtFeature && _buurtData){
     buurtFeature = findFeatureInData(_buurtData, latlng);
     if(buurtFeature){
-      // Maak een tijdelijke Leaflet layer voor getBagFeaturesInBuurt
       try { var tempL = L.geoJSON(buurtFeature); tempL.eachLayer(function(s){ buurtLayerObj = s; }); } catch(e){}
     }
   }
@@ -1245,24 +1258,15 @@ function buildBagCompareHtml(p, latlng){
     }
   }
 
-  // Altijd vergelijken ten opzichte van de buurt
-  var compareFeatures = (buurtFeatures && buurtFeatures.length > 5) ? buurtFeatures : _bagVectorData;
-  var compareLabel = (buurtFeatures && buurtFeatures.length > 5)
-    ? 'Buurt: '+buurtNaam+' ('+buurtFeatures.length+' adressen)'
-    : (buurtNaam ? 'Buurt: '+buurtNaam+' (te weinig BAG data \u2014 '+(_bagVectorData.length)+' geladen adressen gebruikt)' : 'Zichtbare adressen ('+_bagVectorData.length+')');
-  var compareIcon = 'grid_on';
-  var compareColor = 'var(--ac)';
-
-  html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
-  html += '<div style="font:700 12px \'Space Mono\',monospace;color:'+compareColor+';margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">'+compareIcon+'</span> '+compareLabel+'</div>';
-
-  // === Buurt kerncijfers (CBS + BAG gecombineerd) ===
+  // === Buurt kerncijfers (CBS + BAG gecombineerd) — toon altijd als buurt gevonden ===
   if(buurtFeature && buurtFeature.properties){
     var bp = buurtFeature.properties;
+    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
+    html += '<div style="font:700 12px \'Space Mono\',monospace;color:var(--ac);margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">grid_on</span> Buurt: '+(buurtNaam||'onbekend')+'</div>';
     var buurtRows = [];
-    // BAG verblijfsobjecten in deze buurt
+    // BAG verblijfsobjecten in deze buurt (uit cache + viewport)
     if(buurtFeatures && buurtFeatures.length > 0){
-      buurtRows.push({icon:'location_on', label:'BAG verblijfsobjecten', val:buurtFeatures.length.toLocaleString('nl-NL'), color:'var(--ai)'});
+      buurtRows.push({icon:'location_on', label:'BAG verblijfsobjecten (geladen)', val:buurtFeatures.length.toLocaleString('nl-NL'), color:'var(--ai)'});
     }
     // CBS woningvoorraad
     if(bp.woningvoorraad && bp.woningvoorraad > 0) buurtRows.push({icon:'location_city', label:'Woningvoorraad (CBS)', val:bp.woningvoorraad.toLocaleString('nl-NL'), color:'var(--tx)'});
@@ -1295,9 +1299,22 @@ function buildBagCompareHtml(p, latlng){
       });
       html += '</div>';
     }
+    html += '</div>';
   }
 
-  // === BAG statistieken: bouwjaar + oppervlakte ===
+  // === BAG statistieken: bouwjaar + oppervlakte (vergelijking met buurt) ===
+  if(!hasBagData) return html;
+
+  var compareFeatures = (buurtFeatures && buurtFeatures.length > 5) ? buurtFeatures : _bagVectorData;
+  if(!compareFeatures || !compareFeatures.length) return html;
+
+  var compareLabel = (buurtFeatures && buurtFeatures.length > 5)
+    ? buurtNaam+' ('+buurtFeatures.length+' adressen)'
+    : (buurtNaam ? buurtNaam+' (te weinig BAG — '+compareFeatures.length+' geladen gebruikt)' : 'Zichtbare adressen ('+compareFeatures.length+')');
+
+  html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
+  html += '<div style="font:700 12px \'Space Mono\',monospace;color:var(--ai);margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">analytics</span> Vergelijking: '+compareLabel+'</div>';
+
   var bouwjaren = [], oppervlaktes = [];
   compareFeatures.forEach(function(f){
     var fp = f.properties;
@@ -1322,7 +1339,7 @@ function buildBagCompareHtml(p, latlng){
   }
 
   if(bouwjaren.length <= 5 && oppervlaktes.length <= 5){
-    html += '<div style="font-size:11px;color:var(--mt);padding:6px 0">Te weinig adressen ('+compareFeatures.length+') in deze buurt. Laad meer door in te zoomen op dit gebied.</div>';
+    html += '<div style="font-size:11px;color:var(--mt);padding:6px 0">Te weinig adressen ('+compareFeatures.length+') in deze buurt voor statistieken. Zoom in en laad meer adressen.</div>';
   }
 
   html += '</div>';
@@ -1461,6 +1478,14 @@ function toggleBagLayer(on){
       _layerState.panden = true;
       document.querySelector('[data-layer="panden"]').classList.add('active');
       togglePandLayer(true);
+    }
+    // Buurtdata op achtergrond laden (nodig voor kerncijfers bij adres-klik)
+    if(!_buurtData){
+      fetch(BUURTEN_URL).then(function(r){return r.json()}).then(function(d){
+        _buurtData = d;
+        document.getElementById('dsBuurten').textContent = d.features.length.toLocaleString('nl-NL') + ' features';
+        console.log('Buurtdata geladen op achtergrond:', d.features.length, 'buurten');
+      }).catch(function(e){ console.warn('Buurtdata achtergrond laden mislukt:', e); });
     }
     // Forceer verse load (reset bbox check)
     _bagLastBbox = '';
@@ -1903,16 +1928,54 @@ function selectSearchResult(id, label){
 // ============================================================
 function showFeatureInfo(p, cfg, type, isClick){
   var name = p[cfg.nameField] || p[cfg.codeField] || '-';
-  document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">place</span> '+name;
+  var typeIcon = type === 'buurten' ? 'grid_on' : (type === 'wijken' ? 'grid_view' : 'domain');
+  var typeLabel = type === 'buurten' ? 'Buurt' : (type === 'wijken' ? 'Wijk' : 'Gemeente');
+  document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">'+typeIcon+'</span> '+name;
   var html = '';
-  if(isClick) html += '<div class="info-row"><span>Code</span><span class="info-val">'+(p[cfg.codeField]||'-')+'</span></div>';
-  if(type !== 'gemeenten') html += '<div class="info-row"><span>Gemeente</span><span class="info-val">'+(p.gemeentenaam||'-')+'</span></div>';
-  html += '<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--glass-bd)">';
+
+  // Gebiedsinfo header
+  html += '<div style="padding:6px 10px;background:rgba(57,255,20,.04);border-radius:8px;margin-bottom:8px">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
+  html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:var(--ac);vertical-align:-2px">label</span> Type</span>';
+  html += '<span style="font:700 11px Space Mono,monospace;color:var(--ac)">'+typeLabel+'</span></div>';
+  if(isClick) {
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
+    html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:var(--ai);vertical-align:-2px">tag</span> Code</span>';
+    html += '<span style="font:700 11px Space Mono,monospace;color:var(--ai)">'+(p[cfg.codeField]||'-')+'</span></div>';
+  }
+  if(type !== 'gemeenten' && p.gemeentenaam){
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
+    html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:var(--cyan);vertical-align:-2px">domain</span> Gemeente</span>';
+    html += '<span style="font:700 11px Space Mono,monospace;color:var(--cyan)">'+p.gemeentenaam+'</span></div>';
+  }
+  // Kerncijfers: inwoners, huishoudens, woningen
+  var kernRows = [];
+  if(p.aantal_inwoners && p.aantal_inwoners > 0) kernRows.push({icon:'groups', label:'Inwoners', val:p.aantal_inwoners.toLocaleString('nl-NL'), color:'var(--tx)'});
+  if(p.huishoudens && p.huishoudens > 0) kernRows.push({icon:'family_restroom', label:'Huishoudens', val:p.huishoudens.toLocaleString('nl-NL'), color:'var(--tx)'});
+  if(p.woningvoorraad && p.woningvoorraad > 0) kernRows.push({icon:'location_city', label:'Woningen', val:p.woningvoorraad.toLocaleString('nl-NL'), color:'var(--tx)'});
+  if(p.koopwoningen !== undefined && p.koopwoningen !== null && p.woningvoorraad > 0){
+    var ka = Math.round(p.woningvoorraad * p.koopwoningen / 100);
+    kernRows.push({icon:'key', label:'Koopwoningen', val:ka.toLocaleString('nl-NL')+' ('+p.koopwoningen+'%)', color:'var(--ac)'});
+  }
+  if(p.huurwoningen !== undefined && p.huurwoningen !== null && p.woningvoorraad > 0){
+    var ha = Math.round(p.woningvoorraad * p.huurwoningen / 100);
+    kernRows.push({icon:'real_estate_agent', label:'Huurwoningen', val:ha.toLocaleString('nl-NL')+' ('+p.huurwoningen+'%)', color:'var(--wn)'});
+  }
+  kernRows.forEach(function(r){
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
+    html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:'+r.color+';vertical-align:-2px">'+r.icon+'</span> '+r.label+'</span>';
+    html += '<span style="font:700 11px Space Mono,monospace;color:'+r.color+'">'+r.val+'</span></div>';
+  });
+  html += '</div>';
+
+  // Geselecteerde indicatoren met z-score + AI uitleg
+  html += '<div style="padding-top:6px;border-top:1px solid var(--glass-bd)">';
   _activeIndicators.forEach(function(k){
     var v = p[k];
     if(v !== undefined && v !== null) html += buildCompareHtml(k, v);
   });
   html += '</div>';
+
   document.getElementById('infoContent').innerHTML = html;
   document.getElementById('infoPanel').classList.add('show');
   if(isClick) logEvent(type.replace(/en$/,'')+'_klik', name);
