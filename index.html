@@ -265,6 +265,7 @@ select option{background:var(--bg);color:var(--tx)}
     <div class="tabs">
       <div class="tab active" data-tab="kaart" onclick="switchTab('kaart')"><span class="mi mi-sm" style="vertical-align:-3px">map</span> Kaart</div>
       <div class="tab" data-tab="info" onclick="switchTab('info')"><span class="mi mi-sm" style="vertical-align:-3px">info</span> Info</div>
+      <div class="tab" data-tab="log" onclick="switchTab('log');renderLogView()"><span class="mi mi-sm" style="vertical-align:-3px">history</span> Log</div>
     </div>
 
     <!-- KAART TAB -->
@@ -443,6 +444,21 @@ select option{background:var(--bg);color:var(--tx)}
       </div>
     </div>
 
+    <!-- LOG TAB -->
+    <div class="pane" id="p-log">
+      <div class="sh"><span class="mi">history</span> Gebruikslog</div>
+      <div class="card" style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;color:var(--mt)" id="logCount">0 events</span>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-s" onclick="exportLog()" style="font-size:9px;padding:2px 8px"><span class="mi mi-sm" style="font-size:11px">download</span> Export</button>
+            <button class="btn btn-s" onclick="clearLog()" style="font-size:9px;padding:2px 8px"><span class="mi mi-sm" style="font-size:11px">delete</span> Wissen</button>
+          </div>
+        </div>
+      </div>
+      <div id="logEntries" style="font-size:10px;color:var(--mt)"></div>
+    </div>
+
     <div class="sidebar-footer">
       <div class="neon-text">DATA CONSULTANTS</div>
     </div>
@@ -567,6 +583,7 @@ function setBasemap(id){
   document.querySelectorAll('[data-bm]').forEach(function(b){
     b.classList.toggle('active', b.dataset.bm === id);
   });
+  logEvent('basemap', bm.naam || id);
 }
 
 function buildBasemapButtons(){
@@ -913,6 +930,7 @@ function loadBagVectors(){
     var cacheText = document.getElementById('bagCacheText');
     if(cacheText) cacheText.textContent = 'Cache: '+totalCached.toLocaleString('nl-NL')+' adressen';
     toast(allFeatures.length.toLocaleString('nl-NL')+' adressen geladen \u2714');
+    logEvent('bag_klaar', allFeatures.length + ' adressen, cache: ' + totalCached);
   }
 
   // Stap 1: Haal totaal op via hits (XML)
@@ -1051,6 +1069,7 @@ function showBagFeatureInfo(p, latlng){
 
   document.getElementById('infoContent').innerHTML = html;
   document.getElementById('infoPanel').classList.add('show');
+  logEvent('adres_klik', (straat+' '+hnr).trim() + (p.woonplaats ? ', '+p.woonplaats : ''));
 }
 
 // Bereken volledige descriptive statistics van een gesorteerde array
@@ -1318,6 +1337,7 @@ function toggleBagLayer(on){
     loadBagVectors();
     // Herlaad bij pan/zoom
     _map.on('moveend', onBagMoveEnd);
+    logEvent('bag_toggle', 'aan');
   } else {
     _map.off('moveend', onBagMoveEnd);
     if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
@@ -1327,6 +1347,7 @@ function toggleBagLayer(on){
     statusBtns.style.display = 'none';
     document.getElementById('bagCacheInfo').style.display = 'none';
     dimChoroplethLayers(false);
+    logEvent('bag_toggle', 'uit');
   }
 }
 
@@ -1693,6 +1714,7 @@ function selectSearchResult(id, label){
           if(_searchMarker){_map.removeLayer(_searchMarker)}
           _searchMarker = L.marker([lat, lng]).addTo(_map).bindPopup('<b>'+(label||doc.weergavenaam)+'</b>').openPopup();
           _map.setView([lat, lng], 16);
+          logEvent('zoek', label || doc.weergavenaam);
         }
       }
     })
@@ -1716,6 +1738,7 @@ function showFeatureInfo(p, cfg, type, isClick){
   html += '</div>';
   document.getElementById('infoContent').innerHTML = html;
   document.getElementById('infoPanel').classList.add('show');
+  if(isClick) logEvent(type.replace(/en$/,'')+'_klik', name);
 }
 
 // ============================================================
@@ -1786,8 +1809,10 @@ function toggleIndicator(key){
     // Minimaal 1 indicator actief houden
     if(_activeIndicators.length <= 1){toast('Minimaal 1 indicator actief');return}
     _activeIndicators.splice(idx, 1);
+    logEvent('indicator_uit', key);
   } else {
     _activeIndicators.push(key);
+    logEvent('indicator_aan', key);
   }
   buildIndicatorList();
   updateMap();
@@ -1799,6 +1824,7 @@ function setPrimaryIndicator(key){
   if(idx < 0) return;
   _activeIndicators.splice(idx, 1);
   _activeIndicators.unshift(key);
+  logEvent('indicator_primair', key);
   buildIndicatorList();
   updateMap();
   updateActiveStats();
@@ -2042,6 +2068,117 @@ function toast(msg){
 }
 
 // ============================================================
+// GEBRUIKSLOG (localStorage)
+// ============================================================
+var LOG_KEY = 'geoinzicht_log';
+var LOG_MAX = 500; // max events bewaren
+
+function logEvent(type, detail){
+  try {
+    var log = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+    var entry = {
+      ts: new Date().toISOString(),
+      type: type,
+      detail: detail || '',
+      zoom: _map ? _map.getZoom() : null,
+      center: _map ? [_map.getCenter().lat.toFixed(4), _map.getCenter().lng.toFixed(4)] : null
+    };
+    log.push(entry);
+    // Beperk tot max entries
+    if(log.length > LOG_MAX) log = log.slice(log.length - LOG_MAX);
+    localStorage.setItem(LOG_KEY, JSON.stringify(log));
+  } catch(e){ console.warn('Log error:', e); }
+}
+
+function getLog(){
+  try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+
+function renderLogView(){
+  var log = getLog();
+  var countEl = document.getElementById('logCount');
+  var entriesEl = document.getElementById('logEntries');
+  if(countEl) countEl.textContent = log.length + ' events';
+  if(!entriesEl) return;
+
+  if(log.length === 0){
+    entriesEl.innerHTML = '<div style="text-align:center;padding:24px 0;color:var(--mt)"><span class="mi" style="font-size:28px;opacity:.4;display:block;margin-bottom:8px">history</span>Nog geen activiteit gelogd</div>';
+    return;
+  }
+
+  var typeIcons = {
+    'app_open': 'launch', 'adres_klik': 'location_on', 'buurt_klik': 'place',
+    'wijk_klik': 'map', 'gemeente_klik': 'public', 'indicator_aan': 'toggle_on',
+    'indicator_uit': 'toggle_off', 'indicator_primair': 'star',
+    'bag_laden': 'downloading', 'bag_klaar': 'check_circle',
+    'rapport_export': 'print', 'log_export': 'download',
+    'bag_toggle': 'layers', 'basemap': 'map', 'zoek': 'search'
+  };
+  var typeColors = {
+    'app_open': 'var(--ac)', 'adres_klik': 'var(--ai)', 'buurt_klik': 'var(--cyan)',
+    'wijk_klik': 'var(--cyan)', 'gemeente_klik': 'var(--cyan)',
+    'indicator_aan': 'var(--up)', 'indicator_uit': 'var(--dn)', 'indicator_primair': 'var(--wn)',
+    'bag_laden': 'var(--ai)', 'bag_klaar': 'var(--up)',
+    'rapport_export': 'var(--ac)', 'log_export': 'var(--mt)',
+    'bag_toggle': 'var(--ai)', 'basemap': 'var(--mt)', 'zoek': 'var(--mt)'
+  };
+
+  var html = '';
+  // Nieuwste eerst
+  for(var i = log.length - 1; i >= 0; i--){
+    var e = log[i];
+    var d = new Date(e.ts);
+    var tijd = d.toLocaleDateString('nl-NL',{day:'2-digit',month:'short'}) + ' ' + d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    var icon = typeIcons[e.type] || 'info';
+    var color = typeColors[e.type] || 'var(--mt)';
+    html += '<div style="display:flex;gap:6px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04);align-items:flex-start">';
+    html += '<span class="mi" style="font-size:12px;color:'+color+';flex-shrink:0;margin-top:1px">'+icon+'</span>';
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-size:9px;color:var(--mt);opacity:.7">'+tijd+'</div>';
+    html += '<div style="font-size:10px;color:var(--tx);word-break:break-word">'+escapeHtml(e.type.replace(/_/g,' '));
+    if(e.detail) html += ' <span style="color:var(--mt)">— '+escapeHtml(String(e.detail))+'</span>';
+    html += '</div>';
+    if(e.zoom) html += '<div style="font-size:8px;color:var(--mt);opacity:.5">zoom '+e.zoom+'</div>';
+    html += '</div></div>';
+  }
+  entriesEl.innerHTML = html;
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function exportLog(){
+  var log = getLog();
+  if(log.length === 0){ toast('Geen logdata om te exporteren'); return; }
+  // CSV export
+  var csv = 'Tijdstip;Type;Detail;Zoom;Lat;Lng\n';
+  log.forEach(function(e){
+    var center = e.center || ['',''];
+    csv += e.ts + ';' + e.type + ';' + (e.detail||'').replace(/;/g,',') + ';' + (e.zoom||'') + ';' + center[0] + ';' + center[1] + '\n';
+  });
+  var blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'geoinzicht_log_' + new Date().toISOString().substring(0,10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  logEvent('log_export', log.length + ' events');
+  toast('Log geëxporteerd als CSV');
+}
+
+function clearLog(){
+  if(!confirm('Alle logdata wissen? Dit kan niet ongedaan worden.')) return;
+  localStorage.removeItem(LOG_KEY);
+  renderLogView();
+  toast('Log gewist');
+}
+
+// ============================================================
 // RAPPORT EXPORT (PRINT/PDF)
 // ============================================================
 function printInfoPanel(){
@@ -2135,6 +2272,7 @@ function printInfoPanel(){
   if(w){
     w.document.write(html);
     w.document.close();
+    logEvent('rapport_export', locationName);
   } else {
     toast('Pop-up geblokkeerd \u2014 sta pop-ups toe voor deze site');
   }
@@ -2200,6 +2338,7 @@ async function init(){
       document.getElementById('closeSidebar').style.display = 'block';
     }
     toast(_gemeenteData.features.length.toLocaleString('nl-NL') + ' gemeenten geladen');
+    logEvent('app_open', _gemeenteData.features.length + ' gemeenten');
   } catch(e){
     console.error('Init error:', e);
     loadMsg.textContent = 'Fout bij opstarten';
