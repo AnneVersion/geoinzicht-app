@@ -289,7 +289,7 @@ select option{background:var(--bg);color:var(--tx)}
     <div class="tabs">
       <div class="tab active" data-tab="kaart" onclick="switchTab('kaart')"><span class="mi mi-sm" style="vertical-align:-3px">map</span> Kaart</div>
       <div class="tab" data-tab="info" onclick="switchTab('info')"><span class="mi mi-sm" style="vertical-align:-3px">info</span> Info</div>
-      <div class="tab" data-tab="log" onclick="switchTab('log');renderLogView()"><span class="mi mi-sm" style="vertical-align:-3px">history</span> Log</div>
+      <div class="tab" data-tab="log" id="tabLog" style="display:none" onclick="switchTab('log');renderLogView()"><span class="mi mi-sm" style="vertical-align:-3px">admin_panel_settings</span> Admin</div>
     </div>
 
     <!-- KAART TAB -->
@@ -584,7 +584,7 @@ select option{background:var(--bg);color:var(--tx)}
 
       <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v7.1</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v7.3</div>
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
@@ -1533,8 +1533,35 @@ function updateBagStatusCountsFromData(){
 function renderBagVectors(){
   if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null}
   if(!_bagVectorData || !_bagVectorData.length) return;
+  // Gemeente-filter: alleen adressen tonen binnen geselecteerde gemeenten
+  // BAG data wordt per bbox geladen (rechthoek) maar gemeentegrenzen zijn onregelmatig
+  // Filter door punt-in-gemeente-polygoon check te doen
+  var gemFilter = getSelectedGemeenteFilter();
+  var useGemFilter = gemFilter !== 'all' && _gemeenteLayer;
+  var gemBoundsCache = null;
+  if(useGemFilter){
+    gemBoundsCache = [];
+    _gemeenteLayer.eachLayer(function(sub){
+      if(!sub.feature) return;
+      var naam = sub.feature.properties.gemeentenaam;
+      if(gemFilter.has(naam)){
+        gemBoundsCache.push({naam:naam, layer:sub, bounds:sub.getBounds()});
+      }
+    });
+  }
   var filtered = _bagVectorData.filter(function(f){
-    return matchesBagFilter(f.properties.status) && matchesBagExtendedFilters(f.properties);
+    if(!matchesBagFilter(f.properties.status) || !matchesBagExtendedFilters(f.properties)) return false;
+    // Spatial filter: check of punt binnen een geselecteerde gemeente-bbox valt
+    if(useGemFilter && gemBoundsCache.length > 0){
+      var coords = f.geometry && f.geometry.coordinates;
+      if(!coords) return false;
+      var pt = L.latLng(coords[1], coords[0]);
+      for(var i=0;i<gemBoundsCache.length;i++){
+        if(gemBoundsCache[i].bounds.contains(pt)) return true;
+      }
+      return false;
+    }
+    return true;
   });
   // Update filter count
   var countEl = document.getElementById('bagFilterCount');
@@ -1902,15 +1929,16 @@ function updateBagStatusCounts(counts){
 }
 
 function dimChoroplethLayers(dim){
-  // Dim choropleth maar houd kleuren zichtbaar (WOZ etc.)
-  var opacity = dim ? 0.35 : 0.65;
-  var borderOp = dim ? 0.25 : 0.5;
+  // Bij BAG actief: choropleth subtiel dimmen maar duidelijk zichtbaar houden
+  // Hogere waarden dan voorheen zodat buurten/wijken ook op satellite goed zichtbaar zijn
+  var opacity = dim ? 0.5 : 0.65;
+  var borderOp = dim ? 0.6 : 0.5;
+  var borderWeight = dim ? 2.0 : 1.0;
   [_gemeenteLayer, _wijkLayer, _buurtLayer].forEach(function(layer){
     if(!layer) return;
     layer.eachLayer(function(sub){
       try{
-        var s = sub.options;
-        sub.setStyle({fillOpacity:opacity, opacity:borderOp});
+        sub.setStyle({fillOpacity:opacity, opacity:borderOp, weight:borderWeight});
       }catch(e){}
     });
   });
@@ -3868,6 +3896,434 @@ function clearLog(){
 }
 
 // ============================================================
+// SUPABASE ANALYTICS — Bezoekersregistratie & Tracking
+// ============================================================
+// Configuratie: vul hier je Supabase project URL en anon key in
+var SUPABASE_URL = 'https://bkgjlqdbhopjfmwytqtr.supabase.co';
+var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrZ2pscWRiaG9wamZtd3l0cXRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk4MjUyNTYsImV4cCI6MjA1NTQwMTI1Nn0.DPl7gMmVynl0-KVeD0nw6x0VIUJe_pSAoZJq5VlKf_c';
+var _visitorId = null;
+var _sessionId = null;
+var _supabaseReady = false;
+
+// Genereer uniek visitor ID (persistent in localStorage)
+function getVisitorId(){
+  var vid = localStorage.getItem('geoinzicht_vid');
+  if(!vid){
+    vid = 'v_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2,9);
+    localStorage.setItem('geoinzicht_vid', vid);
+  }
+  return vid;
+}
+
+// Genereer sessie ID (nieuw per bezoek)
+function getSessionId(){
+  if(!_sessionId){
+    _sessionId = 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2,6);
+  }
+  return _sessionId;
+}
+
+// Verzamel bezoekersinfo
+function collectVisitorInfo(){
+  var nav = navigator;
+  var scr = screen;
+  var info = {
+    visitor_id: getVisitorId(),
+    session_id: getSessionId(),
+    // Browser & systeem
+    user_agent: nav.userAgent || '',
+    platform: nav.platform || nav.userAgentData && nav.userAgentData.platform || '',
+    language: nav.language || nav.userLanguage || '',
+    languages: (nav.languages || []).join(','),
+    // Scherm
+    screen_w: scr.width,
+    screen_h: scr.height,
+    viewport_w: window.innerWidth,
+    viewport_h: window.innerHeight,
+    pixel_ratio: window.devicePixelRatio || 1,
+    color_depth: scr.colorDepth || scr.pixelDepth || 0,
+    // Verbinding
+    connection_type: nav.connection ? nav.connection.effectiveType || nav.connection.type || '' : '',
+    connection_downlink: nav.connection ? nav.connection.downlink || 0 : 0,
+    // Hardware
+    cores: nav.hardwareConcurrency || 0,
+    memory: nav.deviceMemory || 0,
+    touch: 'ontouchstart' in window || nav.maxTouchPoints > 0,
+    // Pagina
+    referrer: document.referrer || '',
+    url: location.href,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+    timezone_offset: new Date().getTimezoneOffset(),
+    // Canvas fingerprint (licht, niet privacy-invasief)
+    canvas_hash: getCanvasFingerprint(),
+    // Cookies & storage
+    cookies_enabled: nav.cookieEnabled,
+    storage_available: typeof localStorage !== 'undefined',
+    // WebGL renderer (GPU info)
+    gpu: getGPUInfo(),
+    // Tijd
+    first_visit: !localStorage.getItem('geoinzicht_vid'),
+    visit_count: parseInt(localStorage.getItem('geoinzicht_visits') || '0') + 1,
+  };
+
+  // Update visit count
+  localStorage.setItem('geoinzicht_visits', info.visit_count);
+
+  return info;
+}
+
+function getCanvasFingerprint(){
+  try {
+    var c = document.createElement('canvas');
+    c.width = 200; c.height = 50;
+    var ctx = c.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Arial';
+    ctx.fillText('GeoInzicht\ud83c\uddf3\ud83c\uddf1', 2, 2);
+    var d = c.toDataURL();
+    var hash = 0;
+    for(var i = 0; i < d.length; i++){
+      hash = ((hash << 5) - hash) + d.charCodeAt(i);
+      hash |= 0;
+    }
+    return hash.toString(16);
+  } catch(e){ return ''; }
+}
+
+function getGPUInfo(){
+  try {
+    var c = document.createElement('canvas');
+    var gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+    if(!gl) return '';
+    var ext = gl.getExtension('WEBGL_debug_renderer_info');
+    return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+  } catch(e){ return ''; }
+}
+
+// Supabase REST API helper
+function supabasePost(table, data){
+  if(!SUPABASE_URL || !SUPABASE_ANON_KEY) return Promise.resolve(null);
+  return fetch(SUPABASE_URL + '/rest/v1/' + table, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+      'Prefer': 'return=minimal'
+    },
+    body: JSON.stringify(data)
+  }).catch(function(e){ console.warn('Supabase post error:', e.message); });
+}
+
+function supabaseGet(table, query){
+  if(!SUPABASE_URL || !SUPABASE_ANON_KEY) return Promise.resolve([]);
+  var url = SUPABASE_URL + '/rest/v1/' + table + (query ? '?' + query : '');
+  return fetch(url, {
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+    }
+  }).then(function(r){ return r.json(); }).catch(function(e){ console.warn('Supabase get error:', e.message); return []; });
+}
+
+// IP adres ophalen via gratis API
+function getVisitorIP(){
+  return fetch('https://api.ipify.org?format=json')
+    .then(function(r){ return r.json(); })
+    .then(function(d){ return d.ip; })
+    .catch(function(){
+      // Fallback
+      return fetch('https://ipapi.co/json/')
+        .then(function(r){ return r.json(); })
+        .then(function(d){ return {ip:d.ip, city:d.city, region:d.region, country:d.country_name, isp:d.org, lat:d.latitude, lng:d.longitude}; })
+        .catch(function(){ return null; });
+    });
+}
+
+// Geolocatie van IP
+function getIPGeo(ip){
+  return fetch('https://ipapi.co/' + ip + '/json/')
+    .then(function(r){ return r.json(); })
+    .then(function(d){ return {city:d.city||'', region:d.region||'', country:d.country_name||'', isp:d.org||'', lat:d.latitude||0, lng:d.longitude||0, postal:d.postal||''}; })
+    .catch(function(){ return {}; });
+}
+
+// Start tracking sessie
+async function initAnalytics(){
+  try {
+    _visitorId = getVisitorId();
+    _sessionId = getSessionId();
+
+    // Verzamel info
+    var info = collectVisitorInfo();
+
+    // IP ophalen
+    var ipResult = await getVisitorIP();
+    var ip = '';
+    var geo = {};
+    if(typeof ipResult === 'string'){
+      ip = ipResult;
+      geo = await getIPGeo(ip);
+    } else if(ipResult && ipResult.ip){
+      ip = ipResult.ip;
+      geo = ipResult;
+    }
+
+    // Sessie opslaan in Supabase
+    var session = {
+      visitor_id: _visitorId,
+      session_id: _sessionId,
+      ip_address: ip,
+      city: geo.city || '',
+      region: geo.region || '',
+      country: geo.country || '',
+      isp: geo.isp || '',
+      ip_lat: geo.lat || null,
+      ip_lng: geo.lng || null,
+      user_agent: info.user_agent.substring(0, 500),
+      platform: info.platform,
+      language: info.language,
+      languages: info.languages,
+      screen_w: info.screen_w,
+      screen_h: info.screen_h,
+      viewport_w: info.viewport_w,
+      viewport_h: info.viewport_h,
+      pixel_ratio: info.pixel_ratio,
+      color_depth: info.color_depth,
+      connection_type: info.connection_type,
+      cores: info.cores,
+      memory_gb: info.memory,
+      touch_device: info.touch,
+      referrer: info.referrer.substring(0, 500),
+      page_url: info.url.substring(0, 500),
+      timezone: info.timezone,
+      canvas_hash: info.canvas_hash,
+      gpu: (info.gpu || '').substring(0, 200),
+      visit_count: info.visit_count,
+      started_at: new Date().toISOString()
+    };
+
+    await supabasePost('sessions', session);
+    _supabaseReady = true;
+    console.log('Analytics: sessie geregistreerd', _sessionId);
+  } catch(e){
+    console.warn('Analytics init error:', e.message);
+  }
+}
+
+// Track events naar Supabase (naast localStorage)
+function trackEvent(type, detail){
+  if(!_supabaseReady) return;
+  var evt = {
+    visitor_id: _visitorId,
+    session_id: _sessionId,
+    event_type: type,
+    event_detail: typeof detail === 'object' ? JSON.stringify(detail) : String(detail || ''),
+    zoom: _map ? _map.getZoom() : null,
+    center_lat: _map ? parseFloat(_map.getCenter().lat.toFixed(5)) : null,
+    center_lng: _map ? parseFloat(_map.getCenter().lng.toFixed(5)) : null,
+    timestamp: new Date().toISOString()
+  };
+  supabasePost('events', evt);
+}
+
+// Track sessie-einde (beforeunload)
+function trackSessionEnd(){
+  if(!_supabaseReady) return;
+  var duration = Math.round((Date.now() - _appStartTime) / 1000);
+  // Gebruik sendBeacon voor betrouwbare tracking bij pagina-sluiten
+  var url = SUPABASE_URL + '/rest/v1/session_ends';
+  var data = JSON.stringify({
+    visitor_id: _visitorId,
+    session_id: _sessionId,
+    duration_seconds: duration,
+    events_count: getLog().length,
+    ended_at: new Date().toISOString()
+  });
+  if(navigator.sendBeacon){
+    navigator.sendBeacon(url, new Blob([data], {type:'application/json'}));
+  } else {
+    fetch(url, {method:'POST', body:data, headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+SUPABASE_ANON_KEY}, keepalive:true}).catch(function(){});
+  }
+}
+
+// Voeg Supabase tracking toe aan bestaand logEvent
+var _origLogEvent = logEvent;
+logEvent = function(type, detail){
+  _origLogEvent(type, detail);
+  trackEvent(type, detail);
+};
+
+// Track page visibility changes
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden){
+    trackEvent('tab_hidden', '');
+  } else {
+    trackEvent('tab_visible', '');
+  }
+});
+
+// Track sessie-einde
+window.addEventListener('beforeunload', trackSessionEnd);
+
+// E-mail opslaan via Supabase
+function saveEmailToSupabase(email){
+  if(!email) return;
+  return supabasePost('emails', {
+    visitor_id: _visitorId,
+    session_id: _sessionId,
+    email: email,
+    collected_at: new Date().toISOString(),
+    session_duration_min: Math.round((Date.now() - _appStartTime) / 60000)
+  });
+}
+
+// ============================================================
+// ADMIN DASHBOARD (verborgen, alleen met ?admin=1 URL parameter)
+// ============================================================
+var _isAdmin = new URLSearchParams(location.search).has('admin');
+
+function renderAdminDashboard(){
+  if(!_isAdmin) return;
+  // Toon admin tab
+  var tabLog = document.getElementById('tabLog');
+  if(tabLog) tabLog.style.display = '';
+  // Verberg de normale log tab inhoud en toon admin dashboard
+  var logPane = document.getElementById('p-log');
+  if(!logPane) return;
+
+  logPane.innerHTML = '<div class="sh"><span class="mi">admin_panel_settings</span> Admin Dashboard</div>' +
+    '<div class="card" style="margin-bottom:8px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+    '<span style="font:700 12px \'Space Mono\',monospace;color:var(--ac)">Bezoekers Analytics</span>' +
+    '<div style="display:flex;gap:4px">' +
+    '<button class="btn btn-s" onclick="refreshAdminData()" style="font-size:9px;padding:3px 8px"><span class="mi mi-sm" style="font-size:11px">refresh</span> Ververs</button>' +
+    '<button class="btn btn-s" onclick="exportAdminCSV()" style="font-size:9px;padding:3px 8px"><span class="mi mi-sm" style="font-size:11px">download</span> CSV</button>' +
+    '</div></div>' +
+    '<div id="adminStats" style="font-size:11px;color:var(--mt)">Laden...</div>' +
+    '</div>' +
+    '<div class="sh"><span class="mi">people</span> Recente Sessies</div>' +
+    '<div id="adminSessions" class="card" style="font-size:10px;max-height:300px;overflow-y:auto">Laden...</div>' +
+    '<div class="sh"><span class="mi">mail</span> E-mailadressen</div>' +
+    '<div id="adminEmails" class="card" style="font-size:10px;max-height:200px;overflow-y:auto">Laden...</div>' +
+    '<div class="sh"><span class="mi">timeline</span> Recente Events</div>' +
+    '<div id="adminEvents" class="card" style="font-size:10px;max-height:300px;overflow-y:auto">Laden...</div>';
+
+  refreshAdminData();
+}
+
+async function refreshAdminData(){
+  var statsEl = document.getElementById('adminStats');
+  var sessEl = document.getElementById('adminSessions');
+  var emailEl = document.getElementById('adminEmails');
+  var evtEl = document.getElementById('adminEvents');
+  if(!statsEl) return;
+
+  try {
+    // Haal sessies op (laatste 100)
+    var sessions = await supabaseGet('sessions', 'order=started_at.desc&limit=100');
+    var emails = await supabaseGet('emails', 'order=collected_at.desc&limit=50');
+    var events = await supabaseGet('events', 'order=timestamp.desc&limit=200');
+
+    // Stats
+    var uniqueVisitors = new Set(sessions.map(function(s){ return s.visitor_id; })).size;
+    var today = new Date().toISOString().substring(0,10);
+    var todaySessions = sessions.filter(function(s){ return s.started_at && s.started_at.substring(0,10) === today; }).length;
+    var countries = {};
+    var cities = {};
+    sessions.forEach(function(s){
+      if(s.country) countries[s.country] = (countries[s.country]||0) + 1;
+      if(s.city) cities[s.city] = (cities[s.city]||0) + 1;
+    });
+
+    statsEl.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
+      '<div style="background:rgba(57,255,20,.08);border-radius:8px;padding:10px;text-align:center"><div style="font:700 18px \'Space Mono\',monospace;color:var(--ac)">'+uniqueVisitors+'</div><div style="font-size:9px;color:var(--mt)">Unieke bezoekers</div></div>' +
+      '<div style="background:rgba(56,189,248,.08);border-radius:8px;padding:10px;text-align:center"><div style="font:700 18px \'Space Mono\',monospace;color:var(--ai)">'+todaySessions+'</div><div style="font-size:9px;color:var(--mt)">Vandaag</div></div>' +
+      '<div style="background:rgba(251,191,36,.08);border-radius:8px;padding:10px;text-align:center"><div style="font:700 18px \'Space Mono\',monospace;color:var(--wn)">'+sessions.length+'</div><div style="font-size:9px;color:var(--mt)">Totaal sessies</div></div>' +
+      '<div style="background:rgba(239,68,68,.08);border-radius:8px;padding:10px;text-align:center"><div style="font:700 18px \'Space Mono\',monospace;color:#ef4444">'+emails.length+'</div><div style="font-size:9px;color:var(--mt)">E-mails</div></div>' +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--mt)"><b>Landen:</b> ' + Object.entries(countries).sort(function(a,b){return b[1]-a[1]}).map(function(e){return e[0]+' ('+e[1]+')'}).join(', ') + '</div>' +
+      '<div style="font-size:10px;color:var(--mt);margin-top:4px"><b>Steden:</b> ' + Object.entries(cities).sort(function(a,b){return b[1]-a[1]}).slice(0,10).map(function(e){return e[0]+' ('+e[1]+')'}).join(', ') + '</div>';
+
+    // Sessies
+    var sessHtml = '';
+    sessions.slice(0,50).forEach(function(s){
+      var t = s.started_at ? new Date(s.started_at) : null;
+      var tijd = t ? t.toLocaleDateString('nl-NL',{day:'2-digit',month:'short'}) + ' ' + t.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}) : '';
+      var browser = parseBrowser(s.user_agent || '');
+      sessHtml += '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="color:var(--ac);font:500 10px \'Space Mono\',monospace">'+escapeHtml(s.ip_address||'?')+'</span>' +
+        '<span style="color:var(--mt);font-size:9px">'+tijd+'</span></div>' +
+        '<div style="font-size:9px;color:var(--tx);margin-top:2px">'+escapeHtml(browser)+' \u00b7 '+escapeHtml(s.platform||'')+' \u00b7 '+(s.screen_w||'?')+'x'+(s.screen_h||'?')+(s.touch_device?' \u00b7 \u261f Touch':'')+'</div>' +
+        '<div style="font-size:9px;color:var(--mt)">'+escapeHtml((s.city||'')+(s.region?' , '+s.region:'')+(s.country?' , '+s.country:''))+' \u00b7 Bezoek #'+(s.visit_count||1)+'</div>' +
+        (s.referrer ? '<div style="font-size:8px;color:var(--mt);opacity:.6">ref: '+escapeHtml(s.referrer.substring(0,80))+'</div>' : '') +
+        '</div>';
+    });
+    sessEl.innerHTML = sessHtml || '<div style="color:var(--mt);text-align:center;padding:12px">Geen sessies gevonden</div>';
+
+    // Emails
+    var emailHtml = '';
+    emails.forEach(function(e){
+      var t = e.collected_at ? new Date(e.collected_at) : null;
+      var tijd = t ? t.toLocaleDateString('nl-NL') + ' ' + t.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}) : '';
+      emailHtml += '<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between">' +
+        '<span style="color:var(--ai)">'+escapeHtml(e.email||'')+'</span>' +
+        '<span style="color:var(--mt);font-size:9px">'+tijd+' \u00b7 '+(e.session_duration_min||0)+' min</span></div>';
+    });
+    emailEl.innerHTML = emailHtml || '<div style="color:var(--mt);text-align:center;padding:12px">Geen e-mails</div>';
+
+    // Events
+    var evtHtml = '';
+    events.slice(0,100).forEach(function(e){
+      var t = e.timestamp ? new Date(e.timestamp) : null;
+      var tijd = t ? t.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
+      evtHtml += '<div style="padding:2px 0;border-bottom:1px solid rgba(255,255,255,.03);display:flex;gap:6px">' +
+        '<span style="color:var(--mt);font-size:9px;flex-shrink:0;width:55px">'+tijd+'</span>' +
+        '<span style="color:var(--ac);font-size:9px;flex-shrink:0;width:80px">'+escapeHtml(e.event_type||'')+'</span>' +
+        '<span style="color:var(--tx);font-size:9px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml((e.event_detail||'').substring(0,100))+'</span></div>';
+    });
+    evtEl.innerHTML = evtHtml || '<div style="color:var(--mt);text-align:center;padding:12px">Geen events</div>';
+
+  } catch(e){
+    statsEl.innerHTML = '<div style="color:var(--dn)">Fout bij laden: '+escapeHtml(e.message)+'</div>';
+    console.error('Admin dashboard error:', e);
+  }
+}
+
+function parseBrowser(ua){
+  if(!ua) return 'Onbekend';
+  if(ua.indexOf('Firefox') > -1) return 'Firefox';
+  if(ua.indexOf('Edg/') > -1) return 'Edge';
+  if(ua.indexOf('OPR/') > -1 || ua.indexOf('Opera') > -1) return 'Opera';
+  if(ua.indexOf('Chrome') > -1) return 'Chrome';
+  if(ua.indexOf('Safari') > -1) return 'Safari';
+  return 'Overig';
+}
+
+async function exportAdminCSV(){
+  try {
+    var sessions = await supabaseGet('sessions', 'order=started_at.desc&limit=1000');
+    if(!sessions.length){ toast('Geen data'); return; }
+    var keys = Object.keys(sessions[0]);
+    var csv = keys.join(';') + '\n';
+    sessions.forEach(function(s){
+      csv += keys.map(function(k){ return String(s[k]||'').replace(/;/g,',').replace(/\n/g,' '); }).join(';') + '\n';
+    });
+    var blob = new Blob(['\ufeff' + csv], {type:'text/csv;charset=utf-8'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'geoinzicht_sessions_' + new Date().toISOString().substring(0,10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Admin CSV geëxporteerd');
+  } catch(e){ toast('Export fout: '+e.message); }
+}
+
+// ============================================================
 // ACHTERGROND CBS DATA LADEN (buurten + wijken)
 // ============================================================
 function loadBackgroundCbsData(){
@@ -3947,224 +4403,382 @@ function loadBackgroundCbsData(){
 // GEMEENTEN VERGELIJKINGSRAPPORT
 // ============================================================
 function showComparisonReport(){
+  // Zorg dat nationalStats berekend is
+  if(!_nationalStats || Object.keys(_nationalStats).length === 0) computeNationalStats();
+
   // Bepaal wat we vergelijken: buurten of gemeenten
   var compareType = 'gemeenten';
   var compareLabel = 'gemeenten';
-  var gemeenten = [];
+  var items = [];
+  var nameField = 'gemeentenaam';
 
   if(_selectedBuurten.length >= 2 && _buurtData){
-    // Vergelijk buurten
     compareType = 'buurten';
     compareLabel = 'buurten';
+    nameField = 'buurtnaam';
     var buurtFilter = getSelectedBuurtFilter();
     var gemFilter = getSelectedGemeenteFilter();
+    // Deduplicate: gebruik buurtcode als unieke ID
+    var seen = new Set();
     _buurtData.features.forEach(function(f){
       var p = f.properties;
       if(!p.buurtnaam) return;
       if(buurtFilter !== 'all' && !buurtFilter.has(p.buurtnaam)) return;
       if(gemFilter !== 'all' && !gemFilter.has(p.gemeentenaam)) return;
-      gemeenten.push(f);
+      var key = p.buurtcode || p.buurtnaam;
+      if(!seen.has(key)){ seen.add(key); items.push(f); }
     });
   } else if(_selectedGemeenten.length >= 2 && _gemeenteData){
-    // Vergelijk gemeenten
+    // Deduplicate: gebruik gemeentecode
+    var seen = new Set();
     _selectedGemeenten.forEach(function(naam){
       _gemeenteData.features.forEach(function(f){
-        if(f.properties.gemeentenaam === naam) gemeenten.push(f);
+        var code = f.properties.gemeentecode || f.properties.gemeentenaam;
+        if(f.properties.gemeentenaam === naam && !seen.has(code)){
+          seen.add(code);
+          items.push(f);
+        }
       });
     });
   }
 
-  if(gemeenten.length < 2){
+  if(items.length < 2){
     toast('Selecteer minimaal 2 gemeenten of buurten om te vergelijken');
     return;
   }
 
-  // Haal beschikbare indicatoren op
-  var yearInds = _yearIndicators[_activeYear];
-  var avSet = yearInds ? new Set(yearInds) : null;
-  var activeInds = INDICATORS.filter(function(fm){
-    return !avSet || avSet.has(fm.key);
+  // ALLE indicatoren gebruiken, niet alleen year-filtered
+  var allInds = INDICATORS.slice();
+  // Filter indicatoren die minstens bij 1 item data hebben
+  var activeInds = allInds.filter(function(fm){
+    for(var i=0;i<items.length;i++){
+      if(items[i].properties[fm.key] != null) return true;
+    }
+    return false;
   });
 
-  // Bouw vergelijkingstabel
-  var html = '<!DOCTYPE html><html lang="nl"><head>';
-  html += '<meta charset="UTF-8"><title>GeoInzicht Vergelijking</title>';
-  html += '<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">';
-  html += '<style>';
-  html += 'body{font-family:"DM Sans",sans-serif;background:#f8fafc;color:#1e293b;padding:32px;max-width:1200px;margin:0 auto}';
-  html += 'h1{font:700 22px "Space Mono",monospace;color:#16a34a;margin-bottom:4px}';
-  html += '.subtitle{font-size:13px;color:#64748b;margin-bottom:24px}';
-  html += 'table{width:100%;border-collapse:collapse;margin:16px 0;font-size:12px}';
-  html += 'th{background:#f1f5f9;font-weight:600;text-align:left;padding:8px 10px;border-bottom:2px solid #e2e8f0;position:sticky;top:0}';
-  html += 'td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font:400 11px "Space Mono",monospace}';
-  html += 'tr:hover{background:#f8fafc}';
-  html += '.best{background:#dcfce7;color:#16a34a;font-weight:700}';
-  html += '.worst{background:#fef2f2;color:#dc2626}';
-  html += '.ind-name{font:500 12px "DM Sans",sans-serif;color:#1e293b;text-align:left}';
-  html += '.footer{margin-top:24px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:10px;color:#94a3b8;text-align:center}';
-  html += '.bar-bg{background:#e2e8f0;border-radius:4px;height:8px;width:100%;margin-top:2px}';
-  html += '.bar-fill{height:8px;border-radius:4px;transition:width .3s}';
-  html += '@media print{body{padding:16px}th{background:#f1f5f9 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.best,.worst{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
-  html += '</style></head><body>';
-  var nameField = compareType === 'buurten' ? 'buurtnaam' : 'gemeentenaam';
-  html += '<h1>Vergelijkingsrapport</h1>';
-  html += '<div class="subtitle">CBS Kerncijfers '+_activeYear+' \u00b7 '+gemeenten.length+' '+compareLabel+' \u00b7 '+activeInds.length+' indicatoren \u00b7 Gegenereerd: '+new Date().toLocaleString('nl-NL')+'</div>';
-
-  // Tabel
-  html += '<table><thead><tr><th style="min-width:160px">Indicator</th>';
-  gemeenten.forEach(function(g){
-    var label = g.properties[nameField] || g.properties.gemeentenaam || '-';
-    if(compareType === 'buurten' && g.properties.gemeentenaam) label += ' <span style="font-size:9px;color:#94a3b8;font-weight:400">('+g.properties.gemeentenaam+')</span>';
-    html += '<th style="min-width:100px">'+label+'</th>';
-  });
-  html += '<th style="min-width:80px">Landelijk gem.</th></tr></thead><tbody>';
+  // Categoriseer indicatoren
+  var categories = [
+    {label:'Bevolking', color:'#16a34a', bg:'#f0fdf4', keys:['aantal_inwoners','mannen','vrouwen','0_15','15_25','25_45','45_65','65plus','bevolkingsdichtheid','huishoudens','gem_huishouden_grootte']},
+    {label:'Woningen & Vastgoed', color:'#2563eb', bg:'#eff6ff', keys:['woningvoorraad','gem_woz_waarde','koopwoningen','huurwoningen','pct_eengezins']},
+    {label:'Energie & Duurzaamheid', color:'#0891b2', bg:'#ecfeff', keys:['gem_aardgas','gem_elektriciteit']},
+    {label:'Economie & Inkomen', color:'#d97706', bg:'#fffbeb', keys:['gem_inkomen_inwoner','arbeidsparticipatie','bedrijfsvestigingen','personenautos']},
+    {label:'Voorzieningen', color:'#7c3aed', bg:'#f5f3ff', keys:['afstand_huisarts','afstand_supermarkt']}
+  ];
 
   var reverseSet = new Set(REVERSE_KEYS);
 
-  activeInds.forEach(function(fm){
-    html += '<tr><td class="ind-name">'+fm.naam+' <span style="font-size:9px;color:#94a3b8">('+fm.eenheid+')</span></td>';
-    var vals = [];
-    gemeenten.forEach(function(g){
-      var v = g.properties[fm.key];
-      vals.push(v != null ? v : null);
-    });
-    // Bepaal best/worst
-    var numeric = vals.filter(function(v){return v != null});
-    var isReverse = reverseSet.has(fm.key);
-    var bestVal = numeric.length > 0 ? (isReverse ? Math.min.apply(null,numeric) : Math.max.apply(null,numeric)) : null;
-    var worstVal = numeric.length > 0 ? (isReverse ? Math.max.apply(null,numeric) : Math.min.apply(null,numeric)) : null;
-    var range = numeric.length > 0 ? (Math.max.apply(null,numeric) - Math.min.apply(null,numeric)) : 0;
-    var minVal = numeric.length > 0 ? Math.min.apply(null,numeric) : 0;
-    var maxVal = numeric.length > 0 ? Math.max.apply(null,numeric) : 1;
+  // Logo SVG inline (Nederlandse vlag met GeoInzicht tekst)
+  var logoSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" width="200"><rect y="0" width="200" height="16" fill="#AE1C28"/><rect y="16" width="200" height="16" fill="#FFF"/><rect y="32" width="200" height="16" fill="#21468B"/><text x="100" y="28" text-anchor="middle" font-family="Space Mono,monospace" font-size="14" font-weight="700" fill="#16a34a" stroke="#fff" stroke-width="3" paint-order="stroke">GeoInzicht</text></svg>';
 
-    vals.forEach(function(v){
-      if(v == null){
-        html += '<td style="color:#94a3b8">\u2014</td>';
-      } else {
-        var cls = '';
-        if(numeric.length >= 2){
-          if(v === bestVal) cls = ' class="best"';
-          else if(v === worstVal) cls = ' class="worst"';
-        }
-        var pct = maxVal > minVal ? ((v - minVal) / (maxVal - minVal) * 100) : 50;
-        var barColor = v === bestVal ? '#22c55e' : (v === worstVal ? '#ef4444' : '#60a5fa');
-        html += '<td'+cls+'>' + formatCompareVal(v, fm.key) + '<div class="bar-bg"><div class="bar-fill" style="width:'+pct+'%;background:'+barColor+'"></div></div></td>';
-      }
-    });
+  // Bouw HTML
+  var html = '<!DOCTYPE html><html lang="nl"><head>';
+  html += '<meta charset="UTF-8"><title>GeoInzicht Vergelijkingsrapport</title>';
+  html += '<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">';
+  html += '<style>';
+  html += '*{margin:0;padding:0;box-sizing:border-box}';
+  html += 'body{font-family:"DM Sans",sans-serif;background:#f8fafc;color:#1e293b;padding:0;max-width:1100px;margin:0 auto}';
+  html += '.mi{font-family:"Material Symbols Rounded";font-weight:normal;font-style:normal;font-size:16px;line-height:1;display:inline-block;vertical-align:-3px;font-variation-settings:"FILL" 1}';
+  html += '.header{background:linear-gradient(135deg,#0a0f1a 0%,#1e293b 100%);color:#e2e8f0;padding:32px;border-radius:0 0 16px 16px;margin-bottom:24px}';
+  html += '.header h1{font:700 26px "Space Mono",monospace;color:#39ff14;margin-bottom:8px;text-shadow:0 0 20px rgba(57,255,20,.3)}';
+  html += '.header .sub{font-size:13px;color:#94a3b8;line-height:1.6}';
+  html += '.header .logo{display:flex;align-items:center;gap:12px;margin-bottom:16px}';
+  html += '.header .logo-text{font:700 18px "Space Mono",monospace;color:#39ff14}';
+  html += '.content{padding:0 24px 24px}';
+  html += '.section{margin-bottom:24px}';
+  html += '.section-title{font:700 15px "DM Sans",sans-serif;display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid}';
+  html += '.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);border:1px solid #e2e8f0;margin-bottom:12px}';
+  html += 'table{width:100%;border-collapse:collapse;font-size:12px}';
+  html += 'th{background:#f1f5f9;font:600 11px "DM Sans",sans-serif;text-align:left;padding:8px 10px;border-bottom:2px solid #e2e8f0;position:sticky;top:0;white-space:nowrap}';
+  html += 'td{padding:6px 10px;border-bottom:1px solid #f1f5f9;font:400 11px "Space Mono",monospace;vertical-align:top}';
+  html += 'tr:hover td{background:#f8fafc}';
+  html += '.cat-header td{background:#f1f5f9;font:700 11px "DM Sans",sans-serif;color:#475569;padding:6px 10px;border:none}';
+  html += '.best{background:#dcfce7 !important;color:#16a34a;font-weight:700}';
+  html += '.worst{background:#fef2f2 !important;color:#dc2626}';
+  html += '.ind-name{font:500 11px "DM Sans",sans-serif;color:#1e293b;white-space:nowrap}';
+  html += '.ind-unit{font-size:9px;color:#94a3b8;margin-left:4px}';
+  html += '.bar-bg{background:#e2e8f0;border-radius:3px;height:6px;width:100%;margin-top:3px}';
+  html += '.bar-fill{height:6px;border-radius:3px}';
+  html += '.z-badge{display:inline-block;padding:1px 6px;border-radius:8px;font:700 9px "Space Mono",monospace;margin-left:4px}';
+  html += '.z-pos{background:#dcfce7;color:#16a34a}.z-neg{background:#fef2f2;color:#dc2626}.z-neu{background:#f1f5f9;color:#64748b}';
+  html += '.insight-box{padding:12px;border-radius:8px;margin-bottom:8px;font-size:11px;line-height:1.7}';
+  html += '.footer{padding:16px 24px;text-align:center;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;margin-top:8px}';
+  html += '.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}';
+  html += '.score-circle{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 14px "Space Mono",monospace;flex-shrink:0}';
+  html += '@media print{body{padding:0}.header{-webkit-print-color-adjust:exact;print-color-adjust:exact}.best,.worst,.cat-header td,.z-pos,.z-neg,.score-circle{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  html += '@media(max-width:700px){.summary-grid{grid-template-columns:1fr}}';
+  html += '</style></head><body>';
 
-    // Landelijk gemiddelde
-    var ns = _nationalStats[fm.key];
-    html += '<td style="color:#64748b">'+(ns ? formatCompareVal(ns.avg, fm.key) : '\u2014')+'</td>';
-    html += '</tr>';
-  });
-  html += '</tbody></table>';
+  // HEADER met logo
+  html += '<div class="header">';
+  html += '<div class="logo">';
+  html += '<div style="width:40px;height:40px;background:linear-gradient(135deg,#39ff14,#22c55e);border-radius:10px;display:flex;align-items:center;justify-content:center"><span style="font-family:\'Material Symbols Rounded\';font-size:24px;color:#0a0f1a;font-variation-settings:\'FILL\' 1">public</span></div>';
+  html += '<div><div class="logo-text">GeoInzicht</div><div style="font-size:10px;color:#64748b">Data Consultants</div></div>';
+  html += '</div>';
+  html += '<h1>Vergelijkingsrapport</h1>';
+  html += '<div class="sub">';
+  html += 'CBS Kerncijfers '+_activeYear+' &middot; <b>'+items.length+' '+compareLabel+'</b> &middot; '+activeInds.length+' indicatoren<br>';
+  html += 'Gegenereerd: '+new Date().toLocaleString('nl-NL')+' &middot; Bron: CBS/PDOK';
+  html += '</div></div>';
 
-  // Samenvatting per gemeente
-  html += '<div style="margin-top:16px;padding:16px;background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0">';
-  html += '<div style="font:600 13px \'DM Sans\',sans-serif;color:#16a34a;margin-bottom:8px">Samenvatting per '+compareLabel.replace(/en$/,'')+'</div>';
-  html += '<div style="font-size:11px;color:#475569;line-height:1.7">';
-  gemeenten.forEach(function(g){
+  html += '<div class="content">';
+
+  // OVERZICHTSKAARTJES per gemeente/buurt
+  html += '<div class="section">';
+  html += '<div class="section-title" style="color:#16a34a;border-color:#bbf7d0"><span class="mi" style="color:#16a34a">dashboard</span> Overzicht</div>';
+  html += '<div class="summary-grid">';
+  items.forEach(function(g){
     var p = g.properties;
     var displayName = p[nameField] || p.gemeentenaam || '-';
-    var sterke = [];
-    var zwakke = [];
+    var subName = compareType === 'buurten' ? (p.gemeentenaam || '') : '';
+    // Bereken totaal-score (gemiddelde z-score over alle indicatoren)
+    var zScores = [];
     activeInds.forEach(function(fm){
       var v = p[fm.key];
       var ns = _nationalStats[fm.key];
+      if(v == null || !ns || !ns.stddev || ns.stddev === 0) return;
+      var z = (v - ns.avg) / ns.stddev;
+      if(reverseSet.has(fm.key)) z = -z;
+      zScores.push(z);
+    });
+    var avgZ = zScores.length > 0 ? zScores.reduce(function(a,b){return a+b},0) / zScores.length : 0;
+    var scoreColor = avgZ > 0.3 ? '#16a34a' : (avgZ < -0.3 ? '#dc2626' : '#64748b');
+    var scoreBg = avgZ > 0.3 ? '#dcfce7' : (avgZ < -0.3 ? '#fef2f2' : '#f1f5f9');
+    var scoreLabel = avgZ > 0.5 ? 'Bovengemiddeld' : (avgZ < -0.5 ? 'Ondergemiddeld' : 'Gemiddeld');
+
+    html += '<div class="card" style="display:flex;gap:12px;align-items:flex-start">';
+    html += '<div class="score-circle" style="background:'+scoreBg+';color:'+scoreColor+'">'+(avgZ >= 0 ? '+' : '')+avgZ.toFixed(1)+'</div>';
+    html += '<div style="flex:1">';
+    html += '<div style="font:700 14px \'DM Sans\',sans-serif;color:#0f172a">'+displayName+'</div>';
+    if(subName) html += '<div style="font-size:10px;color:#94a3b8">'+subName+'</div>';
+    html += '<div style="font-size:10px;color:'+scoreColor+';margin-top:2px">'+scoreLabel+' (z-score: '+(avgZ >= 0 ? '+' : '')+avgZ.toFixed(2)+')</div>';
+    // Kerngetallen
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">';
+    var keyMetrics = [{k:'aantal_inwoners',l:'Inwoners',fmt:function(v){return v?v.toLocaleString('nl-NL'):'?'}},{k:'gem_woz_waarde',l:'WOZ',fmt:function(v){return v?'\u20ac'+Math.round(v/1000)+'k':'?'}},{k:'gem_inkomen_inwoner',l:'Inkomen',fmt:function(v){return v?'\u20ac'+Math.round(v/1000)+'k':'?'}},{k:'koopwoningen',l:'Koop',fmt:function(v){return v!=null?v+'%':'?'}},{k:'65plus',l:'65+',fmt:function(v){return v!=null?v+'%':'?'}}];
+    keyMetrics.forEach(function(m){
+      var val = p[m.k];
+      html += '<div style="font-size:9px;background:#f1f5f9;padding:2px 6px;border-radius:4px"><span style="color:#94a3b8">'+m.l+':</span> <b style="color:#0f172a">'+m.fmt(val)+'</b></div>';
+    });
+    html += '</div>';
+    // Sterke/zwakke punten
+    var sterke = []; var zwakke = [];
+    activeInds.forEach(function(fm){
+      var v = p[fm.key]; var ns = _nationalStats[fm.key];
       if(v == null || !ns || !ns.stddev) return;
       var z = (v - ns.avg) / ns.stddev;
       if(reverseSet.has(fm.key)) z = -z;
-      if(z > 1) sterke.push(fm.naam);
-      else if(z < -1) zwakke.push(fm.naam);
+      if(z > 1.2) sterke.push(fm.naam);
+      else if(z < -1.2) zwakke.push(fm.naam);
     });
-    html += '<div style="margin-bottom:6px"><b style="color:#0f172a">'+displayName+'</b>';
-    if(sterke.length) html += ' \u2014 <span style="color:#16a34a">Sterk: '+sterke.join(', ')+'</span>';
-    if(zwakke.length) html += ' \u2014 <span style="color:#dc2626">Aandachtspunt: '+zwakke.join(', ')+'</span>';
-    html += '</div>';
+    if(sterke.length) html += '<div style="font-size:9px;color:#16a34a;margin-top:4px"><b>Sterk:</b> '+sterke.slice(0,5).join(', ')+'</div>';
+    if(zwakke.length) html += '<div style="font-size:9px;color:#dc2626;margin-top:2px"><b>Let op:</b> '+zwakke.slice(0,5).join(', ')+'</div>';
+    html += '</div></div>';
   });
   html += '</div></div>';
 
-  // Statistische interpretatie per gemeente
-  html += '<div style="margin-top:16px;padding:16px;background:#eff6ff;border-radius:12px;border:1px solid #bfdbfe">';
-  html += '<div style="font:600 13px \'DM Sans\',sans-serif;color:#2563eb;margin-bottom:8px">\ud83d\udd0d Interpretatie (statistische samenhang)</div>';
-  html += '<div style="font-size:11px;color:#475569;line-height:1.8">';
-  gemeenten.forEach(function(g){
+  // DATA TABEL per categorie
+  html += '<div class="section">';
+  html += '<div class="section-title" style="color:#2563eb;border-color:#bfdbfe"><span class="mi" style="color:#2563eb">table_chart</span> Vergelijkingstabel</div>';
+  html += '<div class="card" style="overflow-x:auto;padding:0">';
+  html += '<table><thead><tr><th style="min-width:180px">Indicator</th>';
+  items.forEach(function(g){
+    var label = g.properties[nameField] || g.properties.gemeentenaam || '-';
+    if(compareType === 'buurten' && g.properties.gemeentenaam) label += '<br><span style="font-size:8px;color:#94a3b8;font-weight:400">'+g.properties.gemeentenaam+'</span>';
+    html += '<th style="min-width:110px;text-align:center">'+label+'</th>';
+  });
+  html += '<th style="min-width:80px;text-align:center">NL gem.</th><th style="min-width:60px;text-align:center">Verschil</th></tr></thead><tbody>';
+
+  categories.forEach(function(cat){
+    var catInds = activeInds.filter(function(fm){ return cat.keys.indexOf(fm.key) > -1; });
+    if(catInds.length === 0) return;
+    // Categorie header
+    html += '<tr class="cat-header"><td colspan="'+(items.length+3)+'" style="background:'+cat.bg+';color:'+cat.color+';font:700 11px \'DM Sans\',sans-serif;border-left:3px solid '+cat.color+'">'+cat.label+' ('+catInds.length+' indicatoren)</td></tr>';
+
+    catInds.forEach(function(fm){
+      html += '<tr><td class="ind-name">'+fm.naam+'<span class="ind-unit">'+fm.eenheid+'</span></td>';
+      var vals = [];
+      items.forEach(function(g){ var v = g.properties[fm.key]; vals.push(v != null ? v : null); });
+      var numeric = vals.filter(function(v){return v != null});
+      var isReverse = reverseSet.has(fm.key);
+      var bestVal = numeric.length > 0 ? (isReverse ? Math.min.apply(null,numeric) : Math.max.apply(null,numeric)) : null;
+      var worstVal = numeric.length > 0 ? (isReverse ? Math.max.apply(null,numeric) : Math.min.apply(null,numeric)) : null;
+      var minVal = numeric.length > 0 ? Math.min.apply(null,numeric) : 0;
+      var maxVal = numeric.length > 0 ? Math.max.apply(null,numeric) : 1;
+
+      vals.forEach(function(v){
+        if(v == null){
+          html += '<td style="color:#94a3b8;text-align:center">\u2014</td>';
+        } else {
+          var cls = '';
+          if(numeric.length >= 2 && bestVal !== worstVal){
+            if(v === bestVal) cls = ' class="best"';
+            else if(v === worstVal) cls = ' class="worst"';
+          }
+          var pct = maxVal > minVal ? ((v - minVal) / (maxVal - minVal) * 100) : 50;
+          var barColor = v === bestVal ? '#22c55e' : (v === worstVal ? '#ef4444' : '#60a5fa');
+          html += '<td'+cls+' style="text-align:center">'+formatCompareVal(v, fm.key);
+          html += '<div class="bar-bg"><div class="bar-fill" style="width:'+pct+'%;background:'+barColor+'"></div></div></td>';
+        }
+      });
+
+      // Landelijk gemiddelde
+      var ns = _nationalStats[fm.key];
+      html += '<td style="color:#64748b;text-align:center;font-size:10px">'+(ns ? formatCompareVal(ns.avg, fm.key) : '\u2014')+'</td>';
+      // Max verschil
+      if(numeric.length >= 2){
+        var diff = Math.abs(Math.max.apply(null,numeric) - Math.min.apply(null,numeric));
+        html += '<td style="color:#94a3b8;text-align:center;font-size:9px">\u0394 '+formatCompareVal(diff, fm.key)+'</td>';
+      } else {
+        html += '<td style="color:#94a3b8;text-align:center">\u2014</td>';
+      }
+      html += '</tr>';
+    });
+  });
+  html += '</tbody></table></div></div>';
+
+  // DIEPGAANDE ANALYSE per gemeente
+  html += '<div class="section">';
+  html += '<div class="section-title" style="color:#7c3aed;border-color:#ddd6fe"><span class="mi" style="color:#7c3aed">psychology</span> AI Gebiedsanalyse</div>';
+  items.forEach(function(g){
     var p = g.properties;
     var displayName = p[nameField] || p.gemeentenaam || '-';
+    html += '<div class="card" style="border-left:3px solid #7c3aed">';
+    html += '<div style="font:700 14px \'DM Sans\',sans-serif;color:#0f172a;margin-bottom:8px">'+displayName+'</div>';
+
+    // Gebiedsprofiel
+    var profiel = '';
+    if(p.aantal_inwoners) profiel += p.aantal_inwoners.toLocaleString('nl-NL')+' inwoners';
+    if(p.bevolkingsdichtheid) profiel += ', '+Math.round(p.bevolkingsdichtheid)+'/km\u00b2';
+    if(p.huishoudens) profiel += ', '+p.huishoudens.toLocaleString('nl-NL')+' huishoudens';
+    if(p.gem_huishouden_grootte) profiel += ' (gem. '+p.gem_huishouden_grootte+' pers.)';
+    if(profiel) html += '<div style="font-size:11px;color:#475569;margin-bottom:8px;padding:6px 8px;background:#f8fafc;border-radius:6px">'+profiel+'</div>';
+
+    // Leeftijdsopbouw
+    var leeftijd = '';
+    if(p['0_15'] || p['15_25'] || p['25_45'] || p['45_65'] || p['65plus']){
+      leeftijd = '<b>Leeftijdsopbouw:</b> ';
+      var parts = [];
+      if(p['0_15']) parts.push('0-14: '+p['0_15']+'%');
+      if(p['15_25']) parts.push('15-24: '+p['15_25']+'%');
+      if(p['25_45']) parts.push('25-44: '+p['25_45']+'%');
+      if(p['45_65']) parts.push('45-64: '+p['45_65']+'%');
+      if(p['65plus']) parts.push('65+: '+p['65plus']+'%');
+      leeftijd += parts.join(' \u00b7 ');
+      html += '<div style="font-size:10px;color:#475569;margin-bottom:6px">'+leeftijd+'</div>';
+    }
+
+    // Insights
     var insights = [];
-    // Welvarend: hoge WOZ + hoog inkomen
-    if(p.gem_woz_waarde && p.gem_inkomen_inwoner){
-      var wozNs = _nationalStats.gem_woz_waarde;
-      var inkNs = _nationalStats.gem_inkomen_inwoner;
-      if(wozNs && inkNs){
-        var wozZ = (p.gem_woz_waarde - wozNs.avg) / (wozNs.stddev||1);
-        var inkZ = (p.gem_inkomen_inwoner - inkNs.avg) / (inkNs.stddev||1);
-        if(wozZ > 0.5 && inkZ > 0.5) insights.push('\ud83d\udcb0 Hoge WOZ \u00e9n hoog inkomen \u2192 welvarend gebied');
-        else if(wozZ < -0.5 && inkZ < -0.5) insights.push('\u26a0\ufe0f Lage WOZ \u00e9n laag inkomen \u2192 sociaaleconomisch kwetsbaar');
-        else if(wozZ > 0.5 && inkZ < -0.5) insights.push('\ud83c\udfe0 Hoge WOZ maar laag inkomen \u2192 mogelijk gentrificatie');
-      }
+
+    // 1. Welvaart
+    if(p.gem_woz_waarde != null || p.gem_inkomen_inwoner != null){
+      var wozZ = calcZ(p.gem_woz_waarde, 'gem_woz_waarde');
+      var inkZ = calcZ(p.gem_inkomen_inwoner, 'gem_inkomen_inwoner');
+      var koopZ = calcZ(p.koopwoningen, 'koopwoningen');
+      if(wozZ > 0.5 && inkZ > 0.5) insights.push({icon:'\ud83d\udcb0', color:'#16a34a', text:'Welvarend gebied: WOZ-waarde \u20ac'+Math.round((p.gem_woz_waarde||0)/1000)+'k en inkomen \u20ac'+Math.round((p.gem_inkomen_inwoner||0)/1000)+'k liggen significant boven het landelijk gemiddelde. Dit duidt op een hoge sociaaleconomische status.'});
+      else if(wozZ < -0.5 && inkZ < -0.5) insights.push({icon:'\u26a0\ufe0f', color:'#dc2626', text:'Sociaaleconomisch kwetsbaar: zowel WOZ-waarde als inkomen liggen onder het gemiddelde. Extra aandacht voor sociale voorzieningen kan nodig zijn.'});
+      else if(wozZ > 0.5 && inkZ < -0.5) insights.push({icon:'\ud83c\udfe0', color:'#d97706', text:'Hoge vastgoedwaarde maar relatief laag inkomen. Dit kan duiden op gentrificatie of een gebied met veel gepensioneerden in duurdere woningen.'});
+      if(koopZ > 0.8) insights.push({icon:'\ud83d\udd11', color:'#16a34a', text:'Veel koopwoningen ('+p.koopwoningen+'%). Stabiele woonomgeving met relatief hoge eigenwoningbezit.'});
+      else if(koopZ < -0.8) insights.push({icon:'\ud83c\udfe2', color:'#2563eb', text:'Veel huurwoningen ('+(p.huurwoningen||'?')+'%). Mogelijk meer doorstroom en sociale huur.'});
     }
-    // Isolatie: hoog gasverbruik
-    if(p.gem_aardgas){
-      var gasNs = _nationalStats.gem_aardgas;
-      if(gasNs){
-        var gasZ = (p.gem_aardgas - gasNs.avg) / (gasNs.stddev||1);
-        if(gasZ > 1) insights.push('\ud83d\udd25 Hoog gasverbruik \u2192 mogelijk slecht ge\u00efsoleerde woningen');
-        else if(gasZ < -0.8) insights.push('\u2744\ufe0f Laag gasverbruik \u2192 goed ge\u00efsoleerd of warmtenet');
-      }
-    }
-    // Vergrijzing
-    if(p['65plus']){
-      var oudNs = _nationalStats['65plus'];
-      if(oudNs){
-        var oudZ = (p['65plus'] - oudNs.avg) / (oudNs.stddev||1);
-        if(oudZ > 1) insights.push('\ud83d\udc74 Hoog % 65+ \u2192 vergrijzend gebied, druk op zorgvoorzieningen');
-      }
-    }
-    // Jong + huurwoningen
-    if(p['15_25'] && p.huurwoningen){
-      var jongNs = _nationalStats['15_25'];
-      var huurNs = _nationalStats.huurwoningen;
-      if(jongNs && huurNs){
-        var jongZ = (p['15_25'] - jongNs.avg) / (jongNs.stddev||1);
-        var huurZ = (p.huurwoningen - huurNs.avg) / (huurNs.stddev||1);
-        if(jongZ > 0.5 && huurZ > 0.5) insights.push('\ud83c\udf93 Veel jongeren + veel huurwoningen \u2192 studentengebied');
-      }
-    }
-    // Arbeidsparticipatie + inkomen
-    if(p.arbeidsparticipatie && p.gem_inkomen_inwoner){
-      var arbNs = _nationalStats.arbeidsparticipatie;
-      var inkNs2 = _nationalStats.gem_inkomen_inwoner;
-      if(arbNs && inkNs2){
-        var arbZ = (p.arbeidsparticipatie - arbNs.avg) / (arbNs.stddev||1);
-        var inkZ2 = (p.gem_inkomen_inwoner - inkNs2.avg) / (inkNs2.stddev||1);
-        if(arbZ > 0.5 && inkZ2 > 0.5) insights.push('\ud83d\udcbc Hoge arbeidsparticipatie + hoog inkomen \u2192 economisch sterk');
-        else if(arbZ < -0.5 && inkZ2 < -0.5) insights.push('\u26a0\ufe0f Lage participatie + laag inkomen \u2192 sociaal kwetsbaar');
-      }
-    }
-    // Bevolkingsdichtheid + eengezins
-    if(p.bevolkingsdichtheid && p.pct_eengezins){
-      var dichthNs = _nationalStats.bevolkingsdichtheid;
-      var eenNs = _nationalStats.pct_eengezins;
-      if(dichthNs && eenNs){
-        var dichthZ = (p.bevolkingsdichtheid - dichthNs.avg) / (dichthNs.stddev||1);
-        var eenZ = (p.pct_eengezins - eenNs.avg) / (eenNs.stddev||1);
-        if(dichthZ < -0.5 && eenZ > 0.5) insights.push('\ud83c\udfe1 Lage dichtheid + veel eengezins \u2192 suburbaan/landelijk');
-        else if(dichthZ > 1 && eenZ < -0.5) insights.push('\ud83c\udfd9\ufe0f Hoge dichtheid + weinig eengezins \u2192 stedelijk');
-      }
-    }
+
+    // 2. Demografie
+    var oudZ = calcZ(p['65plus'], '65plus');
+    var jongZ = calcZ(p['0_15'], '0_15');
+    var jong25Z = calcZ(p['15_25'], '15_25');
+    if(oudZ > 1) insights.push({icon:'\ud83d\udc74', color:'#d97706', text:'Vergrijzend: '+p['65plus']+'% is 65+, fors boven gemiddeld. Hogere vraag naar zorg en aangepaste woningen.'});
+    if(jongZ > 1) insights.push({icon:'\ud83d\udc76', color:'#16a34a', text:'Jong gezinsgebied: '+p['0_15']+'% is 0-14 jaar. Hoge behoefte aan scholen en speelruimte.'});
+    if(jong25Z > 1 && calcZ(p.huurwoningen,'huurwoningen') > 0.5) insights.push({icon:'\ud83c\udf93', color:'#2563eb', text:'Studentenbuurt-karakter: hoog % jongeren (15-24: '+p['15_25']+'%) gecombineerd met veel huurwoningen.'});
+
+    // 3. Energie
+    var gasZ = calcZ(p.gem_aardgas, 'gem_aardgas');
+    var elekZ = calcZ(p.gem_elektriciteit, 'gem_elektriciteit');
+    if(gasZ > 1) insights.push({icon:'\ud83d\udd25', color:'#dc2626', text:'Hoog gasverbruik ('+p.gem_aardgas+' m\u00b3/jaar). Mogelijk slecht ge\u00efsoleerde woningen of oudere bouwjaren. Energietransitie-potentieel.'});
+    else if(gasZ < -0.8) insights.push({icon:'\u2744\ufe0f', color:'#0891b2', text:'Laag gasverbruik ('+p.gem_aardgas+' m\u00b3/jaar). Goede isolatie, nieuwbouw of aansluiting op warmtenet.'});
+    if(elekZ > 1) insights.push({icon:'\u26a1', color:'#d97706', text:'Hoog elektriciteitsverbruik ('+(p.gem_elektriciteit||'?')+' kWh). Mogelijk warmtepompen of meer elektrische apparatuur.'});
+
+    // 4. Economie
+    var arbZ = calcZ(p.arbeidsparticipatie, 'arbeidsparticipatie');
+    var bedZ = calcZ(p.bedrijfsvestigingen, 'bedrijfsvestigingen');
+    if(arbZ > 0.5 && (calcZ(p.gem_inkomen_inwoner,'gem_inkomen_inwoner') > 0.5)) insights.push({icon:'\ud83d\udcbc', color:'#16a34a', text:'Economisch sterk: hoge arbeidsparticipatie ('+(p.arbeidsparticipatie||'?')+'%) gecombineerd met bovengemiddeld inkomen.'});
+    else if(arbZ < -0.5) insights.push({icon:'\u26a0\ufe0f', color:'#dc2626', text:'Lage arbeidsparticipatie ('+(p.arbeidsparticipatie||'?')+'%). Aandachtspunt voor werkgelegenheidsbeleid.'});
+    if(bedZ > 1) insights.push({icon:'\ud83c\udfe2', color:'#2563eb', text:'Veel bedrijvigheid: '+(p.bedrijfsvestigingen||'?')+' vestigingen. Levendig economisch klimaat.'});
+
+    // 5. Voorzieningen
+    var haZ = calcZ(p.afstand_huisarts, 'afstand_huisarts', true);
+    var smZ = calcZ(p.afstand_supermarkt, 'afstand_supermarkt', true);
+    if(haZ < -1) insights.push({icon:'\ud83c\udfe5', color:'#dc2626', text:'Grote afstand tot huisarts ('+(p.afstand_huisarts||'?')+' km). Beperkte gezondheidszorg bereikbaarheid.'});
+    if(smZ < -1) insights.push({icon:'\ud83d\uded2', color:'#dc2626', text:'Grote afstand tot supermarkt ('+(p.afstand_supermarkt||'?')+' km). Mogelijk voedselwoestijn.'});
+    if(haZ > 0.5 && smZ > 0.5) insights.push({icon:'\u2705', color:'#16a34a', text:'Goede voorzieningenbereikbaarheid: huisarts op '+(p.afstand_huisarts||'?')+' km en supermarkt op '+(p.afstand_supermarkt||'?')+' km.'});
+
+    // 6. Stedelijkheid
+    var dichthZ = calcZ(p.bevolkingsdichtheid, 'bevolkingsdichtheid');
+    var eenZ = calcZ(p.pct_eengezins, 'pct_eengezins');
+    if(dichthZ > 1 && eenZ < -0.5) insights.push({icon:'\ud83c\udfd9\ufe0f', color:'#475569', text:'Stedelijk karakter: hoge bevolkingsdichtheid ('+(p.bevolkingsdichtheid||'?')+'/km\u00b2) met weinig eengezinswoningen. Typisch binnenstedelijk.'});
+    else if(dichthZ < -0.5 && eenZ > 0.5) insights.push({icon:'\ud83c\udfe1', color:'#475569', text:'Suburbaan/landelijk: lage dichtheid met veel eengezinswoningen ('+(p.pct_eengezins||'?')+'%). Rustige woonomgeving.'});
+
     if(insights.length > 0){
-      html += '<div style="margin-bottom:8px;padding:6px 8px;background:rgba(37,99,235,.04);border-radius:6px"><b style="color:#1e40af">'+displayName+'</b><ul style="margin:4px 0 0 16px;padding:0">';
-      insights.forEach(function(ins){ html += '<li>'+ins+'</li>'; });
-      html += '</ul></div>';
+      insights.forEach(function(ins){
+        html += '<div class="insight-box" style="background:'+ins.color+'08;border-left:3px solid '+ins.color+'">';
+        html += '<span style="font-size:14px">'+ins.icon+'</span> <span style="color:'+ins.color+';font-weight:600">'+ins.text+'</span></div>';
+      });
+    } else {
+      html += '<div style="font-size:11px;color:#94a3b8;padding:8px">Geen opvallende afwijkingen van het landelijk gemiddelde.</div>';
     }
+    html += '</div>';
   });
+  html += '</div>';
+
+  // DIRECTE VERGELIJKING: grootste verschillen
+  html += '<div class="section">';
+  html += '<div class="section-title" style="color:#d97706;border-color:#fde68a"><span class="mi" style="color:#d97706">compare_arrows</span> Grootste Verschillen</div>';
+  html += '<div class="card">';
+  // Bereken verschil-ranking
+  var diffs = [];
+  activeInds.forEach(function(fm){
+    var vals = items.map(function(g){ return g.properties[fm.key]; }).filter(function(v){ return v != null; });
+    if(vals.length < 2) return;
+    var range = Math.max.apply(null,vals) - Math.min.apply(null,vals);
+    var ns = _nationalStats[fm.key];
+    var relDiff = ns && ns.stddev > 0 ? range / ns.stddev : 0;
+    diffs.push({key:fm.key, naam:fm.naam, eenheid:fm.eenheid, range:range, relDiff:relDiff, vals:vals});
+  });
+  diffs.sort(function(a,b){ return b.relDiff - a.relDiff; });
+
+  if(diffs.length > 0){
+    html += '<table><thead><tr><th>Indicator</th><th style="text-align:center">Verschil</th><th style="text-align:center">Relatief (std.dev.)</th>';
+    items.forEach(function(g){ html += '<th style="text-align:center">'+((g.properties[nameField]||'').substring(0,15))+'</th>'; });
+    html += '</tr></thead><tbody>';
+    diffs.slice(0,12).forEach(function(d,idx){
+      var bgAlpha = Math.max(0.02, 0.12 - idx * 0.01);
+      html += '<tr style="background:rgba(217,119,6,'+bgAlpha+')">';
+      html += '<td class="ind-name">'+d.naam+'<span class="ind-unit">'+d.eenheid+'</span></td>';
+      html += '<td style="text-align:center;font:700 11px \'Space Mono\',monospace;color:#d97706">'+formatCompareVal(d.range, d.key)+'</td>';
+      html += '<td style="text-align:center"><span class="z-badge '+(d.relDiff > 1 ? 'z-neg' : 'z-neu')+'">'+d.relDiff.toFixed(1)+'\u03c3</span></td>';
+      items.forEach(function(g){
+        var v = g.properties[d.key];
+        html += '<td style="text-align:center;font:400 10px \'Space Mono\',monospace">'+(v != null ? formatCompareVal(v, d.key) : '\u2014')+'</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+  } else {
+    html += '<div style="text-align:center;color:#94a3b8;padding:12px">Onvoldoende data voor vergelijking</div>';
+  }
   html += '</div></div>';
 
-  html += '<div class="footer">GeoInzicht v7.1 \u00b7 Data Consultants \u00b7 CBS/PDOK '+_activeYear+' \u00b7 '+new Date().toLocaleDateString('nl-NL')+'</div>';
-  html += '</body></html>';
+  // FOOTER
+  html += '<div class="footer">';
+  html += '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px">';
+  html += '<div style="width:20px;height:20px;background:linear-gradient(135deg,#39ff14,#22c55e);border-radius:5px;display:flex;align-items:center;justify-content:center"><span style="font-family:\'Material Symbols Rounded\';font-size:12px;color:#0a0f1a;font-variation-settings:\'FILL\' 1">public</span></div>';
+  html += '<span style="font:700 11px \'Space Mono\',monospace;color:#16a34a">GeoInzicht</span>';
+  html += '</div>';
+  html += 'GeoInzicht v7.3 &middot; Data Consultants &middot; CBS/PDOK '+_activeYear+' &middot; '+new Date().toLocaleDateString('nl-NL');
+  html += '</div>';
 
-  var w = window.open('','_blank','width=1000,height=700');
+  html += '</div></body></html>';
+
+  var w = window.open('','_blank','width=1100,height=800');
   if(w){
     w.document.write(html);
     w.document.close();
@@ -4175,14 +4789,27 @@ function showComparisonReport(){
   logEvent('vergelijking_export', names.join(', '));
 }
 
+// Helper: z-score berekenen
+function calcZ(value, key, isReverse){
+  if(value == null) return 0;
+  var ns = _nationalStats[key];
+  if(!ns || !ns.stddev || ns.stddev === 0) return 0;
+  var z = (value - ns.avg) / ns.stddev;
+  return isReverse ? -z : z;
+}
+
 function formatCompareVal(v, key){
   if(v == null) return '\u2014';
-  if(typeof v !== 'number') return v;
-  if(key === 'gem_woz_waarde') return '\u20ac ' + Math.round(v/1000) + 'k';
-  if(key === 'gem_inkomen_inwoner') return '\u20ac ' + Math.round(v/1000) + 'k';
+  if(typeof v !== 'number') return String(v);
+  if(key === 'gem_woz_waarde') return '\u20ac' + Math.round(v/1000) + 'k';
+  if(key === 'gem_inkomen_inwoner') return '\u20ac' + Math.round(v/1000) + 'k';
+  if(key === 'afstand_huisarts' || key === 'afstand_supermarkt') return v.toFixed(1) + ' km';
+  if(key === 'gem_aardgas') return Math.round(v) + ' m\u00b3';
+  if(key === 'gem_elektriciteit') return Math.round(v) + ' kWh';
   if(v >= 10000) return v.toLocaleString('nl-NL');
   if(v >= 100) return Math.round(v).toLocaleString('nl-NL');
   if(v >= 10) return v.toFixed(1);
+  if(v >= 1) return v.toFixed(1);
   return v.toFixed(2);
 }
 
@@ -4220,6 +4847,17 @@ function submitFeedback(){
     existing.push(feedback);
     localStorage.setItem(FEEDBACK_KEY, JSON.stringify(existing));
   } catch(e){}
+  // Sla op in Supabase
+  if(email) saveEmailToSupabase(email);
+  supabasePost('feedback', {
+    visitor_id: _visitorId || getVisitorId(),
+    session_id: _sessionId || getSessionId(),
+    text: text,
+    email: email,
+    year: _activeYear,
+    session_duration_min: Math.round((Date.now() - _appStartTime) / 60000),
+    submitted_at: new Date().toISOString()
+  }).catch(function(){});
   localStorage.setItem(FEEDBACK_SHOWN_KEY, '1');
   logEvent('feedback_verstuurd', text.substring(0,100));
   closeFeedback();
@@ -4423,6 +5061,12 @@ async function init(){
 
     // Start feedback timer (30 min)
     initFeedbackTimer();
+
+    // Start Supabase analytics (niet-blokkerend)
+    initAnalytics().catch(function(e){ console.warn('Analytics start error:', e); });
+
+    // Admin dashboard renderen als ?admin in URL
+    renderAdminDashboard();
   } catch(e){
     console.error('Init error:', e);
     loadMsg.textContent = 'Fout bij opstarten';
