@@ -37,6 +37,38 @@ def get_conn():
         autocommit=True
     )
 
+def ensure_tables():
+    """Maak ontbrekende tabellen aan."""
+    try:
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'analytics_uploads')
+            BEGIN
+                CREATE TABLE analytics_uploads (
+                    id              INT IDENTITY(1,1) PRIMARY KEY,
+                    upload_id       VARCHAR(100) NOT NULL,
+                    visitor_id      VARCHAR(100) DEFAULT '',
+                    session_id      VARCHAR(100) DEFAULT '',
+                    filename        NVARCHAR(500) DEFAULT '',
+                    icon            VARCHAR(50) DEFAULT 'location_on',
+                    color           VARCHAR(20) DEFAULT '#e11d48',
+                    label_column    NVARCHAR(100) DEFAULT '',
+                    columns_json    NVARCHAR(MAX) DEFAULT '[]',
+                    data_json       NVARCHAR(MAX) DEFAULT '[]',
+                    row_count       INT DEFAULT 0,
+                    uploaded_at     DATETIME2 DEFAULT GETUTCDATE()
+                );
+                CREATE INDEX IX_uploads_upload_id ON analytics_uploads(upload_id);
+                CREATE INDEX IX_uploads_uploaded_at ON analytics_uploads(uploaded_at);
+                PRINT 'Tabel analytics_uploads aangemaakt';
+            END
+        """)
+        conn.close()
+    except Exception as e:
+        print(f"  Tabel-check fout (niet kritiek): {e}")
+
+
 def test_connection():
     """Test de database verbinding bij opstarten."""
     try:
@@ -385,6 +417,69 @@ def get_feedback():
 
 
 # ---------------------------------------------------------------------------
+# Upload Endpoints (gebruikers data-uploads)
+# ---------------------------------------------------------------------------
+
+@app.route('/api/upload', methods=['POST'])
+def save_upload():
+    """Sla een gebruikers-upload op (metadata + data als JSON)."""
+    try:
+        d = request.get_json(force=True)
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO analytics_uploads (
+                upload_id, visitor_id, session_id, filename,
+                icon, color, label_column, columns_json, data_json,
+                row_count, uploaded_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            d.get('upload_id', ''), d.get('visitor_id', ''),
+            d.get('session_id', ''), d.get('filename', ''),
+            d.get('icon', 'location_on'), d.get('color', '#e11d48'),
+            d.get('label_column', ''), d.get('columns_json', '[]'),
+            d.get('data_json', '[]'), d.get('row_count', 0),
+            d.get('uploaded_at', datetime.datetime.utcnow().isoformat())
+        ))
+        conn.close()
+        return jsonify({'status': 'ok'}), 201
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/admin/uploads', methods=['GET'])
+def get_uploads():
+    """Haal alle uploads op (admin)."""
+    try:
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM analytics_uploads ORDER BY uploaded_at DESC")
+        columns = [col[0] for col in cursor.description]
+        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        conn.close()
+        for row in rows:
+            for k, v in row.items():
+                if isinstance(v, datetime.datetime):
+                    row[k] = v.isoformat()
+        return jsonify(rows)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/admin/upload/<upload_id>', methods=['DELETE'])
+def delete_upload(upload_id):
+    """Verwijder een upload (admin)."""
+    try:
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM analytics_uploads WHERE upload_id = ?", (upload_id,))
+        conn.close()
+        return jsonify({'status': 'ok'}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
 # Start
 # ---------------------------------------------------------------------------
 if __name__ == '__main__':
@@ -393,6 +488,7 @@ if __name__ == '__main__':
     print("=" * 50)
     print(f"  Database: {DB_SERVER}/{DB_NAME}")
     test_connection()
+    ensure_tables()
     print(f"  API draait op http://localhost:5000")
     print(f"  Admin dashboard: voeg ?admin toe aan GeoInzicht URL")
     print("=" * 50)

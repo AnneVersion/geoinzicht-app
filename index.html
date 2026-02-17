@@ -657,10 +657,16 @@ select option{background:var(--bg);color:var(--tx)}
         </div>
       </div>
 
-      <!-- Actieve uploads -->
+      <!-- Actieve uploads op kaart -->
       <div id="uploadActiveSection" style="display:none">
-        <div class="sh"><span class="mi">layers</span> Actieve Uploads</div>
+        <div class="sh"><span class="mi">layers</span> Op Kaart</div>
         <div id="uploadLayerList" class="card" style="font-size:10px"></div>
+      </div>
+
+      <!-- Opgeslagen uploads (persistent) -->
+      <div id="uploadSavedSection" style="display:none">
+        <div class="sh"><span class="mi">save</span> Opgeslagen Uploads</div>
+        <div id="uploadSavedList" class="card" style="font-size:10px"></div>
       </div>
     </div>
 
@@ -4414,7 +4420,7 @@ var _syncBusy = false;         // Voorkom dubbele syncs
 // --------------- IndexedDB Setup ---------------
 function openAnalyticsDB(){
   return new Promise(function(resolve, reject){
-    var req = indexedDB.open('geoinzicht_analytics', 2);
+    var req = indexedDB.open('geoinzicht_analytics', 3);
     req.onupgradeneeded = function(e){
       var db = e.target.result;
       // Sessions store
@@ -4437,6 +4443,12 @@ function openAnalyticsDB(){
       if(!db.objectStoreNames.contains('feedback')){
         var fs = db.createObjectStore('feedback', {autoIncrement:true});
         fs.createIndex('synced', 'synced', {unique:false});
+      }
+      // Uploads store (v3)
+      if(!db.objectStoreNames.contains('uploads')){
+        var us = db.createObjectStore('uploads', {keyPath:'upload_id'});
+        us.createIndex('synced', 'synced', {unique:false});
+        us.createIndex('uploaded_at', 'uploaded_at', {unique:false});
       }
     };
     req.onsuccess = function(e){
@@ -5053,6 +5065,8 @@ function renderAdminDashboard(){
     '<div id="adminSessions" class="card" style="font-size:10px;max-height:300px;overflow-y:auto">Laden...</div>' +
     '<div class="sh"><span class="mi">mail</span> E-mailadressen</div>' +
     '<div id="adminEmails" class="card" style="font-size:10px;max-height:200px;overflow-y:auto">Laden...</div>' +
+    '<div class="sh"><span class="mi">upload_file</span> Gebruikers Uploads <span id="adminUploadCount" style="font:400 9px \'Space Mono\',monospace;color:var(--mt);text-transform:none;letter-spacing:0"></span></div>' +
+    '<div id="adminUploads" class="card" style="font-size:10px;max-height:350px;overflow-y:auto">Laden...</div>' +
     '<div class="sh"><span class="mi">timeline</span> Recente Events</div>' +
     '<div id="adminEvents" class="card" style="font-size:10px;max-height:300px;overflow-y:auto">Laden...</div>' +
     '<div class="sh"><span class="mi">settings</span> Admin Instellingen</div>' +
@@ -5243,6 +5257,50 @@ async function refreshAdminData(){
     });
     evtEl.innerHTML = evtHtml || '<div style="color:var(--mt);text-align:center;padding:12px">Geen events</div>';
 
+    // Uploads
+    var uplEl = document.getElementById('adminUploads');
+    var uplCountEl = document.getElementById('adminUploadCount');
+    if(uplEl){
+      var uploads = [];
+      // Haal uit IndexedDB
+      try { uploads = await idbGetAll('uploads'); } catch(e){}
+      // Sorteer op datum (nieuwste eerst)
+      uploads.sort(function(a,b){ return (b.uploaded_at||'').localeCompare(a.uploaded_at||''); });
+
+      if(uplCountEl) uplCountEl.textContent = uploads.length + ' uploads';
+
+      var uplHtml = '';
+      uploads.forEach(function(u){
+        var t = u.uploaded_at ? new Date(u.uploaded_at) : null;
+        var tijd = t ? t.toLocaleDateString('nl-NL',{day:'2-digit',month:'short',year:'numeric'}) + ' ' + t.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}) : '';
+        var syncBadge = u.synced ? '' : ' <span style="color:var(--wn);font-size:8px" title="Nog niet gesynct">\u25cf</span>';
+        var onMap = false;
+        for(var i=0;i<_uploadLayers.length;i++){ if(_uploadLayers[i].upload_id===u.upload_id){ onMap=true; break; } }
+
+        uplHtml += '<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<div style="width:28px;height:28px;background:'+(u.color||'#e11d48')+';border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+              '<span class="mi" style="font-size:14px;color:#fff;font-variation-settings:\'FILL\' 1">'+(u.icon||'location_on')+'</span></div>' +
+            '<div style="flex:1">' +
+              '<div style="font:600 11px \'DM Sans\',sans-serif;color:var(--tx)">'+escapeHtml(u.name||u.filename||'Upload')+'</div>' +
+              '<div style="font-size:9px;color:var(--mt)">' +
+                (u.row_count||0)+' locaties \u00b7 '+tijd+syncBadge +
+                (onMap ? ' \u00b7 <span style="color:var(--ac)">op kaart</span>' : '') +
+              '</div>' +
+              (u.visitor_id ? '<div style="font-size:8px;color:var(--mt);opacity:.6">Bezoeker: '+escapeHtml(u.visitor_id.substring(0,12))+'</div>' : '') +
+            '</div>' +
+            '<button class="btn btn-s" onclick="adminShowUploadData(\''+escapeHtml(u.upload_id)+'\')" style="font-size:9px;padding:2px 6px" title="Bekijk data">' +
+              '<span class="mi mi-sm" style="font-size:11px">table_view</span></button>' +
+            '<button class="btn btn-s" onclick="adminReplotUpload(\''+escapeHtml(u.upload_id)+'\')" style="font-size:9px;padding:2px 6px" title="Opnieuw op kaart">' +
+              '<span class="mi mi-sm" style="font-size:11px">add_location</span></button>' +
+            '<button class="btn btn-s" onclick="deleteUploadPermanent(\''+escapeHtml(u.upload_id)+'\')" style="font-size:9px;padding:2px 6px;border-color:var(--dn);color:var(--dn)" title="Permanent verwijderen">' +
+              '<span class="mi mi-sm" style="font-size:11px">delete_forever</span></button>' +
+          '</div>' +
+        '</div>';
+      });
+      uplEl.innerHTML = uplHtml || '<div style="color:var(--mt);text-align:center;padding:12px">Geen uploads</div>';
+    }
+
   } catch(e){
     statsEl.innerHTML = '<div style="color:var(--dn)">Fout bij laden: '+escapeHtml(e.message)+'</div>';
     console.error('Admin dashboard error:', e);
@@ -5257,6 +5315,65 @@ function parseBrowser(ua){
   if(ua.indexOf('Chrome') > -1) return 'Chrome';
   if(ua.indexOf('Safari') > -1) return 'Safari';
   return 'Overig';
+}
+
+// Admin: bekijk upload data in popup
+function adminShowUploadData(uploadId){
+  idbGetAll('uploads').then(function(uploads){
+    var rec = null;
+    for(var i=0;i<uploads.length;i++){ if(uploads[i].upload_id===uploadId){ rec=uploads[i]; break; } }
+    if(!rec){ toast('Upload niet gevonden'); return; }
+
+    var cols = rec.columns || [];
+    var data = rec.data || [];
+    var html = '<div style="font-family:DM Sans,sans-serif;padding:16px;max-width:600px;max-height:500px;overflow:auto">';
+    html += '<div style="font:700 14px \'DM Sans\',sans-serif;color:var(--ac);margin-bottom:8px">'+escapeHtml(rec.name||rec.filename||'Upload')+'</div>';
+    html += '<div style="font-size:10px;color:var(--mt);margin-bottom:10px">'+data.length+' rijen \u00b7 '+cols.length+' kolommen \u00b7 '+new Date(rec.uploaded_at).toLocaleString('nl-NL')+'</div>';
+    html += '<table style="width:100%;font-size:9px;border-collapse:collapse">';
+    html += '<tr>';
+    cols.forEach(function(c){ if(c!=='_lat'&&c!=='_lng') html += '<th style="padding:3px 6px;border-bottom:1px solid var(--br);text-align:left;color:var(--ac);font-size:8px">'+escapeHtml(c)+'</th>'; });
+    html += '</tr>';
+    data.slice(0,50).forEach(function(r){
+      html += '<tr>';
+      cols.forEach(function(c){ if(c!=='_lat'&&c!=='_lng') html += '<td style="padding:2px 6px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--tx)">'+escapeHtml(String(r[c]||'').substring(0,40))+'</td>'; });
+      html += '</tr>';
+    });
+    if(data.length > 50) html += '<tr><td colspan="'+cols.length+'" style="padding:6px;color:var(--mt);text-align:center">... en '+(data.length-50)+' meer rijen</td></tr>';
+    html += '</table></div>';
+
+    // Toon in een modal-achtige overlay
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer';
+    overlay.onclick = function(){ document.body.removeChild(overlay); };
+    var card = document.createElement('div');
+    card.style.cssText = 'background:var(--p);border:1px solid var(--br);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.5);cursor:default';
+    card.onclick = function(e){ e.stopPropagation(); };
+    card.innerHTML = html;
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+  });
+}
+
+// Admin: herplaats upload op kaart
+function adminReplotUpload(uploadId){
+  // Check of al op kaart
+  for(var i=0;i<_uploadLayers.length;i++){
+    if(_uploadLayers[i].upload_id === uploadId){
+      toast('Upload staat al op de kaart');
+      try{ _map.fitBounds(_uploadLayers[i].layer.getBounds(), {padding:[40,40], maxZoom:14}); }catch(e){}
+      return;
+    }
+  }
+  idbGetAll('uploads').then(function(uploads){
+    var rec = null;
+    for(var i=0;i<uploads.length;i++){ if(uploads[i].upload_id===uploadId){ rec=uploads[i]; break; } }
+    if(!rec){ toast('Upload niet gevonden'); return; }
+    var layerInfo = renderUploadMarkers(rec);
+    _uploadLayers.push(layerInfo);
+    updateUploadLayerList();
+    try{ _map.fitBounds(layerInfo.layer.getBounds(), {padding:[40,40], maxZoom:14}); }catch(e){}
+    toast(layerInfo.count + ' markers op kaart geplaatst');
+  });
 }
 
 async function exportAdminCSV(){
@@ -5292,9 +5409,10 @@ async function exportAdminCSV(){
 // ============================================================
 // GEBRUIKERS DATA UPLOAD (CSV/Excel naar kaart)
 // ============================================================
-var _uploadData = null;      // Geparsede rijen [{lat,lng,...}]
-var _uploadColumns = [];     // Kolomnamen
-var _uploadLayers = [];      // Array van {name, layer, icon, color, count}
+var _uploadData = null;      // Geparsede rijen [{lat,lng,...}] — tijdelijk voor preview
+var _uploadColumns = [];     // Kolomnamen — tijdelijk voor preview
+var _uploadFileName = '';    // Bestandsnaam van huidige upload
+var _uploadLayers = [];      // Array van {upload_id, name, layer, icon, color, count, data, columns, labelCol}
 var _uploadSelectedIcon = 'location_on';
 var _uploadSelectedColor = '#e11d48';
 
@@ -5356,6 +5474,7 @@ function handleUploadDrop(e){
 
 function handleUploadFile(file){
   if(!file) return;
+  _uploadFileName = file.name;
   var ext = file.name.split('.').pop().toLowerCase();
 
   if(ext === 'csv' || ext === 'tsv'){
@@ -5423,7 +5542,7 @@ function parseCSV(text, fileName, separator){
   var lngCol = findColumn(headers, ['lng','lon','longitude','lengtegraad','x','lng_wgs84','long']);
 
   if(!latCol || !lngCol){
-    toast('Geen lat/lng kolommen gevonden. Voeg "lat" en "lng" kolommen toe.');
+    toast('Geen lat/lng kolommen gevonden. Bestand moet "lat" en "lng" (of "latitude"/"longitude") kolommen bevatten om op de kaart te plotten.');
     return;
   }
 
@@ -5517,17 +5636,77 @@ function addUploadToMap(){
   var labelCol = document.getElementById('uploadLabelCol').value;
   var icon = _uploadSelectedIcon;
   var color = _uploadSelectedColor;
-  var layerName = 'Upload ' + (_uploadLayers.length + 1);
+  var uploadId = 'upl_' + Date.now() + '_' + Math.random().toString(36).substring(2,8);
+  var layerName = _uploadFileName || ('Upload ' + (_uploadLayers.length + 1));
 
-  // Maak markers met custom iconen
+  // Bewaar data persistent in IndexedDB
+  var uploadRecord = {
+    upload_id: uploadId,
+    name: layerName,
+    filename: _uploadFileName || '',
+    icon: icon,
+    color: color,
+    label_column: labelCol,
+    columns: _uploadColumns.slice(),
+    data: _uploadData.map(function(r){
+      var clean = {};
+      _uploadColumns.forEach(function(c){ if(r[c] !== undefined) clean[c] = r[c]; });
+      clean._lat = r._lat;
+      clean._lng = r._lng;
+      return clean;
+    }),
+    row_count: _uploadData.length,
+    uploaded_at: new Date().toISOString(),
+    visitor_id: _visitorId || '',
+    session_id: _sessionId || '',
+    synced: 0
+  };
+
+  // Sla op in IndexedDB
+  idbPut('uploads', uploadRecord).then(function(){
+    // Sync naar server
+    syncUploadToServer(uploadRecord);
+  });
+
+  // Render de markers op de kaart
+  var layerInfo = renderUploadMarkers(uploadRecord);
+  _uploadLayers.push(layerInfo);
+
+  // Zoom naar data
+  var bounds = _uploadData.map(function(r){ return [r._lat, r._lng]; });
+  if(bounds.length > 0){
+    try{ _map.fitBounds(bounds, {padding:[40,40], maxZoom:14}); }catch(e){}
+  }
+
+  // Update actieve uploads lijst
+  updateUploadLayerList();
+  updateSavedUploadsList();
+
+  toast(layerInfo.count + ' markers op kaart geplaatst \u00b7 Data opgeslagen');
+  logEvent('upload_kaart', layerName + ': ' + layerInfo.count + ' markers');
+
+  // Reset upload state (data is opgeslagen, preview kan weg)
+  _uploadData = null;
+  _uploadColumns = [];
+  _uploadFileName = '';
+  document.getElementById('uploadPreview').style.display = 'none';
+  document.getElementById('uploadIconSection').style.display = 'none';
+  document.getElementById('uploadFileInput').value = '';
+}
+
+// Render markers op kaart vanuit een upload record
+function renderUploadMarkers(rec){
   var markers = L.layerGroup();
-  var bounds = [];
+  var data = rec.data || [];
+  var labelCol = rec.label_column || '';
+  var icon = rec.icon || 'location_on';
+  var color = rec.color || '#e11d48';
+  var cols = rec.columns || [];
 
-  _uploadData.forEach(function(r){
+  data.forEach(function(r){
     var lat = r._lat, lng = r._lng;
-    bounds.push([lat,lng]);
+    if(!lat || !lng) return;
 
-    // Custom div icon met Material Symbol
     var markerIcon = L.divIcon({
       className: 'upload-marker',
       html: '<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;background:'+color+';border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.4);border:2px solid #fff"><span class="mi" style="font-size:16px;color:#fff;transform:rotate(45deg);font-variation-settings:\'FILL\' 1">'+icon+'</span></div>',
@@ -5543,7 +5722,7 @@ function addUploadToMap(){
     if(labelCol && r[labelCol]){
       popupHtml += '<div style="font:700 13px \'DM Sans\',sans-serif;color:#0f172a;margin-bottom:6px">'+escapeHtml(String(r[labelCol]))+'</div>';
     }
-    _uploadColumns.forEach(function(col){
+    cols.forEach(function(col){
       if(col === '_lat' || col === '_lng') return;
       var val = r[col];
       if(val === undefined || val === null || val === '') return;
@@ -5555,13 +5734,9 @@ function addUploadToMap(){
     popupHtml += '</div>';
     marker.bindPopup(popupHtml, {maxWidth:300});
 
-    // Tooltip met label
     if(labelCol && r[labelCol]){
       marker.bindTooltip(String(r[labelCol]).substring(0,30), {
-        permanent: false,
-        direction: 'top',
-        offset: [0,-34],
-        className: 'upload-tooltip'
+        permanent: false, direction: 'top', offset: [0,-34], className: 'upload-tooltip'
       });
     }
 
@@ -5570,34 +5745,66 @@ function addUploadToMap(){
 
   markers.addTo(_map);
 
-  // Zoom naar data
-  if(bounds.length > 0){
-    try{ _map.fitBounds(bounds, {padding:[40,40], maxZoom:14}); }catch(e){}
-  }
-
-  // Sla layer op
-  var layerInfo = {
-    name: layerName,
+  return {
+    upload_id: rec.upload_id,
+    name: rec.name || rec.filename || 'Upload',
     layer: markers,
     icon: icon,
     color: color,
-    count: _uploadData.length,
-    columns: _uploadColumns.slice()
+    count: data.length,
+    columns: cols,
+    labelCol: labelCol
   };
-  _uploadLayers.push(layerInfo);
+}
 
-  // Update actieve uploads lijst
-  updateUploadLayerList();
+// Sync upload naar SQL Server
+function syncUploadToServer(rec){
+  if(!_apiOnline) return;
+  try {
+    fetch(ANALYTICS_API + '/upload', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        upload_id: rec.upload_id,
+        visitor_id: rec.visitor_id || '',
+        session_id: rec.session_id || '',
+        filename: rec.filename || '',
+        icon: rec.icon,
+        color: rec.color,
+        label_column: rec.label_column || '',
+        columns_json: JSON.stringify(rec.columns || []),
+        data_json: JSON.stringify(rec.data || []),
+        row_count: rec.row_count || 0,
+        uploaded_at: rec.uploaded_at
+      })
+    }).then(function(r){
+      if(r.ok){
+        // Markeer als gesynct
+        rec.synced = 1;
+        idbPut('uploads', rec);
+      }
+    }).catch(function(){});
+  } catch(e){}
+}
 
-  toast(layerInfo.count + ' markers op kaart geplaatst');
-  logEvent('upload_kaart', layerName + ': ' + layerInfo.count + ' markers');
-
-  // Reset upload state
-  _uploadData = null;
-  _uploadColumns = [];
-  document.getElementById('uploadPreview').style.display = 'none';
-  document.getElementById('uploadIconSection').style.display = 'none';
-  document.getElementById('uploadFileInput').value = '';
+// Laad alle opgeslagen uploads bij app start
+function loadSavedUploads(){
+  idbGetAll('uploads').then(function(uploads){
+    if(!uploads || !uploads.length){
+      updateSavedUploadsList();
+      return;
+    }
+    uploads.sort(function(a,b){ return (a.uploaded_at||'').localeCompare(b.uploaded_at||''); });
+    uploads.forEach(function(rec){
+      var layerInfo = renderUploadMarkers(rec);
+      _uploadLayers.push(layerInfo);
+    });
+    if(_uploadLayers.length > 0){
+      updateUploadLayerList();
+      toast(_uploadLayers.length + ' opgeslagen upload(s) geladen');
+    }
+    updateSavedUploadsList();
+  }).catch(function(e){ console.warn('Uploads laden mislukt:', e); });
 }
 
 function updateUploadLayerList(){
@@ -5622,10 +5829,46 @@ function updateUploadLayerList(){
         '<span class="mi mi-sm" style="font-size:11px">'+(_map.hasLayer(ul.layer)?'visibility':'visibility_off')+'</span></button>' +
       '<button class="btn btn-s" onclick="zoomToUploadLayer('+idx+')" style="font-size:9px;padding:2px 6px" title="Zoom naar">' +
         '<span class="mi mi-sm" style="font-size:11px">zoom_in</span></button>' +
-      '<button class="btn btn-s" onclick="removeUploadLayer('+idx+')" style="font-size:9px;padding:2px 6px;border-color:var(--dn);color:var(--dn)" title="Verwijder">' +
-        '<span class="mi mi-sm" style="font-size:11px">close</span></button>' +
+      '<button class="btn btn-s" onclick="removeUploadLayer('+idx+')" style="font-size:9px;padding:2px 6px" title="Verberg (data blijft bewaard)">' +
+        '<span class="mi mi-sm" style="font-size:11px">visibility_off</span></button>' +
     '</div>';
   }).join('');
+}
+
+function updateSavedUploadsList(){
+  var section = document.getElementById('uploadSavedSection');
+  var list = document.getElementById('uploadSavedList');
+  if(!section || !list) return;
+
+  idbGetAll('uploads').then(function(uploads){
+    if(!uploads || !uploads.length){
+      section.style.display = 'none';
+      return;
+    }
+    section.style.display = '';
+    uploads.sort(function(a,b){ return (b.uploaded_at||'').localeCompare(a.uploaded_at||''); });
+
+    list.innerHTML = uploads.map(function(u){
+      var t = u.uploaded_at ? new Date(u.uploaded_at) : null;
+      var datum = t ? t.toLocaleDateString('nl-NL',{day:'2-digit',month:'short'}) : '';
+      var onMap = false;
+      for(var i=0;i<_uploadLayers.length;i++){ if(_uploadLayers[i].upload_id===u.upload_id){ onMap=true; break; } }
+
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+        '<div style="width:22px;height:22px;background:'+(u.color||'#e11d48')+';border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+          '<span class="mi" style="font-size:12px;color:#fff;font-variation-settings:\'FILL\' 1">'+(u.icon||'location_on')+'</span></div>' +
+        '<div style="flex:1">' +
+          '<div style="font:600 10px \'DM Sans\',sans-serif;color:var(--tx)">'+escapeHtml(u.name||u.filename||'Upload')+'</div>' +
+          '<div style="font-size:9px;color:var(--mt)">'+(u.row_count||0)+' loc \u00b7 '+datum+
+            (onMap ? ' \u00b7 <span style="color:var(--ac)">\u25cf op kaart</span>' : '') +
+          '</div>' +
+        '</div>' +
+        (onMap ? '' : '<button class="btn btn-s" onclick="adminReplotUpload(\''+escapeHtml(u.upload_id)+'\')" style="font-size:9px;padding:2px 6px" title="Toon op kaart"><span class="mi mi-sm" style="font-size:11px">add_location</span></button>') +
+      '</div>';
+    }).join('');
+  }).catch(function(){
+    section.style.display = 'none';
+  });
 }
 
 function toggleUploadLayer(idx){
@@ -5654,7 +5897,36 @@ function removeUploadLayer(idx){
   if(_map.hasLayer(ul.layer)) _map.removeLayer(ul.layer);
   _uploadLayers.splice(idx, 1);
   updateUploadLayerList();
-  toast('Upload laag verwijderd');
+  updateSavedUploadsList();
+  toast('Upload van kaart verwijderd \u00b7 Data bewaard');
+}
+
+// Permanent verwijderen (alleen admin)
+function deleteUploadPermanent(uploadId){
+  if(!confirm('Weet je zeker dat je deze upload permanent wilt verwijderen? Dit kan niet ongedaan worden.')) return;
+  // Verwijder van kaart
+  for(var i = _uploadLayers.length - 1; i >= 0; i--){
+    if(_uploadLayers[i].upload_id === uploadId){
+      if(_map.hasLayer(_uploadLayers[i].layer)) _map.removeLayer(_uploadLayers[i].layer);
+      _uploadLayers.splice(i, 1);
+    }
+  }
+  updateUploadLayerList();
+  // Verwijder uit IndexedDB
+  if(_analyticsDb){
+    try {
+      var tx = _analyticsDb.transaction('uploads', 'readwrite');
+      tx.objectStore('uploads').delete(uploadId);
+    } catch(e){}
+  }
+  // Verwijder uit SQL Server
+  if(_apiOnline){
+    fetch(ANALYTICS_API + '/admin/upload/' + encodeURIComponent(uploadId), {method:'DELETE'}).catch(function(){});
+  }
+  toast('Upload permanent verwijderd');
+  updateSavedUploadsList();
+  // Ververs admin dashboard als dat open is
+  if(_adminUnlocked) refreshAdminData();
 }
 
 function clearUploadData(){
@@ -6910,7 +7182,10 @@ async function init(){
     initFeedbackTimer();
 
     // Start analytics (IndexedDB + sync naar SQL Server als online)
-    initAnalytics().catch(function(e){ console.warn('Analytics start error:', e); });
+    initAnalytics().then(function(){
+      // Laad opgeslagen uploads na IndexedDB klaar is
+      loadSavedUploads();
+    }).catch(function(e){ console.warn('Analytics start error:', e); });
 
     // Admin dashboard renderen als ?admin in URL (beveiligd met wachtwoord)
     renderAdminDashboard();
