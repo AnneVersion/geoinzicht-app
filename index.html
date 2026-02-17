@@ -3272,7 +3272,7 @@ function updateMsUI(wrapId){
   var btn = document.getElementById('loadSelectionBtn');
   if(btn) btn.style.display = hasSelection ? 'flex' : 'none';
   var cmpBtn = document.getElementById('compareBtn');
-  if(cmpBtn) cmpBtn.style.display = (_selectedGemeenten.length >= 2) ? 'flex' : 'none';
+  if(cmpBtn) cmpBtn.style.display = (_selectedGemeenten.length >= 2 || _selectedBuurten.length >= 2) ? 'flex' : 'none';
 
   // BAG adres-aantallen tonen voor geselecteerde gemeenten
   updateBagSelectionInfo();
@@ -3471,22 +3471,14 @@ function loadSelection(){
     renderChoropleth('buurten');
     updateActiveStats();
 
-    // BAG automatisch laden voor geselecteerde gemeenten (pre-built bestanden)
+    // BAG data op achtergrond laden (cache vullen) — zonder de choropleth te dimmen
     if(_selectedGemeenten.length > 0){
-      // Activeer BAG laag als dat nog niet het geval is
-      if(!_layerState.bag){
-        _layerState.bag = true;
-        var bagBtn = document.querySelector('[data-layer="bag"]');
-        if(bagBtn) bagBtn.classList.add('active');
-        toggleBagLayer(true);
-      }
-      // Laad BAG uit pre-built bestanden
       loadBagForSelection().catch(function(e){
-        console.warn('BAG pre-built laden mislukt, probeer WFS fallback:', e.message);
-        // Fallback: WFS laden
-        startBagBackgroundLoad();
+        console.warn('BAG pre-built laden mislukt:', e.message);
       });
-    } else if(_layerState.bag){
+    }
+    // Als BAG laag al actief is, herlaad
+    if(_layerState.bag){
       _bagLastBbox = '';
       _bagLastBounds = null;
       _bagForceReload = true;
@@ -3732,19 +3724,37 @@ function loadBackgroundCbsData(){
 // GEMEENTEN VERGELIJKINGSRAPPORT
 // ============================================================
 function showComparisonReport(){
-  if(_selectedGemeenten.length < 2){
-    toast('Selecteer minimaal 2 gemeenten om te vergelijken');
+  // Bepaal wat we vergelijken: buurten of gemeenten
+  var compareType = 'gemeenten';
+  var compareLabel = 'gemeenten';
+  var gemeenten = [];
+
+  if(_selectedBuurten.length >= 2 && _buurtData){
+    // Vergelijk buurten
+    compareType = 'buurten';
+    compareLabel = 'buurten';
+    var buurtFilter = getSelectedBuurtFilter();
+    var gemFilter = getSelectedGemeenteFilter();
+    _buurtData.features.forEach(function(f){
+      var p = f.properties;
+      if(!p.buurtnaam) return;
+      if(buurtFilter !== 'all' && !buurtFilter.has(p.buurtnaam)) return;
+      if(gemFilter !== 'all' && !gemFilter.has(p.gemeentenaam)) return;
+      gemeenten.push(f);
+    });
+  } else if(_selectedGemeenten.length >= 2 && _gemeenteData){
+    // Vergelijk gemeenten
+    _selectedGemeenten.forEach(function(naam){
+      _gemeenteData.features.forEach(function(f){
+        if(f.properties.gemeentenaam === naam) gemeenten.push(f);
+      });
+    });
+  }
+
+  if(gemeenten.length < 2){
+    toast('Selecteer minimaal 2 gemeenten of buurten om te vergelijken');
     return;
   }
-  if(!_gemeenteData){ toast('Geen gemeentedata geladen'); return; }
-
-  var gemeenten = [];
-  _selectedGemeenten.forEach(function(naam){
-    _gemeenteData.features.forEach(function(f){
-      if(f.properties.gemeentenaam === naam) gemeenten.push(f);
-    });
-  });
-  if(gemeenten.length < 2){ toast('Gemeentedata niet gevonden'); return; }
 
   // Haal beschikbare indicatoren op
   var yearInds = _yearIndicators[_activeYear];
@@ -3773,13 +3783,16 @@ function showComparisonReport(){
   html += '.bar-fill{height:8px;border-radius:4px;transition:width .3s}';
   html += '@media print{body{padding:16px}th{background:#f1f5f9 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}.best,.worst{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
   html += '</style></head><body>';
+  var nameField = compareType === 'buurten' ? 'buurtnaam' : 'gemeentenaam';
   html += '<h1>Vergelijkingsrapport</h1>';
-  html += '<div class="subtitle">CBS Kerncijfers '+_activeYear+' \u00b7 '+gemeenten.length+' gemeenten \u00b7 '+activeInds.length+' indicatoren \u00b7 Gegenereerd: '+new Date().toLocaleString('nl-NL')+'</div>';
+  html += '<div class="subtitle">CBS Kerncijfers '+_activeYear+' \u00b7 '+gemeenten.length+' '+compareLabel+' \u00b7 '+activeInds.length+' indicatoren \u00b7 Gegenereerd: '+new Date().toLocaleString('nl-NL')+'</div>';
 
   // Tabel
   html += '<table><thead><tr><th style="min-width:160px">Indicator</th>';
   gemeenten.forEach(function(g){
-    html += '<th style="min-width:100px">'+g.properties.gemeentenaam+'</th>';
+    var label = g.properties[nameField] || g.properties.gemeentenaam || '-';
+    if(compareType === 'buurten' && g.properties.gemeentenaam) label += ' <span style="font-size:9px;color:#94a3b8;font-weight:400">('+g.properties.gemeentenaam+')</span>';
+    html += '<th style="min-width:100px">'+label+'</th>';
   });
   html += '<th style="min-width:80px">Landelijk gem.</th></tr></thead><tbody>';
 
@@ -3825,10 +3838,11 @@ function showComparisonReport(){
 
   // Samenvatting per gemeente
   html += '<div style="margin-top:16px;padding:16px;background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0">';
-  html += '<div style="font:600 13px \'DM Sans\',sans-serif;color:#16a34a;margin-bottom:8px">Samenvatting per gemeente</div>';
+  html += '<div style="font:600 13px \'DM Sans\',sans-serif;color:#16a34a;margin-bottom:8px">Samenvatting per '+compareLabel.replace(/en$/,'')+'</div>';
   html += '<div style="font-size:11px;color:#475569;line-height:1.7">';
   gemeenten.forEach(function(g){
     var p = g.properties;
+    var displayName = p[nameField] || p.gemeentenaam || '-';
     var sterke = [];
     var zwakke = [];
     activeInds.forEach(function(fm){
@@ -3836,11 +3850,11 @@ function showComparisonReport(){
       var ns = _nationalStats[fm.key];
       if(v == null || !ns || !ns.stddev) return;
       var z = (v - ns.avg) / ns.stddev;
-      if(reverseSet.has(fm.key)) z = -z; // Bij afstand is lager beter
+      if(reverseSet.has(fm.key)) z = -z;
       if(z > 1) sterke.push(fm.naam);
       else if(z < -1) zwakke.push(fm.naam);
     });
-    html += '<div style="margin-bottom:6px"><b style="color:#0f172a">'+p.gemeentenaam+'</b>';
+    html += '<div style="margin-bottom:6px"><b style="color:#0f172a">'+displayName+'</b>';
     if(sterke.length) html += ' \u2014 <span style="color:#16a34a">Sterk: '+sterke.join(', ')+'</span>';
     if(zwakke.length) html += ' \u2014 <span style="color:#dc2626">Aandachtspunt: '+zwakke.join(', ')+'</span>';
     html += '</div>';
@@ -3853,6 +3867,7 @@ function showComparisonReport(){
   html += '<div style="font-size:11px;color:#475569;line-height:1.8">';
   gemeenten.forEach(function(g){
     var p = g.properties;
+    var displayName = p[nameField] || p.gemeentenaam || '-';
     var insights = [];
     // Welvarend: hoge WOZ + hoog inkomen
     if(p.gem_woz_waarde && p.gem_inkomen_inwoner){
@@ -3916,7 +3931,7 @@ function showComparisonReport(){
       }
     }
     if(insights.length > 0){
-      html += '<div style="margin-bottom:8px;padding:6px 8px;background:rgba(37,99,235,.04);border-radius:6px"><b style="color:#1e40af">'+p.gemeentenaam+'</b><ul style="margin:4px 0 0 16px;padding:0">';
+      html += '<div style="margin-bottom:8px;padding:6px 8px;background:rgba(37,99,235,.04);border-radius:6px"><b style="color:#1e40af">'+displayName+'</b><ul style="margin:4px 0 0 16px;padding:0">';
       insights.forEach(function(ins){ html += '<li>'+ins+'</li>'; });
       html += '</ul></div>';
     }
@@ -3933,7 +3948,8 @@ function showComparisonReport(){
   } else {
     toast('Popup geblokkeerd \u2014 sta popups toe');
   }
-  logEvent('vergelijking_export', _selectedGemeenten.join(', '));
+  var names = compareType === 'buurten' ? _selectedBuurten : _selectedGemeenten;
+  logEvent('vergelijking_export', names.join(', '));
 }
 
 function formatCompareVal(v, key){
