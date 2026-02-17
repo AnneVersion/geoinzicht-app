@@ -207,7 +207,7 @@ def build_gemeente(gemeente_code, gemeente_naam, bbox, output_dir=None):
         features = download_page(bbox, start_index)
         all_features.extend(features)
 
-        if not features or len(features) < PAGE_SIZE:
+        if not features:
             break
 
         # Rate limiting — kleine pauze om PDOK niet te overbelasten
