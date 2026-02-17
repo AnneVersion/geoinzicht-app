@@ -320,6 +320,26 @@ select option{background:var(--bg);color:var(--tx)}
           <div id="bagLoadBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--ac),var(--ai));border-radius:3px;transition:width .3s ease"></div>
         </div>
       </div>
+      <!-- Achtergrond BAG laden -->
+      <button class="ms-loadbtn" id="bagBgLoadBtn" onclick="startBagBackgroundLoad()" style="display:none">
+        <span class="mi mi-sm">cloud_download</span> Laad alle BAG adressen (achtergrond)
+      </button>
+      <div id="bagBgProgress" style="display:none;margin-bottom:8px;padding:8px 10px;background:rgba(56,189,248,.04);border-radius:8px;border-left:3px solid var(--ai)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font:600 10px 'DM Sans',sans-serif;color:var(--ai);display:flex;align-items:center;gap:4px">
+            <span class="mi mi-sm" style="font-size:13px;animation:spin 1.5s linear infinite">sync</span>
+            <span id="bagBgText">Achtergrond laden...</span>
+          </span>
+          <span style="display:flex;align-items:center;gap:6px">
+            <span id="bagBgPct" style="font:700 10px 'Space Mono',monospace;color:var(--ac)">0%</span>
+            <button class="btn btn-s" onclick="cancelBagBackgroundLoad()" style="font-size:9px;padding:1px 6px;color:var(--dn)"><span class="mi mi-sm" style="font-size:11px">stop</span></button>
+          </span>
+        </div>
+        <div style="height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden">
+          <div id="bagBgBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--ai),var(--ac));border-radius:3px;transition:width .4s ease"></div>
+        </div>
+        <div id="bagBgDetail" style="font:400 9px 'Space Mono',monospace;color:var(--mt);margin-top:3px">Gemeenten: 0/0</div>
+      </div>
 
       <div class="sh"><span class="mi">filter_alt</span> Filter</div>
       <!-- Multi-select Gemeente -->
@@ -1600,6 +1620,7 @@ function toggleBagLayer(on){
     statusSection.style.display = '';
     statusBtns.style.display = 'flex';
     document.getElementById('bagCacheInfo').style.display = 'flex';
+    document.getElementById('bagBgLoadBtn').style.display = '';
     dimChoroplethLayers(true);
     // Panden als context
     if(!_layerState.panden){
@@ -1640,6 +1661,8 @@ function toggleBagLayer(on){
     statusSection.style.display = 'none';
     statusBtns.style.display = 'none';
     document.getElementById('bagCacheInfo').style.display = 'none';
+    document.getElementById('bagBgLoadBtn').style.display = 'none';
+    document.getElementById('bagBgProgress').style.display = 'none';
     dimChoroplethLayers(false);
     logEvent('bag_toggle', 'uit');
   }
@@ -1655,6 +1678,199 @@ function onBagMoveEnd(){
     _bagMoveTimer = null;
     loadBagVectors();
   }, 400);
+}
+
+// ============================================================
+// ACHTERGROND BAG LADEN
+// ============================================================
+var _bagBgAbort = null;
+var _bagBgRunning = false;
+
+function cancelBagBackgroundLoad(){
+  if(_bagBgAbort){ _bagBgAbort.abort(); _bagBgAbort = null; }
+  _bagBgRunning = false;
+  document.getElementById('bagBgProgress').style.display = 'none';
+  document.getElementById('bagBgLoadBtn').style.display = '';
+  toast('Achtergrond laden gestopt');
+}
+
+function startBagBackgroundLoad(){
+  if(_bagBgRunning){ toast('Achtergrond laden is al bezig'); return; }
+
+  // Bepaal welke gemeenten: selectie of alles in viewport
+  var gemeenteGeoms = [];
+  var src = _gemeenteData;
+  if(!src){ toast('Geen gemeentedata beschikbaar'); return; }
+
+  var gemFilter = getSelectedGemeenteFilter();
+  src.features.forEach(function(f){
+    if(!f.geometry) return;
+    var naam = f.properties.gemeentenaam;
+    if(gemFilter !== 'all' && !gemFilter.has(naam)) return;
+    // Bereken bbox van de gemeente-geometrie
+    var coords = [];
+    function extractCoords(geom){
+      if(!geom) return;
+      if(geom.type === 'Polygon'){
+        geom.coordinates.forEach(function(ring){ ring.forEach(function(c){ coords.push(c); }); });
+      } else if(geom.type === 'MultiPolygon'){
+        geom.coordinates.forEach(function(poly){ poly.forEach(function(ring){ ring.forEach(function(c){ coords.push(c); }); }); });
+      }
+    }
+    extractCoords(f.geometry);
+    if(coords.length === 0) return;
+    var minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+    coords.forEach(function(c){ if(c[0]<minLng)minLng=c[0]; if(c[0]>maxLng)maxLng=c[0]; if(c[1]<minLat)minLat=c[1]; if(c[1]>maxLat)maxLat=c[1]; });
+    gemeenteGeoms.push({naam:naam, bbox:minLat.toFixed(5)+','+minLng.toFixed(5)+','+maxLat.toFixed(5)+','+maxLng.toFixed(5)+',EPSG:4326'});
+  });
+
+  if(gemeenteGeoms.length === 0){
+    toast('Geen gemeenten geselecteerd');
+    return;
+  }
+
+  // Als geen selectie (alle gemeenten) en meer dan 20, waarschuw
+  if(gemFilter === 'all' && gemeenteGeoms.length > 20){
+    // Gebruik viewport als filter
+    var b = _map.getBounds();
+    gemeenteGeoms = gemeenteGeoms.filter(function(g){
+      var parts = g.bbox.split(',');
+      var s = parseFloat(parts[0]), w = parseFloat(parts[1]), n = parseFloat(parts[2]), e = parseFloat(parts[3]);
+      // Check overlap met viewport
+      return !(n < b.getSouth() || s > b.getNorth() || e < b.getWest() || w > b.getEast());
+    });
+    if(gemeenteGeoms.length === 0){
+      toast('Geen gemeenten in viewport — selecteer gemeenten of zoom in');
+      return;
+    }
+  }
+
+  _bagBgRunning = true;
+  _bagBgAbort = new AbortController();
+  var signal = _bagBgAbort.signal;
+
+  // UI
+  document.getElementById('bagBgLoadBtn').style.display = 'none';
+  var progEl = document.getElementById('bagBgProgress');
+  progEl.style.display = 'block';
+  var bgText = document.getElementById('bagBgText');
+  var bgPct = document.getElementById('bagBgPct');
+  var bgBar = document.getElementById('bagBgBar');
+  var bgDetail = document.getElementById('bagBgDetail');
+
+  var totalGemeenten = gemeenteGeoms.length;
+  var completedGemeenten = 0;
+  var totalAddresses = 0;
+  var startTime = Date.now();
+
+  bgText.textContent = 'Starten... (' + totalGemeenten + ' gemeenten)';
+  bgPct.textContent = '0%';
+  bgBar.style.width = '0%';
+
+  // Laad alle gemeenten sequentieel (1 tegelijk, 6 pages parallel per gemeente)
+  async function loadGemeente(gem){
+    if(signal.aborted) return 0;
+    bgText.textContent = gem.naam + '...';
+
+    // Hits query voor deze gemeente
+    var hitsUrl = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&resultType=hits&srsName=EPSG:4326&BBOX='+gem.bbox;
+    try {
+      var resp = await fetch(hitsUrl, {signal:signal});
+      var xml = await resp.text();
+      var m = xml.match(/numberMatched="(\d+)"/);
+      var total = m ? parseInt(m[1]) : 0;
+      if(total === 0) return 0;
+
+      // Laad alle pagina's voor deze gemeente
+      var totalPages = Math.ceil(total / BAG_PAGE_SIZE);
+      var loaded = 0;
+      var nextPage = 0;
+      var pagesComplete = 0;
+
+      await new Promise(function(resolve){
+        var running = 0;
+        function next(){
+          if(signal.aborted){ resolve(); return; }
+          while(nextPage < totalPages && running < BAG_CONCURRENCY){
+            (function(pi){
+              var startIdx = pi * BAG_PAGE_SIZE;
+              running++;
+              var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&outputFormat=application/json&count='+BAG_PAGE_SIZE+'&startIndex='+startIdx+'&sortBy=identificatie&srsName=EPSG:4326&BBOX='+gem.bbox;
+              fetch(url,{signal:signal}).then(function(r){return r.json()}).then(function(d){
+                running--;
+                var feats = d.features || [];
+                if(feats.length > 0){
+                  loaded += feats.length;
+                  saveBagToIDB(feats);
+                }
+                pagesComplete++;
+                // Update detail
+                bgDetail.textContent = gem.naam+': '+loaded.toLocaleString('nl-NL')+'/'+total.toLocaleString('nl-NL')+' · Gemeente '+(completedGemeenten+1)+'/'+totalGemeenten;
+                if(pagesComplete >= totalPages) resolve();
+                else next();
+              }).catch(function(e){
+                running--;
+                pagesComplete++;
+                if(e.name !== 'AbortError') console.warn('BAG bg page error:', e.message);
+                if(pagesComplete >= totalPages) resolve();
+                else next();
+              });
+            })(nextPage);
+            nextPage++;
+          }
+        }
+        next();
+      });
+
+      return loaded;
+    } catch(e){
+      if(e.name !== 'AbortError') console.warn('BAG bg gemeente error:', gem.naam, e.message);
+      return 0;
+    }
+  }
+
+  // Verwerk gemeenten sequentieel (voorkomt overbelasting PDOK)
+  (async function(){
+    for(var i = 0; i < gemeenteGeoms.length; i++){
+      if(signal.aborted) break;
+      var gem = gemeenteGeoms[i];
+      var count = await loadGemeente(gem);
+      totalAddresses += count;
+      completedGemeenten++;
+
+      var pct = Math.round(completedGemeenten / totalGemeenten * 100);
+      var elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+      var eta = completedGemeenten > 0 ? Math.round((totalGemeenten - completedGemeenten) * (elapsed / completedGemeenten)) : '?';
+      bgPct.textContent = pct + '%';
+      bgBar.style.width = pct + '%';
+      bgDetail.textContent = completedGemeenten+'/'+totalGemeenten+' gemeenten · '+totalAddresses.toLocaleString('nl-NL')+' adressen · '+elapsed+'s (±'+eta+'s resterend)';
+    }
+
+    // Klaar
+    _bagBgRunning = false;
+    _bagBgAbort = null;
+    var elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    bgText.textContent = 'Klaar!';
+    bgPct.textContent = '100%';
+    bgBar.style.width = '100%';
+    bgDetail.textContent = totalAddresses.toLocaleString('nl-NL')+' adressen geladen in '+elapsed+'s · '+_bagMemCount.toLocaleString('nl-NL')+' in cache';
+    updateBagCacheUI();
+
+    // Herrender de kaart met alle gecachte data
+    _bagVectorData = getCachedBagFeatures();
+    renderBagVectors();
+    updateBagStatusCountsFromData();
+
+    toast(totalAddresses.toLocaleString('nl-NL')+' BAG adressen geladen voor '+completedGemeenten+' gemeenten ✔');
+
+    // Verberg progress na 5 seconden
+    setTimeout(function(){
+      if(!_bagBgRunning){
+        progEl.style.display = 'none';
+        document.getElementById('bagBgLoadBtn').style.display = '';
+      }
+    }, 5000);
+  })();
 }
 
 // bagStatusColor via bagStatusToColor() hierboven
