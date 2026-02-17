@@ -584,7 +584,7 @@ select option{background:var(--bg);color:var(--tx)}
 
       <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v7.3</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v7.4</div>
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
@@ -4096,16 +4096,157 @@ function clearLog(){
 }
 
 // ============================================================
-// ANALYTICS — Bezoekersregistratie via lokale SQL Server API
+// ANALYTICS — Offline-first met IndexedDB + SQL Server sync
 // ============================================================
-// API endpoint: lokale Flask server (analytics_api.py)
-// Start met: python analytics_api.py
+// Data wordt ALTIJD lokaal opgeslagen in IndexedDB.
+// Als de Flask API (analytics_api.py) bereikbaar is, worden
+// ongesyncde records automatisch naar SQL Server gepusht.
+// Zo gaat er nooit data verloren, ongeacht of de server draait.
+
 var ANALYTICS_API = 'http://localhost:5000/api';
 var _visitorId = null;
 var _sessionId = null;
-var _supabaseReady = false;
+var _analyticsReady = false;
+var _analyticsDb = null;       // IndexedDB reference
+var _apiOnline = false;        // Is Flask API bereikbaar?
+var _syncInterval = null;      // Sync timer
+var _syncBusy = false;         // Voorkom dubbele syncs
 
-// Genereer uniek visitor ID (persistent in localStorage)
+// --------------- IndexedDB Setup ---------------
+function openAnalyticsDB(){
+  return new Promise(function(resolve, reject){
+    var req = indexedDB.open('geoinzicht_analytics', 2);
+    req.onupgradeneeded = function(e){
+      var db = e.target.result;
+      // Sessions store
+      if(!db.objectStoreNames.contains('sessions')){
+        var ss = db.createObjectStore('sessions', {keyPath:'session_id'});
+        ss.createIndex('synced', 'synced', {unique:false});
+      }
+      // Events store
+      if(!db.objectStoreNames.contains('events')){
+        var es = db.createObjectStore('events', {autoIncrement:true});
+        es.createIndex('synced', 'synced', {unique:false});
+        es.createIndex('session_id', 'session_id', {unique:false});
+      }
+      // Emails store
+      if(!db.objectStoreNames.contains('emails')){
+        var ms = db.createObjectStore('emails', {autoIncrement:true});
+        ms.createIndex('synced', 'synced', {unique:false});
+      }
+      // Feedback store
+      if(!db.objectStoreNames.contains('feedback')){
+        var fs = db.createObjectStore('feedback', {autoIncrement:true});
+        fs.createIndex('synced', 'synced', {unique:false});
+      }
+    };
+    req.onsuccess = function(e){
+      _analyticsDb = e.target.result;
+      resolve(_analyticsDb);
+    };
+    req.onerror = function(e){
+      console.warn('IndexedDB open fout:', e.target.error);
+      reject(e.target.error);
+    };
+  });
+}
+
+// --------------- IndexedDB Helpers ---------------
+function idbPut(storeName, record){
+  return new Promise(function(resolve, reject){
+    if(!_analyticsDb){ resolve(); return; }
+    try {
+      var tx = _analyticsDb.transaction(storeName, 'readwrite');
+      var store = tx.objectStore(storeName);
+      var req = store.put(record);
+      req.onsuccess = function(){ resolve(req.result); };
+      req.onerror = function(e){ reject(e.target.error); };
+    } catch(e){ reject(e); }
+  });
+}
+
+function idbAdd(storeName, record){
+  return new Promise(function(resolve, reject){
+    if(!_analyticsDb){ resolve(); return; }
+    try {
+      var tx = _analyticsDb.transaction(storeName, 'readwrite');
+      var store = tx.objectStore(storeName);
+      var req = store.add(record);
+      req.onsuccess = function(){ resolve(req.result); };
+      req.onerror = function(e){ reject(e.target.error); };
+    } catch(e){ reject(e); }
+  });
+}
+
+function idbGetAllByIndex(storeName, indexName, value){
+  return new Promise(function(resolve, reject){
+    if(!_analyticsDb){ resolve([]); return; }
+    try {
+      var tx = _analyticsDb.transaction(storeName, 'readonly');
+      var store = tx.objectStore(storeName);
+      var idx = store.index(indexName);
+      var req = idx.openCursor(IDBKeyRange.only(value));
+      var results = [];
+      req.onsuccess = function(e){
+        var cursor = e.target.result;
+        if(cursor){
+          results.push({key: cursor.primaryKey, value: cursor.value});
+          cursor.continue();
+        } else {
+          resolve(results);
+        }
+      };
+      req.onerror = function(e){ reject(e.target.error); };
+    } catch(e){ reject(e); }
+  });
+}
+
+function idbGetAll(storeName){
+  return new Promise(function(resolve, reject){
+    if(!_analyticsDb){ resolve([]); return; }
+    try {
+      var tx = _analyticsDb.transaction(storeName, 'readonly');
+      var store = tx.objectStore(storeName);
+      var req = store.getAll();
+      req.onsuccess = function(){ resolve(req.result || []); };
+      req.onerror = function(e){ reject(e.target.error); };
+    } catch(e){ reject(e); }
+  });
+}
+
+function idbMarkSynced(storeName, key){
+  return new Promise(function(resolve, reject){
+    if(!_analyticsDb){ resolve(); return; }
+    try {
+      var tx = _analyticsDb.transaction(storeName, 'readwrite');
+      var store = tx.objectStore(storeName);
+      var getReq = store.get(key);
+      getReq.onsuccess = function(){
+        var rec = getReq.result;
+        if(rec){
+          rec.synced = 1;
+          store.put(rec);
+        }
+        resolve();
+      };
+      getReq.onerror = function(e){ reject(e.target.error); };
+    } catch(e){ reject(e); }
+  });
+}
+
+function idbCount(storeName){
+  return new Promise(function(resolve){
+    if(!_analyticsDb){ resolve(0); return; }
+    try {
+      var tx = _analyticsDb.transaction(storeName, 'readonly');
+      var req = tx.objectStore(storeName).count();
+      req.onsuccess = function(){ resolve(req.result); };
+      req.onerror = function(){ resolve(0); };
+    } catch(e){ resolve(0); }
+  });
+}
+
+// --------------- Visitor & Session IDs ---------------
 function getVisitorId(){
   var vid = localStorage.getItem('geoinzicht_vid');
   if(!vid){
@@ -4115,7 +4256,6 @@ function getVisitorId(){
   return vid;
 }
 
-// Genereer sessie ID (nieuw per bezoek)
 function getSessionId(){
   if(!_sessionId){
     _sessionId = 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2,6);
@@ -4123,53 +4263,32 @@ function getSessionId(){
   return _sessionId;
 }
 
-// Verzamel bezoekersinfo
+// --------------- Bezoekersinfo ---------------
 function collectVisitorInfo(){
   var nav = navigator;
   var scr = screen;
-  var info = {
+  return {
     visitor_id: getVisitorId(),
     session_id: getSessionId(),
-    // Browser & systeem
     user_agent: nav.userAgent || '',
-    platform: nav.platform || nav.userAgentData && nav.userAgentData.platform || '',
+    platform: nav.platform || (nav.userAgentData && nav.userAgentData.platform) || '',
     language: nav.language || nav.userLanguage || '',
     languages: (nav.languages || []).join(','),
-    // Scherm
-    screen_w: scr.width,
-    screen_h: scr.height,
-    viewport_w: window.innerWidth,
-    viewport_h: window.innerHeight,
+    screen_w: scr.width, screen_h: scr.height,
+    viewport_w: window.innerWidth, viewport_h: window.innerHeight,
     pixel_ratio: window.devicePixelRatio || 1,
     color_depth: scr.colorDepth || scr.pixelDepth || 0,
-    // Verbinding
     connection_type: nav.connection ? nav.connection.effectiveType || nav.connection.type || '' : '',
-    connection_downlink: nav.connection ? nav.connection.downlink || 0 : 0,
-    // Hardware
     cores: nav.hardwareConcurrency || 0,
     memory: nav.deviceMemory || 0,
     touch: 'ontouchstart' in window || nav.maxTouchPoints > 0,
-    // Pagina
     referrer: document.referrer || '',
     url: location.href,
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
-    timezone_offset: new Date().getTimezoneOffset(),
-    // Canvas fingerprint (licht, niet privacy-invasief)
     canvas_hash: getCanvasFingerprint(),
-    // Cookies & storage
-    cookies_enabled: nav.cookieEnabled,
-    storage_available: typeof localStorage !== 'undefined',
-    // WebGL renderer (GPU info)
     gpu: getGPUInfo(),
-    // Tijd
-    first_visit: !localStorage.getItem('geoinzicht_vid'),
     visit_count: parseInt(localStorage.getItem('geoinzicht_visits') || '0') + 1,
   };
-
-  // Update visit count
-  localStorage.setItem('geoinzicht_visits', info.visit_count);
-
-  return info;
 }
 
 function getCanvasFingerprint(){
@@ -4200,28 +4319,12 @@ function getGPUInfo(){
   } catch(e){ return ''; }
 }
 
-// Analytics API helpers (lokale SQL Server via Flask)
-function analyticsPost(endpoint, data){
-  return fetch(ANALYTICS_API + '/' + endpoint, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(data)
-  }).catch(function(e){ console.warn('Analytics post error:', e.message); });
-}
-
-function analyticsGet(endpoint){
-  return fetch(ANALYTICS_API + '/' + endpoint)
-    .then(function(r){ return r.json(); })
-    .catch(function(e){ console.warn('Analytics get error:', e.message); return []; });
-}
-
-// IP adres ophalen via gratis API
+// --------------- IP / Geo ---------------
 function getVisitorIP(){
   return fetch('https://api.ipify.org?format=json')
     .then(function(r){ return r.json(); })
     .then(function(d){ return d.ip; })
     .catch(function(){
-      // Fallback
       return fetch('https://ipapi.co/json/')
         .then(function(r){ return r.json(); })
         .then(function(d){ return {ip:d.ip, city:d.city, region:d.region, country:d.country_name, isp:d.org, lat:d.latitude, lng:d.longitude}; })
@@ -4229,36 +4332,160 @@ function getVisitorIP(){
     });
 }
 
-// Geolocatie van IP
 function getIPGeo(ip){
   return fetch('https://ipapi.co/' + ip + '/json/')
     .then(function(r){ return r.json(); })
-    .then(function(d){ return {city:d.city||'', region:d.region||'', country:d.country_name||'', isp:d.org||'', lat:d.latitude||0, lng:d.longitude||0, postal:d.postal||''}; })
+    .then(function(d){ return {city:d.city||'', region:d.region||'', country:d.country_name||'', isp:d.org||'', lat:d.latitude||0, lng:d.longitude||0}; })
     .catch(function(){ return {}; });
 }
 
-// Start tracking sessie
+// --------------- API Online Check ---------------
+function checkApiOnline(){
+  return fetch(ANALYTICS_API + '/health', {method:'GET', signal: AbortSignal.timeout(3000)})
+    .then(function(r){ _apiOnline = r.ok; return _apiOnline; })
+    .catch(function(){ _apiOnline = false; return false; });
+}
+
+// --------------- Sync Engine ---------------
+async function syncToServer(){
+  if(_syncBusy || !_apiOnline || !_analyticsDb) return;
+  _syncBusy = true;
+  var totalSynced = 0;
+  try {
+    // 1. Sync sessions
+    var unsyncedSessions = await idbGetAllByIndex('sessions', 'synced', 0);
+    for(var i = 0; i < unsyncedSessions.length; i++){
+      var s = unsyncedSessions[i];
+      var rec = Object.assign({}, s.value);
+      delete rec.synced;
+      try {
+        var r = await fetch(ANALYTICS_API + '/session', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(rec)
+        });
+        if(r.ok){
+          await idbMarkSynced('sessions', s.key);
+          totalSynced++;
+        }
+      } catch(e){ _apiOnline = false; break; }
+    }
+
+    // 2. Sync events (batch van max 50)
+    if(_apiOnline){
+      var unsyncedEvents = await idbGetAllByIndex('events', 'synced', 0);
+      var batch = [];
+      var batchKeys = [];
+      for(var j = 0; j < unsyncedEvents.length && j < 200; j++){
+        var ev = Object.assign({}, unsyncedEvents[j].value);
+        delete ev.synced;
+        batch.push(ev);
+        batchKeys.push(unsyncedEvents[j].key);
+      }
+      if(batch.length > 0){
+        try {
+          var r2 = await fetch(ANALYTICS_API + '/events', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(batch)
+          });
+          if(r2.ok){
+            for(var k = 0; k < batchKeys.length; k++){
+              await idbMarkSynced('events', batchKeys[k]);
+            }
+            totalSynced += batch.length;
+          }
+        } catch(e){ _apiOnline = false; }
+      }
+    }
+
+    // 3. Sync emails
+    if(_apiOnline){
+      var unsyncedEmails = await idbGetAllByIndex('emails', 'synced', 0);
+      for(var m = 0; m < unsyncedEmails.length; m++){
+        var em = Object.assign({}, unsyncedEmails[m].value);
+        delete em.synced;
+        try {
+          var r3 = await fetch(ANALYTICS_API + '/email', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(em)
+          });
+          if(r3.ok){
+            await idbMarkSynced('emails', unsyncedEmails[m].key);
+            totalSynced++;
+          }
+        } catch(e){ _apiOnline = false; break; }
+      }
+    }
+
+    // 4. Sync feedback
+    if(_apiOnline){
+      var unsyncedFeedback = await idbGetAllByIndex('feedback', 'synced', 0);
+      for(var n = 0; n < unsyncedFeedback.length; n++){
+        var fb = Object.assign({}, unsyncedFeedback[n].value);
+        delete fb.synced;
+        try {
+          var r4 = await fetch(ANALYTICS_API + '/feedback', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify(fb)
+          });
+          if(r4.ok){
+            await idbMarkSynced('feedback', unsyncedFeedback[n].key);
+            totalSynced++;
+          }
+        } catch(e){ _apiOnline = false; break; }
+      }
+    }
+
+    if(totalSynced > 0){
+      console.log('Analytics sync: ' + totalSynced + ' records naar SQL Server gestuurd');
+    }
+  } catch(e){
+    console.warn('Analytics sync error:', e.message);
+  }
+  _syncBusy = false;
+}
+
+// Start sync interval: check elke 30 sec of API online is, sync als dat zo is
+function startSyncEngine(){
+  // Check direct
+  checkApiOnline().then(function(online){
+    if(online) syncToServer();
+  });
+  // Daarna elke 30 seconden
+  _syncInterval = setInterval(function(){
+    checkApiOnline().then(function(online){
+      if(online) syncToServer();
+    });
+  }, 30000);
+}
+
+// --------------- Init Analytics ---------------
 async function initAnalytics(){
   try {
+    // Open IndexedDB
+    await openAnalyticsDB();
+
     _visitorId = getVisitorId();
     _sessionId = getSessionId();
 
     // Verzamel info
     var info = collectVisitorInfo();
+    localStorage.setItem('geoinzicht_visits', info.visit_count);
 
-    // IP ophalen
-    var ipResult = await getVisitorIP();
+    // IP ophalen (async, niet blokkerend)
     var ip = '';
     var geo = {};
-    if(typeof ipResult === 'string'){
-      ip = ipResult;
-      geo = await getIPGeo(ip);
-    } else if(ipResult && ipResult.ip){
-      ip = ipResult.ip;
-      geo = ipResult;
-    }
+    try {
+      var ipResult = await getVisitorIP();
+      if(typeof ipResult === 'string'){
+        ip = ipResult;
+        geo = await getIPGeo(ip);
+      } else if(ipResult && ipResult.ip){
+        ip = ipResult.ip;
+        geo = ipResult;
+      }
+    } catch(e){ /* IP ophalen mislukt, geen probleem */ }
 
-    // Sessie opslaan in Supabase
+    // Sessie record
     var session = {
       visitor_id: _visitorId,
       session_id: _sessionId,
@@ -4273,10 +4500,8 @@ async function initAnalytics(){
       platform: info.platform,
       language: info.language,
       languages: info.languages,
-      screen_w: info.screen_w,
-      screen_h: info.screen_h,
-      viewport_w: info.viewport_w,
-      viewport_h: info.viewport_h,
+      screen_w: info.screen_w, screen_h: info.screen_h,
+      viewport_w: info.viewport_w, viewport_h: info.viewport_h,
       pixel_ratio: info.pixel_ratio,
       color_depth: info.color_depth,
       connection_type: info.connection_type,
@@ -4289,20 +4514,30 @@ async function initAnalytics(){
       canvas_hash: info.canvas_hash,
       gpu: (info.gpu || '').substring(0, 200),
       visit_count: info.visit_count,
-      started_at: new Date().toISOString()
+      started_at: new Date().toISOString(),
+      ended_at: null,
+      duration_seconds: null,
+      synced: 0   // 0 = niet gesynct, 1 = gesynct naar SQL Server
     };
 
-    await analyticsPost('session', session);
-    _supabaseReady = true;
-    console.log('Analytics: sessie geregistreerd', _sessionId);
+    // Altijd opslaan in IndexedDB
+    await idbPut('sessions', session);
+    _analyticsReady = true;
+    console.log('Analytics: sessie opgeslagen in IndexedDB', _sessionId);
+
+    // Start sync engine
+    startSyncEngine();
+
   } catch(e){
     console.warn('Analytics init error:', e.message);
+    // Zelfs als IDB faalt, markeer als ready zodat events niet verloren gaan
+    _analyticsReady = true;
   }
 }
 
-// Track events naar SQL Server (naast localStorage)
+// --------------- Track Events ---------------
 function trackEvent(type, detail){
-  if(!_supabaseReady) return;
+  if(!_analyticsReady) return;
   var evt = {
     visitor_id: _visitorId,
     session_id: _sessionId,
@@ -4311,26 +4546,48 @@ function trackEvent(type, detail){
     zoom: _map ? _map.getZoom() : null,
     center_lat: _map ? parseFloat(_map.getCenter().lat.toFixed(5)) : null,
     center_lng: _map ? parseFloat(_map.getCenter().lng.toFixed(5)) : null,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    synced: 0
   };
-  analyticsPost('event', evt);
+  // Fire-and-forget naar IndexedDB
+  idbAdd('events', evt).catch(function(e){ console.warn('Event IDB fout:', e); });
 }
 
-// Track sessie-einde (beforeunload)
+// --------------- Sessie-einde ---------------
 function trackSessionEnd(){
-  if(!_supabaseReady) return;
+  if(!_analyticsReady || !_analyticsDb) return;
   var duration = Math.round((Date.now() - _appStartTime) / 1000);
-  var url = ANALYTICS_API + '/session-end';
-  var data = JSON.stringify({
-    session_id: _sessionId,
-    duration_seconds: duration,
-    ended_at: new Date().toISOString()
-  });
-  if(navigator.sendBeacon){
-    navigator.sendBeacon(url, new Blob([data], {type:'application/json'}));
-  } else {
-    fetch(url, {method:'POST', body:data, headers:{'Content-Type':'application/json'}, keepalive:true}).catch(function(){});
-  }
+
+  // Update sessie in IndexedDB
+  try {
+    var tx = _analyticsDb.transaction('sessions', 'readwrite');
+    var store = tx.objectStore('sessions');
+    var getReq = store.get(_sessionId);
+    getReq.onsuccess = function(){
+      var rec = getReq.result;
+      if(rec){
+        rec.ended_at = new Date().toISOString();
+        rec.duration_seconds = duration;
+        rec.synced = 0; // Opnieuw syncen nodig
+        store.put(rec);
+      }
+    };
+  } catch(e){}
+
+  // Probeer ook direct naar API te sturen (sendBeacon)
+  try {
+    var url = ANALYTICS_API + '/session-end';
+    var data = JSON.stringify({
+      session_id: _sessionId,
+      duration_seconds: duration,
+      ended_at: new Date().toISOString()
+    });
+    if(navigator.sendBeacon){
+      navigator.sendBeacon(url, new Blob([data], {type:'application/json'}));
+    } else {
+      fetch(url, {method:'POST', body:data, headers:{'Content-Type':'application/json'}, keepalive:true}).catch(function(){});
+    }
+  } catch(e){}
 }
 
 // Voeg analytics tracking toe aan bestaand logEvent
@@ -4352,50 +4609,196 @@ document.addEventListener('visibilitychange', function(){
 // Track sessie-einde
 window.addEventListener('beforeunload', trackSessionEnd);
 
-// E-mail opslaan via Analytics API
-function saveEmailToSupabase(email){
+// E-mail opslaan (altijd in IndexedDB, sync later)
+function saveEmailToAnalytics(email){
   if(!email) return;
-  return analyticsPost('email', {
+  return idbAdd('emails', {
     visitor_id: _visitorId,
     session_id: _sessionId,
     email: email,
     collected_at: new Date().toISOString(),
-    session_duration_min: Math.round((Date.now() - _appStartTime) / 60000)
-  });
+    session_duration_min: Math.round((Date.now() - _appStartTime) / 60000),
+    synced: 0
+  }).catch(function(e){ console.warn('Email IDB fout:', e); });
+}
+
+// Feedback opslaan (altijd in IndexedDB, sync later)
+function saveFeedbackToAnalytics(text, email, year){
+  if(!text) return;
+  return idbAdd('feedback', {
+    visitor_id: _visitorId,
+    session_id: _sessionId,
+    text: text,
+    email: email || '',
+    year: year || _activeYear,
+    session_duration_min: Math.round((Date.now() - _appStartTime) / 60000),
+    submitted_at: new Date().toISOString(),
+    synced: 0
+  }).catch(function(e){ console.warn('Feedback IDB fout:', e); });
 }
 
 // ============================================================
-// ADMIN DASHBOARD (verborgen, alleen met ?admin=1 URL parameter)
+// ADMIN DASHBOARD — Beveiligd met wachtwoord
 // ============================================================
+// Admin is alleen toegankelijk met ?admin in URL + correct wachtwoord.
+// Wachtwoord-hash wordt opgeslagen bij eerste keer instellen.
+// Data komt uit IndexedDB (altijd beschikbaar) OF SQL Server API.
+
 var _isAdmin = new URLSearchParams(location.search).has('admin');
+var _adminUnlocked = false;
+var ADMIN_HASH_KEY = 'geoinzicht_admin_hash';
+
+// Simpele hash functie (sha-256 via SubtleCrypto)
+async function hashPassword(pw){
+  var enc = new TextEncoder().encode(pw);
+  var hashBuffer = await crypto.subtle.digest('SHA-256', enc);
+  var hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+}
+
+async function checkAdminPassword(pw){
+  var stored = localStorage.getItem(ADMIN_HASH_KEY);
+  if(!stored){
+    // Eerste keer: sla wachtwoord op
+    var h = await hashPassword(pw);
+    localStorage.setItem(ADMIN_HASH_KEY, h);
+    return true;
+  }
+  var h2 = await hashPassword(pw);
+  return h2 === stored;
+}
+
+function showAdminLogin(){
+  var logPane = document.getElementById('p-log');
+  if(!logPane) return;
+  var tabLog = document.getElementById('tabLog');
+  if(tabLog) tabLog.style.display = '';
+
+  var firstTime = !localStorage.getItem(ADMIN_HASH_KEY);
+  logPane.innerHTML =
+    '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;padding:24px">' +
+    '<span class="mi" style="font-size:48px;color:var(--ac);margin-bottom:12px">admin_panel_settings</span>' +
+    '<div style="font:700 14px \'Space Mono\',monospace;color:var(--ac);margin-bottom:8px">Admin Dashboard</div>' +
+    '<div style="font-size:11px;color:var(--mt);margin-bottom:16px;text-align:center">' +
+      (firstTime ? 'Stel een admin wachtwoord in.<br>Dit wordt lokaal opgeslagen.' : 'Voer je admin wachtwoord in.') +
+    '</div>' +
+    '<div style="display:flex;gap:6px;align-items:center">' +
+    '<input type="password" id="adminPwInput" placeholder="Wachtwoord" ' +
+      'style="background:var(--s2);border:1px solid var(--br);border-radius:6px;padding:8px 12px;color:var(--tx);font-size:12px;width:180px" ' +
+      'onkeydown="if(event.key===\'Enter\')verifyAdminPw()">' +
+    '<button class="btn btn-p" onclick="verifyAdminPw()" style="font-size:11px;padding:8px 14px">' +
+      (firstTime ? '<span class="mi mi-sm">lock</span> Instellen' : '<span class="mi mi-sm">lock_open</span> Inloggen') +
+    '</button></div>' +
+    '<div id="adminPwError" style="font-size:10px;color:var(--dn);margin-top:8px;display:none"></div>' +
+    '</div>';
+
+  // Focus input
+  setTimeout(function(){ var inp = document.getElementById('adminPwInput'); if(inp) inp.focus(); }, 100);
+}
+
+async function verifyAdminPw(){
+  var inp = document.getElementById('adminPwInput');
+  var errEl = document.getElementById('adminPwError');
+  if(!inp) return;
+  var pw = inp.value.trim();
+  if(!pw){
+    errEl.textContent = 'Voer een wachtwoord in';
+    errEl.style.display = '';
+    return;
+  }
+  if(pw.length < 4){
+    errEl.textContent = 'Minimaal 4 tekens';
+    errEl.style.display = '';
+    return;
+  }
+  var ok = await checkAdminPassword(pw);
+  if(ok){
+    _adminUnlocked = true;
+    renderAdminDashboard();
+  } else {
+    errEl.textContent = 'Onjuist wachtwoord';
+    errEl.style.display = '';
+    inp.value = '';
+    inp.focus();
+  }
+}
 
 function renderAdminDashboard(){
   if(!_isAdmin) return;
+  if(!_adminUnlocked){
+    showAdminLogin();
+    return;
+  }
+
   // Toon admin tab
   var tabLog = document.getElementById('tabLog');
   if(tabLog) tabLog.style.display = '';
-  // Verberg de normale log tab inhoud en toon admin dashboard
   var logPane = document.getElementById('p-log');
   if(!logPane) return;
 
-  logPane.innerHTML = '<div class="sh"><span class="mi">admin_panel_settings</span> Admin Dashboard</div>' +
+  logPane.innerHTML =
+    '<div class="sh"><span class="mi">admin_panel_settings</span> Admin Dashboard</div>' +
     '<div class="card" style="margin-bottom:8px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-    '<span style="font:700 12px \'Space Mono\',monospace;color:var(--ac)">Bezoekers Analytics</span>' +
-    '<div style="display:flex;gap:4px">' +
-    '<button class="btn btn-s" onclick="refreshAdminData()" style="font-size:9px;padding:3px 8px"><span class="mi mi-sm" style="font-size:11px">refresh</span> Ververs</button>' +
-    '<button class="btn btn-s" onclick="exportAdminCSV()" style="font-size:9px;padding:3px 8px"><span class="mi mi-sm" style="font-size:11px">download</span> CSV</button>' +
-    '</div></div>' +
-    '<div id="adminStats" style="font-size:11px;color:var(--mt)">Laden...</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+        '<span style="font:700 12px \'Space Mono\',monospace;color:var(--ac)">Bezoekers Analytics</span>' +
+        '<div style="display:flex;gap:4px;align-items:center">' +
+          '<span id="adminSyncStatus" style="font-size:9px;color:var(--mt)"></span>' +
+          '<button class="btn btn-s" onclick="forceSync()" style="font-size:9px;padding:3px 8px" title="Forceer sync naar SQL Server"><span class="mi mi-sm" style="font-size:11px">sync</span> Sync</button>' +
+          '<button class="btn btn-s" onclick="refreshAdminData()" style="font-size:9px;padding:3px 8px"><span class="mi mi-sm" style="font-size:11px">refresh</span> Ververs</button>' +
+          '<button class="btn btn-s" onclick="exportAdminCSV()" style="font-size:9px;padding:3px 8px"><span class="mi mi-sm" style="font-size:11px">download</span> CSV</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="adminStats" style="font-size:11px;color:var(--mt)">Laden...</div>' +
     '</div>' +
     '<div class="sh"><span class="mi">people</span> Recente Sessies</div>' +
     '<div id="adminSessions" class="card" style="font-size:10px;max-height:300px;overflow-y:auto">Laden...</div>' +
     '<div class="sh"><span class="mi">mail</span> E-mailadressen</div>' +
     '<div id="adminEmails" class="card" style="font-size:10px;max-height:200px;overflow-y:auto">Laden...</div>' +
     '<div class="sh"><span class="mi">timeline</span> Recente Events</div>' +
-    '<div id="adminEvents" class="card" style="font-size:10px;max-height:300px;overflow-y:auto">Laden...</div>';
+    '<div id="adminEvents" class="card" style="font-size:10px;max-height:300px;overflow-y:auto">Laden...</div>' +
+    '<div class="sh"><span class="mi">settings</span> Admin Instellingen</div>' +
+    '<div class="card" style="font-size:10px">' +
+      '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
+        '<button class="btn btn-s" onclick="resetAdminPassword()" style="font-size:9px;padding:3px 8px"><span class="mi mi-sm" style="font-size:11px">key</span> Wachtwoord wijzigen</button>' +
+        '<button class="btn btn-s" onclick="clearLocalAnalytics()" style="font-size:9px;padding:3px 8px;border-color:var(--dn);color:var(--dn)"><span class="mi mi-sm" style="font-size:11px">delete_sweep</span> Lokale data wissen</button>' +
+      '</div>' +
+    '</div>';
 
   refreshAdminData();
+}
+
+async function forceSync(){
+  var statusEl = document.getElementById('adminSyncStatus');
+  if(statusEl) statusEl.innerHTML = '<span style="color:var(--wn)">Syncen...</span>';
+  await checkApiOnline();
+  if(_apiOnline){
+    await syncToServer();
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--ac)">Gesynct \u2714</span>';
+    refreshAdminData();
+  } else {
+    if(statusEl) statusEl.innerHTML = '<span style="color:var(--dn)">API offline</span>';
+    toast('SQL Server API niet bereikbaar. Start: python analytics_api.py');
+  }
+}
+
+function resetAdminPassword(){
+  if(!confirm('Wachtwoord wijzigen? Het huidige wachtwoord wordt verwijderd.')) return;
+  localStorage.removeItem(ADMIN_HASH_KEY);
+  _adminUnlocked = false;
+  showAdminLogin();
+  toast('Stel een nieuw admin wachtwoord in');
+}
+
+function clearLocalAnalytics(){
+  if(!confirm('Alle lokale analytics data wissen uit IndexedDB?\nData die al naar SQL Server is gesynct blijft daar behouden.')) return;
+  if(!_analyticsDb) return;
+  var stores = ['sessions','events','emails','feedback'];
+  var tx = _analyticsDb.transaction(stores, 'readwrite');
+  stores.forEach(function(name){ tx.objectStore(name).clear(); });
+  tx.oncomplete = function(){
+    toast('Lokale analytics data gewist');
+    refreshAdminData();
+  };
 }
 
 async function refreshAdminData(){
@@ -4403,31 +4806,102 @@ async function refreshAdminData(){
   var sessEl = document.getElementById('adminSessions');
   var emailEl = document.getElementById('adminEmails');
   var evtEl = document.getElementById('adminEvents');
+  var statusEl = document.getElementById('adminSyncStatus');
   if(!statsEl) return;
 
   try {
-    // Haal data op via lokale API
-    var stats = await analyticsGet('admin/stats');
-    var sessions = await analyticsGet('admin/sessions?limit=100');
-    var emails = await analyticsGet('admin/emails');
-    var events = await analyticsGet('admin/events?limit=200');
+    // Probeer data uit SQL Server (als online), anders IndexedDB
+    var sessions = [];
+    var emails = [];
+    var events = [];
+    var stats = null;
+    var dataSource = 'IndexedDB';
 
-    // Stats uit API
+    if(_apiOnline){
+      try {
+        stats = await fetch(ANALYTICS_API + '/admin/stats').then(function(r){ return r.json(); });
+        sessions = await fetch(ANALYTICS_API + '/admin/sessions?limit=100').then(function(r){ return r.json(); });
+        emails = await fetch(ANALYTICS_API + '/admin/emails').then(function(r){ return r.json(); });
+        events = await fetch(ANALYTICS_API + '/admin/events?limit=200').then(function(r){ return r.json(); });
+        dataSource = 'SQL Server';
+      } catch(e){
+        _apiOnline = false;
+      }
+    }
+
+    // Fallback: data uit IndexedDB
+    if(!_apiOnline || !stats){
+      sessions = await idbGetAll('sessions');
+      sessions.sort(function(a,b){ return (b.started_at||'').localeCompare(a.started_at||''); });
+      emails = await idbGetAll('emails');
+      emails.sort(function(a,b){ return (b.collected_at||'').localeCompare(a.collected_at||''); });
+      events = await idbGetAll('events');
+      events.sort(function(a,b){ return (b.timestamp||'').localeCompare(a.timestamp||''); });
+      events = events.slice(0, 200);
+      dataSource = 'IndexedDB';
+
+      // Bereken stats uit lokale data
+      var visitors = {};
+      var today = new Date().toISOString().substring(0,10);
+      var todaySess = 0;
+      sessions.forEach(function(s){
+        if(s.visitor_id) visitors[s.visitor_id] = true;
+        if(s.started_at && s.started_at.substring(0,10) === today) todaySess++;
+      });
+
+      var countries = {};
+      var cities = {};
+      sessions.forEach(function(s){
+        if(s.country){ countries[s.country] = (countries[s.country]||0) + 1; }
+        if(s.city){ cities[s.city] = (cities[s.city]||0) + 1; }
+      });
+
+      stats = {
+        unique_visitors: Object.keys(visitors).length,
+        today_sessions: todaySess,
+        total_sessions: sessions.length,
+        total_emails: emails.length,
+        total_events: events.length,
+        top_countries: Object.entries(countries).sort(function(a,b){return b[1]-a[1]}).slice(0,10).map(function(e){return {country:e[0],count:e[1]}}),
+        top_cities: Object.entries(cities).sort(function(a,b){return b[1]-a[1]}).slice(0,10).map(function(e){return {city:e[0],count:e[1]}}),
+      };
+    }
+
+    // Sync status
+    var unsyncCount = 0;
+    try {
+      var us = await idbGetAllByIndex('sessions','synced',0);
+      var ue = await idbGetAllByIndex('events','synced',0);
+      var um = await idbGetAllByIndex('emails','synced',0);
+      var uf = await idbGetAllByIndex('feedback','synced',0);
+      unsyncCount = us.length + ue.length + um.length + uf.length;
+    } catch(e){}
+
+    if(statusEl){
+      var syncHtml = '<span style="color:' + (_apiOnline ? 'var(--ac)' : 'var(--dn)') + '">\u25cf ' + (_apiOnline ? 'Online' : 'Offline') + '</span>';
+      if(unsyncCount > 0){
+        syncHtml += ' \u00b7 <span style="color:var(--wn)">' + unsyncCount + ' ongesynct</span>';
+      }
+      syncHtml += ' \u00b7 <span style="color:var(--mt)">' + dataSource + '</span>';
+      statusEl.innerHTML = syncHtml;
+    }
+
+    // Stats
     var uniqueVisitors = stats.unique_visitors || 0;
     var todaySessions = stats.today_sessions || 0;
-    var countries = {};
-    var cities = {};
-    (stats.top_countries || []).forEach(function(c){ countries[c.country] = c.count; });
-    (stats.top_cities || []).forEach(function(c){ cities[c.city] = c.count; });
+    var countriesMap = {};
+    var citiesMap = {};
+    (stats.top_countries || []).forEach(function(c){ countriesMap[c.country] = c.count; });
+    (stats.top_cities || []).forEach(function(c){ citiesMap[c.city] = c.count; });
 
     statsEl.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
       '<div style="background:rgba(57,255,20,.08);border-radius:8px;padding:10px;text-align:center"><div style="font:700 18px \'Space Mono\',monospace;color:var(--ac)">'+uniqueVisitors+'</div><div style="font-size:9px;color:var(--mt)">Unieke bezoekers</div></div>' +
       '<div style="background:rgba(56,189,248,.08);border-radius:8px;padding:10px;text-align:center"><div style="font:700 18px \'Space Mono\',monospace;color:var(--ai)">'+todaySessions+'</div><div style="font-size:9px;color:var(--mt)">Vandaag</div></div>' +
-      '<div style="background:rgba(251,191,36,.08);border-radius:8px;padding:10px;text-align:center"><div style="font:700 18px \'Space Mono\',monospace;color:var(--wn)">'+sessions.length+'</div><div style="font-size:9px;color:var(--mt)">Totaal sessies</div></div>' +
-      '<div style="background:rgba(239,68,68,.08);border-radius:8px;padding:10px;text-align:center"><div style="font:700 18px \'Space Mono\',monospace;color:#ef4444">'+emails.length+'</div><div style="font-size:9px;color:var(--mt)">E-mails</div></div>' +
+      '<div style="background:rgba(251,191,36,.08);border-radius:8px;padding:10px;text-align:center"><div style="font:700 18px \'Space Mono\',monospace;color:var(--wn)">'+(stats.total_sessions||sessions.length)+'</div><div style="font-size:9px;color:var(--mt)">Totaal sessies</div></div>' +
+      '<div style="background:rgba(239,68,68,.08);border-radius:8px;padding:10px;text-align:center"><div style="font:700 18px \'Space Mono\',monospace;color:#ef4444">'+(stats.total_emails||emails.length)+'</div><div style="font-size:9px;color:var(--mt)">E-mails</div></div>' +
       '</div>' +
-      '<div style="font-size:10px;color:var(--mt)"><b>Landen:</b> ' + Object.entries(countries).sort(function(a,b){return b[1]-a[1]}).map(function(e){return e[0]+' ('+e[1]+')'}).join(', ') + '</div>' +
-      '<div style="font-size:10px;color:var(--mt);margin-top:4px"><b>Steden:</b> ' + Object.entries(cities).sort(function(a,b){return b[1]-a[1]}).slice(0,10).map(function(e){return e[0]+' ('+e[1]+')'}).join(', ') + '</div>';
+      '<div style="font-size:10px;color:var(--mt)"><b>Landen:</b> ' + Object.entries(countriesMap).sort(function(a,b){return b[1]-a[1]}).map(function(e){return e[0]+' ('+e[1]+')'}).join(', ') + '</div>' +
+      '<div style="font-size:10px;color:var(--mt);margin-top:4px"><b>Steden:</b> ' + Object.entries(citiesMap).sort(function(a,b){return b[1]-a[1]}).slice(0,10).map(function(e){return e[0]+' ('+e[1]+')'}).join(', ') + '</div>';
 
     // Sessies
     var sessHtml = '';
@@ -4435,10 +4909,11 @@ async function refreshAdminData(){
       var t = s.started_at ? new Date(s.started_at) : null;
       var tijd = t ? t.toLocaleDateString('nl-NL',{day:'2-digit',month:'short'}) + ' ' + t.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}) : '';
       var browser = parseBrowser(s.user_agent || '');
+      var syncBadge = s.synced === 0 ? ' <span style="color:var(--wn);font-size:8px" title="Nog niet gesynct">\u25cf</span>' : '';
       sessHtml += '<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
-        '<span style="color:var(--ac);font:500 10px \'Space Mono\',monospace">'+escapeHtml(s.ip_address||'?')+'</span>' +
-        '<span style="color:var(--mt);font-size:9px">'+tijd+'</span></div>' +
+        '<span style="color:var(--ac);font:500 10px \'Space Mono\',monospace">'+escapeHtml(s.ip_address||'lokaal')+'</span>' +
+        '<span style="color:var(--mt);font-size:9px">'+tijd+syncBadge+'</span></div>' +
         '<div style="font-size:9px;color:var(--tx);margin-top:2px">'+escapeHtml(browser)+' \u00b7 '+escapeHtml(s.platform||'')+' \u00b7 '+(s.screen_w||'?')+'x'+(s.screen_h||'?')+(s.touch_device?' \u00b7 \u261f Touch':'')+'</div>' +
         '<div style="font-size:9px;color:var(--mt)">'+escapeHtml((s.city||'')+(s.region?' , '+s.region:'')+(s.country?' , '+s.country:''))+' \u00b7 Bezoek #'+(s.visit_count||1)+'</div>' +
         (s.referrer ? '<div style="font-size:8px;color:var(--mt);opacity:.6">ref: '+escapeHtml(s.referrer.substring(0,80))+'</div>' : '') +
@@ -4487,9 +4962,17 @@ function parseBrowser(ua){
 
 async function exportAdminCSV(){
   try {
-    var sessions = await analyticsGet('admin/sessions?limit=1000');
+    var sessions = [];
+    if(_apiOnline){
+      try {
+        sessions = await fetch(ANALYTICS_API + '/admin/sessions?limit=1000').then(function(r){ return r.json(); });
+      } catch(e){ _apiOnline = false; }
+    }
+    if(!sessions.length){
+      sessions = await idbGetAll('sessions');
+    }
     if(!sessions.length){ toast('Geen data'); return; }
-    var keys = Object.keys(sessions[0]);
+    var keys = Object.keys(sessions[0]).filter(function(k){ return k !== 'synced'; });
     var csv = keys.join(';') + '\n';
     sessions.forEach(function(s){
       csv += keys.map(function(k){ return String(s[k]||'').replace(/;/g,',').replace(/\n/g,' '); }).join(';') + '\n';
@@ -4586,6 +5069,70 @@ function loadBackgroundCbsData(){
 // ============================================================
 // GEMEENTEN VERGELIJKINGSRAPPORT
 // ============================================================
+function countBagForArea(areaFeature, areaType){
+  // Tel BAG adressen die binnen het gebied vallen
+  // Gebruikt _bagMem (in-memory cache) en _bagVectorData
+  var count = 0;
+  var bouwjaren = [];
+  var oppervlaktes = [];
+  var gebruiksdoelen = {};
+  if(!areaFeature || !areaFeature.geometry) return {count:0, bouwjaren:[], oppervlaktes:[], gebruiksdoelen:{}};
+
+  // Haal bounds op voor snelle pre-filter
+  var geom = areaFeature.geometry;
+  var coords = geom.coordinates;
+  // Bereken bbox
+  var minLat=90,maxLat=-90,minLng=180,maxLng=-180;
+  function scanCoords(c){
+    if(typeof c[0]==='number'){ if(c[1]<minLat)minLat=c[1]; if(c[1]>maxLat)maxLat=c[1]; if(c[0]<minLng)minLng=c[0]; if(c[0]>maxLng)maxLng=c[0]; return; }
+    for(var i=0;i<c.length;i++) scanCoords(c[i]);
+  }
+  scanCoords(coords);
+
+  // Haal latlngs op voor punt-in-polygoon
+  var latlngs = [];
+  try {
+    var tempLayer = L.geoJSON(areaFeature);
+    tempLayer.eachLayer(function(sub){
+      if(sub.getLatLngs){
+        var ll = sub.getLatLngs();
+        latlngs = ll[0] || ll;
+        if(Array.isArray(latlngs[0])) latlngs = latlngs[0];
+      }
+    });
+  } catch(e){ return {count:0, bouwjaren:[], oppervlaktes:[], gebruiksdoelen:{}}; }
+  if(!latlngs.length) return {count:0, bouwjaren:[], oppervlaktes:[], gebruiksdoelen:{}};
+
+  function checkFeature(f){
+    var c = f.geometry && f.geometry.coordinates;
+    if(!c) return;
+    if(c[1] < minLat || c[1] > maxLat || c[0] < minLng || c[0] > maxLng) return;
+    if(pointInPolygon(c[1], c[0], latlngs)){
+      count++;
+      var fp = f.properties || {};
+      if(fp.bouwjaar && fp.bouwjaar > 1000) bouwjaren.push(fp.bouwjaar);
+      if(fp.oppervlakte && fp.oppervlakte > 0) oppervlaktes.push(fp.oppervlakte);
+      var doel = fp.gebruiksdoel || 'Onbekend';
+      gebruiksdoelen[doel] = (gebruiksdoelen[doel]||0) + 1;
+    }
+  }
+
+  // Scan in-memory cache
+  for(var id in _bagMem) checkFeature(_bagMem[id]);
+  // Scan viewport data (skip duplicaten)
+  var seen = {};
+  for(var id2 in _bagMem) seen[id2] = true;
+  if(_bagVectorData){
+    _bagVectorData.forEach(function(f){
+      var fid = f.properties && (f.properties.identificatie || f.properties.id);
+      if(fid && seen[fid]) return;
+      if(fid) seen[fid] = true;
+      checkFeature(f);
+    });
+  }
+  return {count:count, bouwjaren:bouwjaren, oppervlaktes:oppervlaktes, gebruiksdoelen:gebruiksdoelen};
+}
+
 function showComparisonReport(){
   // Zorg dat nationalStats berekend is
   if(!_nationalStats || Object.keys(_nationalStats).length === 0) computeNationalStats();
@@ -4602,7 +5149,6 @@ function showComparisonReport(){
     nameField = 'buurtnaam';
     var buurtFilter = getSelectedBuurtFilter();
     var gemFilter = getSelectedGemeenteFilter();
-    // Deduplicate: gebruik buurtcode als unieke ID
     var seen = new Set();
     _buurtData.features.forEach(function(f){
       var p = f.properties;
@@ -4613,7 +5159,6 @@ function showComparisonReport(){
       if(!seen.has(key)){ seen.add(key); items.push(f); }
     });
   } else if(_selectedGemeenten.length >= 2 && _gemeenteData){
-    // Deduplicate: gebruik gemeentecode
     var seen = new Set();
     _selectedGemeenten.forEach(function(naam){
       _gemeenteData.features.forEach(function(f){
@@ -4631,9 +5176,18 @@ function showComparisonReport(){
     return;
   }
 
-  // ALLE indicatoren gebruiken, niet alleen year-filtered
+  // BAG adressen tellen per item
+  var hasBag = (_bagMemCount > 0) || (_bagVectorData && _bagVectorData.length > 0);
+  var bagStats = {};
+  if(hasBag){
+    items.forEach(function(g){
+      var name = g.properties[nameField] || g.properties.gemeentenaam || '-';
+      bagStats[name] = countBagForArea(g, compareType);
+    });
+  }
+
+  // ALLE indicatoren
   var allInds = INDICATORS.slice();
-  // Filter indicatoren die minstens bij 1 item data hebben
   var activeInds = allInds.filter(function(fm){
     for(var i=0;i<items.length;i++){
       if(items[i].properties[fm.key] != null) return true;
@@ -4641,21 +5195,21 @@ function showComparisonReport(){
     return false;
   });
 
-  // Categoriseer indicatoren
+  // Categoriseer
   var categories = [
-    {label:'Bevolking', color:'#16a34a', bg:'#f0fdf4', keys:['aantal_inwoners','mannen','vrouwen','0_15','15_25','25_45','45_65','65plus','bevolkingsdichtheid','huishoudens','gem_huishouden_grootte']},
-    {label:'Woningen & Vastgoed', color:'#2563eb', bg:'#eff6ff', keys:['woningvoorraad','gem_woz_waarde','koopwoningen','huurwoningen','pct_eengezins']},
-    {label:'Energie & Duurzaamheid', color:'#0891b2', bg:'#ecfeff', keys:['gem_aardgas','gem_elektriciteit']},
-    {label:'Economie & Inkomen', color:'#d97706', bg:'#fffbeb', keys:['gem_inkomen_inwoner','arbeidsparticipatie','bedrijfsvestigingen','personenautos']},
-    {label:'Voorzieningen', color:'#7c3aed', bg:'#f5f3ff', keys:['afstand_huisarts','afstand_supermarkt']}
+    {label:'Bevolking', icon:'groups', color:'#16a34a', bg:'#f0fdf4', keys:['aantal_inwoners','mannen','vrouwen','0_15','15_25','25_45','45_65','65plus','bevolkingsdichtheid','huishoudens','gem_huishouden_grootte']},
+    {label:'Woningen & Vastgoed', icon:'home', color:'#2563eb', bg:'#eff6ff', keys:['woningvoorraad','gem_woz_waarde','koopwoningen','huurwoningen','pct_eengezins']},
+    {label:'Energie & Duurzaamheid', icon:'bolt', color:'#0891b2', bg:'#ecfeff', keys:['gem_aardgas','gem_elektriciteit']},
+    {label:'Economie & Inkomen', icon:'payments', color:'#d97706', bg:'#fffbeb', keys:['gem_inkomen_inwoner','arbeidsparticipatie','bedrijfsvestigingen','personenautos']},
+    {label:'Voorzieningen', icon:'local_hospital', color:'#7c3aed', bg:'#f5f3ff', keys:['afstand_huisarts','afstand_supermarkt']}
   ];
 
   var reverseSet = new Set(REVERSE_KEYS);
 
-  // Logo SVG inline (Nederlandse vlag met GeoInzicht tekst)
-  var logoSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" width="200"><rect y="0" width="200" height="16" fill="#AE1C28"/><rect y="16" width="200" height="16" fill="#FFF"/><rect y="32" width="200" height="16" fill="#21468B"/><text x="100" y="28" text-anchor="middle" font-family="Space Mono,monospace" font-size="14" font-weight="700" fill="#16a34a" stroke="#fff" stroke-width="3" paint-order="stroke">GeoInzicht</text></svg>';
+  // Kleuren per item (max 8)
+  var itemColors = ['#2563eb','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#e11d48','#65a30d'];
 
-  // Bouw HTML
+  // ===== Bouw rapport HTML =====
   var html = '<!DOCTYPE html><html lang="nl"><head>';
   html += '<meta charset="UTF-8"><title>GeoInzicht Vergelijkingsrapport</title>';
   html += '<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">';
@@ -4669,7 +5223,7 @@ function showComparisonReport(){
   html += '.header .logo{display:flex;align-items:center;gap:12px;margin-bottom:16px}';
   html += '.header .logo-text{font:700 18px "Space Mono",monospace;color:#39ff14}';
   html += '.content{padding:0 24px 24px}';
-  html += '.section{margin-bottom:24px}';
+  html += '.section{margin-bottom:28px}';
   html += '.section-title{font:700 15px "DM Sans",sans-serif;display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid}';
   html += '.card{background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);border:1px solid #e2e8f0;margin-bottom:12px}';
   html += 'table{width:100%;border-collapse:collapse;font-size:12px}';
@@ -4688,12 +5242,15 @@ function showComparisonReport(){
   html += '.insight-box{padding:12px;border-radius:8px;margin-bottom:8px;font-size:11px;line-height:1.7}';
   html += '.footer{padding:16px 24px;text-align:center;font-size:10px;color:#94a3b8;border-top:1px solid #e2e8f0;margin-top:8px}';
   html += '.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}';
+  html += '.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}';
   html += '.score-circle{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 14px "Space Mono",monospace;flex-shrink:0}';
-  html += '@media print{body{padding:0}.header{-webkit-print-color-adjust:exact;print-color-adjust:exact}.best,.worst,.cat-header td,.z-pos,.z-neg,.score-circle{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
-  html += '@media(max-width:700px){.summary-grid{grid-template-columns:1fr}}';
+  html += '.legend-item{display:flex;align-items:center;gap:6px;font-size:10px;color:#475569}';
+  html += '.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}';
+  html += '@media print{body{padding:0}.header,.card,.cat-header td,.best,.worst,.z-pos,.z-neg,.score-circle{-webkit-print-color-adjust:exact;print-color-adjust:exact}}';
+  html += '@media(max-width:700px){.summary-grid,.chart-grid{grid-template-columns:1fr}}';
   html += '</style></head><body>';
 
-  // HEADER met logo
+  // ===== HEADER =====
   html += '<div class="header">';
   html += '<div class="logo">';
   html += '<div style="width:40px;height:40px;background:linear-gradient(135deg,#39ff14,#22c55e);border-radius:10px;display:flex;align-items:center;justify-content:center"><span style="font-family:\'Material Symbols Rounded\';font-size:24px;color:#0a0f1a;font-variation-settings:\'FILL\' 1">public</span></div>';
@@ -4701,25 +5258,37 @@ function showComparisonReport(){
   html += '</div>';
   html += '<h1>Vergelijkingsrapport</h1>';
   html += '<div class="sub">';
-  html += 'CBS Kerncijfers '+_activeYear+' &middot; <b>'+items.length+' '+compareLabel+'</b> &middot; '+activeInds.length+' indicatoren<br>';
-  html += 'Gegenereerd: '+new Date().toLocaleString('nl-NL')+' &middot; Bron: CBS/PDOK';
+  html += 'CBS Kerncijfers '+_activeYear+' &middot; <b>'+items.length+' '+compareLabel+'</b> &middot; '+activeInds.length+' indicatoren';
+  if(hasBag){
+    var totalBag = 0;
+    for(var bn in bagStats) totalBag += bagStats[bn].count;
+    if(totalBag > 0) html += ' &middot; '+totalBag.toLocaleString('nl-NL')+' BAG adressen';
+  }
+  html += '<br>Gegenereerd: '+new Date().toLocaleString('nl-NL')+' &middot; Bron: CBS/PDOK/BAG Kadaster';
   html += '</div></div>';
 
   html += '<div class="content">';
 
-  // OVERZICHTSKAARTJES per gemeente/buurt
+  // Legenda
+  html += '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px">';
+  items.forEach(function(g, idx){
+    var name = g.properties[nameField] || g.properties.gemeentenaam || '-';
+    html += '<div class="legend-item"><div class="legend-dot" style="background:'+itemColors[idx % itemColors.length]+'"></div><b>'+name+'</b></div>';
+  });
+  html += '</div>';
+
+  // ===== 1. OVERZICHTSKAARTJES =====
   html += '<div class="section">';
   html += '<div class="section-title" style="color:#16a34a;border-color:#bbf7d0"><span class="mi" style="color:#16a34a">dashboard</span> Overzicht</div>';
   html += '<div class="summary-grid">';
-  items.forEach(function(g){
+  items.forEach(function(g, idx){
     var p = g.properties;
     var displayName = p[nameField] || p.gemeentenaam || '-';
     var subName = compareType === 'buurten' ? (p.gemeentenaam || '') : '';
-    // Bereken totaal-score (gemiddelde z-score over alle indicatoren)
+    var color = itemColors[idx % itemColors.length];
     var zScores = [];
     activeInds.forEach(function(fm){
-      var v = p[fm.key];
-      var ns = _nationalStats[fm.key];
+      var v = p[fm.key]; var ns = _nationalStats[fm.key];
       if(v == null || !ns || !ns.stddev || ns.stddev === 0) return;
       var z = (v - ns.avg) / ns.stddev;
       if(reverseSet.has(fm.key)) z = -z;
@@ -4730,7 +5299,7 @@ function showComparisonReport(){
     var scoreBg = avgZ > 0.3 ? '#dcfce7' : (avgZ < -0.3 ? '#fef2f2' : '#f1f5f9');
     var scoreLabel = avgZ > 0.5 ? 'Bovengemiddeld' : (avgZ < -0.5 ? 'Ondergemiddeld' : 'Gemiddeld');
 
-    html += '<div class="card" style="display:flex;gap:12px;align-items:flex-start">';
+    html += '<div class="card" style="display:flex;gap:12px;align-items:flex-start;border-top:3px solid '+color+'">';
     html += '<div class="score-circle" style="background:'+scoreBg+';color:'+scoreColor+'">'+(avgZ >= 0 ? '+' : '')+avgZ.toFixed(1)+'</div>';
     html += '<div style="flex:1">';
     html += '<div style="font:700 14px \'DM Sans\',sans-serif;color:#0f172a">'+displayName+'</div>';
@@ -4738,11 +5307,16 @@ function showComparisonReport(){
     html += '<div style="font-size:10px;color:'+scoreColor+';margin-top:2px">'+scoreLabel+' (z-score: '+(avgZ >= 0 ? '+' : '')+avgZ.toFixed(2)+')</div>';
     // Kerngetallen
     html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">';
-    var keyMetrics = [{k:'aantal_inwoners',l:'Inwoners',fmt:function(v){return v?v.toLocaleString('nl-NL'):'?'}},{k:'gem_woz_waarde',l:'WOZ',fmt:function(v){return v?'\u20ac'+Math.round(v/1000)+'k':'?'}},{k:'gem_inkomen_inwoner',l:'Inkomen',fmt:function(v){return v?'\u20ac'+Math.round(v/1000)+'k':'?'}},{k:'koopwoningen',l:'Koop',fmt:function(v){return v!=null?v+'%':'?'}},{k:'65plus',l:'65+',fmt:function(v){return v!=null?v+'%':'?'}}];
+    var keyMetrics = [{k:'aantal_inwoners',l:'Inwoners',fmt:function(v){return v?v.toLocaleString('nl-NL'):'?'}},{k:'woningvoorraad',l:'Woningen',fmt:function(v){return v?v.toLocaleString('nl-NL'):'?'}},{k:'gem_woz_waarde',l:'WOZ',fmt:function(v){return v?'\u20ac'+Math.round(v/1000)+'k':'?'}},{k:'gem_inkomen_inwoner',l:'Inkomen',fmt:function(v){return v?'\u20ac'+Math.round(v/1000)+'k':'?'}},{k:'koopwoningen',l:'Koop',fmt:function(v){return v!=null?v+'%':'?'}}];
     keyMetrics.forEach(function(m){
       var val = p[m.k];
       html += '<div style="font-size:9px;background:#f1f5f9;padding:2px 6px;border-radius:4px"><span style="color:#94a3b8">'+m.l+':</span> <b style="color:#0f172a">'+m.fmt(val)+'</b></div>';
     });
+    // BAG adressen
+    var bs = bagStats[displayName];
+    if(bs && bs.count > 0){
+      html += '<div style="font-size:9px;background:#eff6ff;padding:2px 6px;border-radius:4px;border:1px solid #bfdbfe"><span style="color:#2563eb">BAG:</span> <b style="color:#1e40af">'+bs.count.toLocaleString('nl-NL')+' adressen</b></div>';
+    }
     html += '</div>';
     // Sterke/zwakke punten
     var sterke = []; var zwakke = [];
@@ -4760,23 +5334,295 @@ function showComparisonReport(){
   });
   html += '</div></div>';
 
-  // DATA TABEL per categorie
+  // ===== 2. GRAFIEKEN =====
+  html += '<div class="section">';
+  html += '<div class="section-title" style="color:#0891b2;border-color:#a5f3fc"><span class="mi" style="color:#0891b2">bar_chart</span> Grafieken</div>';
+  html += '<div class="chart-grid">';
+
+  // Helper: SVG horizontale staafgrafiek
+  function buildBarChart(title, dataItems, unit, formatFn){
+    if(!dataItems.length) return '';
+    var maxVal = Math.max.apply(null, dataItems.map(function(d){return d.value||0}));
+    if(maxVal <= 0) return '';
+    var barH = 24;
+    var gap = 6;
+    var labelW = 110;
+    var chartW = 380;
+    var svgH = dataItems.length * (barH + gap) + 10;
+    var s = '<div class="card"><div style="font:600 12px \'DM Sans\',sans-serif;color:#475569;margin-bottom:8px">'+title+'</div>';
+    s += '<svg width="100%" viewBox="0 0 '+chartW+' '+svgH+'" xmlns="http://www.w3.org/2000/svg" style="max-width:'+chartW+'px">';
+    dataItems.forEach(function(d, i){
+      var y = i * (barH + gap);
+      var barW = maxVal > 0 ? ((d.value / maxVal) * (chartW - labelW - 60)) : 0;
+      s += '<text x="0" y="'+(y+16)+'" font-family="DM Sans,sans-serif" font-size="10" fill="#475569">'+d.label.substring(0,18)+'</text>';
+      s += '<rect x="'+labelW+'" y="'+y+'" width="'+barW+'" height="'+barH+'" rx="4" fill="'+d.color+'" opacity="0.8"/>';
+      var valText = formatFn ? formatFn(d.value) : d.value.toLocaleString('nl-NL');
+      if(unit) valText += ' '+unit;
+      s += '<text x="'+(labelW + barW + 5)+'" y="'+(y+16)+'" font-family="Space Mono,monospace" font-size="10" font-weight="700" fill="'+d.color+'">'+valText+'</text>';
+    });
+    s += '</svg></div>';
+    return s;
+  }
+
+  // Chart 1: Inwoners
+  var inwData = [];
+  items.forEach(function(g, idx){
+    var v = g.properties.aantal_inwoners;
+    if(v != null) inwData.push({label: g.properties[nameField]||'-', value:v, color:itemColors[idx%itemColors.length]});
+  });
+  html += buildBarChart('Aantal Inwoners', inwData, '', function(v){return v.toLocaleString('nl-NL')});
+
+  // Chart 2: Woningvoorraad + BAG adressen (gestapeld)
+  var wonData = [];
+  items.forEach(function(g, idx){
+    var name = g.properties[nameField]||'-';
+    var won = g.properties.woningvoorraad;
+    var bs = bagStats[name];
+    var bagCnt = bs ? bs.count : 0;
+    if(won || bagCnt) wonData.push({label:name, won:won||0, bag:bagCnt, color:itemColors[idx%itemColors.length]});
+  });
+  if(wonData.length){
+    var maxWon = Math.max.apply(null, wonData.map(function(d){return Math.max(d.won, d.bag)}));
+    if(maxWon > 0){
+      var barH2 = 28; var gap2 = 8; var labelW2 = 110; var chartW2 = 380;
+      var svgH2 = wonData.length * (barH2*2 + gap2) + 10;
+      html += '<div class="card"><div style="font:600 12px \'DM Sans\',sans-serif;color:#475569;margin-bottom:4px">Woningvoorraad vs BAG Adressen</div>';
+      html += '<div style="font-size:9px;color:#94a3b8;margin-bottom:8px;display:flex;gap:12px"><span>\u25a0 CBS Woningvoorraad</span><span style="opacity:.6">\u25a0 BAG Adressen (geladen)</span></div>';
+      html += '<svg width="100%" viewBox="0 0 '+chartW2+' '+svgH2+'" xmlns="http://www.w3.org/2000/svg" style="max-width:'+chartW2+'px">';
+      wonData.forEach(function(d, i){
+        var y = i * (barH2*2 + gap2);
+        var bW1 = maxWon > 0 ? (d.won / maxWon * (chartW2 - labelW2 - 70)) : 0;
+        var bW2 = maxWon > 0 ? (d.bag / maxWon * (chartW2 - labelW2 - 70)) : 0;
+        html += '<text x="0" y="'+(y+14)+'" font-family="DM Sans,sans-serif" font-size="10" fill="#475569">'+d.label.substring(0,18)+'</text>';
+        // Woningvoorraad bar
+        html += '<rect x="'+labelW2+'" y="'+y+'" width="'+bW1+'" height="'+(barH2-2)+'" rx="3" fill="'+d.color+'" opacity="0.85"/>';
+        html += '<text x="'+(labelW2+bW1+4)+'" y="'+(y+14)+'" font-family="Space Mono,monospace" font-size="9" font-weight="700" fill="'+d.color+'">'+(d.won?d.won.toLocaleString('nl-NL'):'?')+'</text>';
+        // BAG bar
+        var y2 = y + barH2;
+        html += '<rect x="'+labelW2+'" y="'+y2+'" width="'+bW2+'" height="'+(barH2-2)+'" rx="3" fill="'+d.color+'" opacity="0.35"/>';
+        if(d.bag > 0){
+          html += '<text x="'+(labelW2+bW2+4)+'" y="'+(y2+14)+'" font-family="Space Mono,monospace" font-size="9" fill="'+d.color+'" opacity="0.7">'+d.bag.toLocaleString('nl-NL')+' BAG</text>';
+        }
+      });
+      html += '</svg></div>';
+    }
+  }
+
+  // Chart 3: WOZ-waarde
+  var wozData = [];
+  items.forEach(function(g, idx){
+    var v = g.properties.gem_woz_waarde;
+    if(v != null) wozData.push({label: g.properties[nameField]||'-', value:v, color:itemColors[idx%itemColors.length]});
+  });
+  html += buildBarChart('Gem. WOZ-waarde', wozData, '', function(v){return '\u20ac'+Math.round(v/1000)+'k'});
+
+  // Chart 4: Leeftijdsopbouw (grouped bar)
+  var leeftijdKeys = [{k:'0_15',l:'0-14'},{k:'15_25',l:'15-24'},{k:'25_45',l:'25-44'},{k:'45_65',l:'45-64'},{k:'65plus',l:'65+'}];
+  var hasLeeftijd = items.some(function(g){ return leeftijdKeys.some(function(lk){ return g.properties[lk.k] != null; }); });
+  if(hasLeeftijd){
+    var gBarH = 18; var gGap = 4; var groupGap = 12; var gLabelW = 50; var gChartW = 380;
+    var gSvgH = leeftijdKeys.length * (items.length * (gBarH + gGap) + groupGap) + 20;
+    html += '<div class="card"><div style="font:600 12px \'DM Sans\',sans-serif;color:#475569;margin-bottom:8px">Leeftijdsopbouw (%)</div>';
+    html += '<svg width="100%" viewBox="0 0 '+gChartW+' '+gSvgH+'" xmlns="http://www.w3.org/2000/svg" style="max-width:'+gChartW+'px">';
+    var gY = 0;
+    leeftijdKeys.forEach(function(lk){
+      html += '<text x="0" y="'+(gY+14)+'" font-family="DM Sans,sans-serif" font-size="10" font-weight="600" fill="#64748b">'+lk.l+'</text>';
+      items.forEach(function(g, idx){
+        var v = g.properties[lk.k] || 0;
+        var bW = v * ((gChartW - gLabelW - 50) / 50); // max ~50%
+        var c = itemColors[idx%itemColors.length];
+        html += '<rect x="'+gLabelW+'" y="'+gY+'" width="'+bW+'" height="'+gBarH+'" rx="3" fill="'+c+'" opacity="0.8"/>';
+        html += '<text x="'+(gLabelW+bW+4)+'" y="'+(gY+13)+'" font-family="Space Mono,monospace" font-size="9" fill="'+c+'">'+v+'%</text>';
+        gY += gBarH + gGap;
+      });
+      gY += groupGap;
+    });
+    html += '</svg></div>';
+  }
+
+  // Chart 5: Energie
+  var gasData = [];
+  items.forEach(function(g, idx){
+    var v = g.properties.gem_aardgas;
+    if(v != null) gasData.push({label: g.properties[nameField]||'-', value:v, color:itemColors[idx%itemColors.length]});
+  });
+  html += buildBarChart('Gem. Gasverbruik', gasData, 'm\u00b3/jaar');
+
+  // Chart 6: Inkomen
+  var inkData = [];
+  items.forEach(function(g, idx){
+    var v = g.properties.gem_inkomen_inwoner;
+    if(v != null) inkData.push({label: g.properties[nameField]||'-', value:v, color:itemColors[idx%itemColors.length]});
+  });
+  html += buildBarChart('Gem. Inkomen per Inwoner', inkData, '', function(v){return '\u20ac'+Math.round(v/1000)+'k'});
+
+  // Chart 7: Radar/spider chart (z-scores voor 6 kernthema\'s)
+  var radarKeys = [
+    {k:'gem_woz_waarde',l:'WOZ'},
+    {k:'gem_inkomen_inwoner',l:'Inkomen'},
+    {k:'arbeidsparticipatie',l:'Arbeid'},
+    {k:'bevolkingsdichtheid',l:'Dichtheid'},
+    {k:'koopwoningen',l:'Koop%'},
+    {k:'afstand_huisarts',l:'Huisarts',rev:true}
+  ];
+  var hasRadar = items.every(function(g){ return radarKeys.filter(function(rk){ return g.properties[rk.k]!=null; }).length >= 4; });
+  if(hasRadar){
+    var cx=190, cy=160, R=120, angles=radarKeys.length;
+    html += '<div class="card" style="grid-column:1/-1"><div style="font:600 12px \'DM Sans\',sans-serif;color:#475569;margin-bottom:8px">Radardiagram (z-scores)</div>';
+    html += '<svg width="100%" viewBox="0 0 380 330" xmlns="http://www.w3.org/2000/svg" style="max-width:380px;margin:0 auto;display:block">';
+    // Grid circles
+    for(var ring=1;ring<=3;ring++){
+      var rr = R * ring / 3;
+      html += '<circle cx="'+cx+'" cy="'+cy+'" r="'+rr+'" fill="none" stroke="#e2e8f0" stroke-width="1"/>';
+    }
+    // Axes + labels
+    radarKeys.forEach(function(rk, i){
+      var angle = (Math.PI*2*i/angles) - Math.PI/2;
+      var x2 = cx + Math.cos(angle)*R;
+      var y2 = cy + Math.sin(angle)*R;
+      html += '<line x1="'+cx+'" y1="'+cy+'" x2="'+x2+'" y2="'+y2+'" stroke="#e2e8f0" stroke-width="1"/>';
+      var lx = cx + Math.cos(angle)*(R+18);
+      var ly = cy + Math.sin(angle)*(R+18);
+      html += '<text x="'+lx+'" y="'+ly+'" text-anchor="middle" dominant-baseline="middle" font-family="DM Sans,sans-serif" font-size="9" font-weight="600" fill="#475569">'+rk.l+'</text>';
+    });
+    // Data polygons
+    items.forEach(function(g, idx){
+      var c = itemColors[idx%itemColors.length];
+      var pts = [];
+      radarKeys.forEach(function(rk, i){
+        var v = g.properties[rk.k];
+        var ns = _nationalStats[rk.k];
+        var z = 0;
+        if(v!=null && ns && ns.stddev > 0){
+          z = (v - ns.avg)/ns.stddev;
+          if(rk.rev) z = -z;
+        }
+        // Normaliseer z-score naar 0-1 range: z=-2 -> 0, z=0 -> 0.5, z=2 -> 1
+        var norm = Math.max(0, Math.min(1, (z + 2) / 4));
+        var angle = (Math.PI*2*i/angles) - Math.PI/2;
+        var px = cx + Math.cos(angle)*(R*norm);
+        var py = cy + Math.sin(angle)*(R*norm);
+        pts.push(px.toFixed(1)+','+py.toFixed(1));
+      });
+      html += '<polygon points="'+pts.join(' ')+'" fill="'+c+'" fill-opacity="0.15" stroke="'+c+'" stroke-width="2" stroke-opacity="0.8"/>';
+      pts.forEach(function(pt){
+        var xy = pt.split(',');
+        html += '<circle cx="'+xy[0]+'" cy="'+xy[1]+'" r="3" fill="'+c+'"/>';
+      });
+    });
+    html += '</svg></div>';
+  }
+
+  // Chart 8: BAG Bouwjaar verdeling (als beschikbaar)
+  var hasBagBouwjaar = false;
+  for(var bn2 in bagStats){ if(bagStats[bn2].bouwjaren.length > 10){ hasBagBouwjaar = true; break; } }
+  if(hasBagBouwjaar){
+    // Bouwjaar histogram per decennium
+    var decades = ['<1920','1920','1930','1940','1950','1960','1970','1980','1990','2000','2010','2020+'];
+    var decadeRanges = [[0,1920],[1920,1930],[1930,1940],[1940,1950],[1950,1960],[1960,1970],[1970,1980],[1980,1990],[1990,2000],[2000,2010],[2010,2020],[2020,2100]];
+    var decadeData = {};
+    items.forEach(function(g, idx){
+      var name = g.properties[nameField]||'-';
+      var bs = bagStats[name];
+      if(!bs || bs.bouwjaren.length < 10) return;
+      decadeData[name] = {color: itemColors[idx%itemColors.length], counts:[]};
+      decadeRanges.forEach(function(dr){
+        var cnt = bs.bouwjaren.filter(function(bj){return bj >= dr[0] && bj < dr[1]}).length;
+        decadeData[name].counts.push(cnt);
+      });
+    });
+    if(Object.keys(decadeData).length > 0){
+      var maxDec = 0;
+      for(var dn in decadeData) decadeData[dn].counts.forEach(function(c){if(c>maxDec)maxDec=c});
+      var dBarW = 22; var dGap = 3; var dChartW = decades.length*(dBarW*items.length + dGap*items.length + 8) + 40;
+      var dChartH = 180; var dLabelH = 25;
+      html += '<div class="card" style="grid-column:1/-1"><div style="font:600 12px \'DM Sans\',sans-serif;color:#475569;margin-bottom:8px">BAG Bouwjaarverdeling per Decennium</div>';
+      html += '<svg width="100%" viewBox="0 0 '+dChartW+' '+(dChartH+dLabelH+10)+'" xmlns="http://www.w3.org/2000/svg" style="max-width:'+dChartW+'px">';
+      // Grid lines
+      for(var gl=0;gl<=4;gl++){
+        var gy = dChartH - (dChartH * gl/4);
+        html += '<line x1="30" y1="'+gy+'" x2="'+dChartW+'" y2="'+gy+'" stroke="#e2e8f0" stroke-width="0.5"/>';
+        html += '<text x="26" y="'+(gy+3)+'" text-anchor="end" font-family="Space Mono,monospace" font-size="8" fill="#94a3b8">'+Math.round(maxDec*gl/4)+'</text>';
+      }
+      var dx = 35;
+      decades.forEach(function(dec, di){
+        var itemIdx = 0;
+        for(var dn2 in decadeData){
+          var dd = decadeData[dn2];
+          var cnt = dd.counts[di] || 0;
+          var bh = maxDec > 0 ? (cnt / maxDec * (dChartH - 10)) : 0;
+          html += '<rect x="'+dx+'" y="'+(dChartH - bh)+'" width="'+dBarW+'" height="'+bh+'" rx="2" fill="'+dd.color+'" opacity="0.75"/>';
+          dx += dBarW + dGap;
+          itemIdx++;
+        }
+        html += '<text x="'+(dx - (dBarW*items.length + dGap*items.length)/2)+'" y="'+(dChartH + 14)+'" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="8" fill="#64748b">'+dec+'</text>';
+        dx += 8;
+      });
+      html += '</svg></div>';
+    }
+  }
+
+  html += '</div></div>';
+
+  // ===== 3. DATA TABEL =====
   html += '<div class="section">';
   html += '<div class="section-title" style="color:#2563eb;border-color:#bfdbfe"><span class="mi" style="color:#2563eb">table_chart</span> Vergelijkingstabel</div>';
   html += '<div class="card" style="overflow-x:auto;padding:0">';
   html += '<table><thead><tr><th style="min-width:180px">Indicator</th>';
-  items.forEach(function(g){
+  items.forEach(function(g, idx){
     var label = g.properties[nameField] || g.properties.gemeentenaam || '-';
     if(compareType === 'buurten' && g.properties.gemeentenaam) label += '<br><span style="font-size:8px;color:#94a3b8;font-weight:400">'+g.properties.gemeentenaam+'</span>';
-    html += '<th style="min-width:110px;text-align:center">'+label+'</th>';
+    html += '<th style="min-width:110px;text-align:center;border-top:3px solid '+itemColors[idx%itemColors.length]+'">'+label+'</th>';
   });
   html += '<th style="min-width:80px;text-align:center">NL gem.</th><th style="min-width:60px;text-align:center">Verschil</th></tr></thead><tbody>';
+
+  // BAG adressen rij (als beschikbaar)
+  if(hasBag){
+    var anyBag = false;
+    for(var bn3 in bagStats){ if(bagStats[bn3].count > 0) anyBag = true; }
+    if(anyBag){
+      html += '<tr class="cat-header"><td colspan="'+(items.length+3)+'" style="background:#eff6ff;color:#2563eb;font:700 11px \'DM Sans\',sans-serif;border-left:3px solid #2563eb">BAG Adressen (geladen)</td></tr>';
+      html += '<tr><td class="ind-name">BAG adressen<span class="ind-unit">geladen</span></td>';
+      items.forEach(function(g, idx){
+        var name = g.properties[nameField]||'-';
+        var bs = bagStats[name];
+        var v = bs ? bs.count : 0;
+        html += '<td style="text-align:center;color:#2563eb;font-weight:'+(v>0?'700':'400')+'">'+(v>0?v.toLocaleString('nl-NL'):'\u2014')+'</td>';
+      });
+      html += '<td style="color:#94a3b8;text-align:center">\u2014</td><td style="color:#94a3b8;text-align:center">\u2014</td></tr>';
+      // Gem bouwjaar
+      html += '<tr><td class="ind-name">Gem. bouwjaar BAG<span class="ind-unit">jaar</span></td>';
+      items.forEach(function(g){
+        var name = g.properties[nameField]||'-';
+        var bs = bagStats[name];
+        if(bs && bs.bouwjaren.length > 0){
+          var avg = Math.round(bs.bouwjaren.reduce(function(a,b){return a+b},0)/bs.bouwjaren.length);
+          html += '<td style="text-align:center">'+avg+'</td>';
+        } else {
+          html += '<td style="text-align:center;color:#94a3b8">\u2014</td>';
+        }
+      });
+      html += '<td style="color:#94a3b8;text-align:center">\u2014</td><td style="color:#94a3b8;text-align:center">\u2014</td></tr>';
+      // Gem oppervlakte
+      html += '<tr><td class="ind-name">Gem. oppervlakte BAG<span class="ind-unit">m\u00b2</span></td>';
+      items.forEach(function(g){
+        var name = g.properties[nameField]||'-';
+        var bs = bagStats[name];
+        if(bs && bs.oppervlaktes.length > 0){
+          var avg = Math.round(bs.oppervlaktes.reduce(function(a,b){return a+b},0)/bs.oppervlaktes.length);
+          html += '<td style="text-align:center">'+avg+' m\u00b2</td>';
+        } else {
+          html += '<td style="text-align:center;color:#94a3b8">\u2014</td>';
+        }
+      });
+      html += '<td style="color:#94a3b8;text-align:center">\u2014</td><td style="color:#94a3b8;text-align:center">\u2014</td></tr>';
+    }
+  }
 
   categories.forEach(function(cat){
     var catInds = activeInds.filter(function(fm){ return cat.keys.indexOf(fm.key) > -1; });
     if(catInds.length === 0) return;
-    // Categorie header
-    html += '<tr class="cat-header"><td colspan="'+(items.length+3)+'" style="background:'+cat.bg+';color:'+cat.color+';font:700 11px \'DM Sans\',sans-serif;border-left:3px solid '+cat.color+'">'+cat.label+' ('+catInds.length+' indicatoren)</td></tr>';
+    html += '<tr class="cat-header"><td colspan="'+(items.length+3)+'" style="background:'+cat.bg+';color:'+cat.color+';font:700 11px \'DM Sans\',sans-serif;border-left:3px solid '+cat.color+'"><span class="mi" style="font-size:13px;vertical-align:-2px;color:'+cat.color+'">'+cat.icon+'</span> '+cat.label+' ('+catInds.length+')</td></tr>';
 
     catInds.forEach(function(fm){
       html += '<tr><td class="ind-name">'+fm.naam+'<span class="ind-unit">'+fm.eenheid+'</span></td>';
@@ -4804,11 +5650,8 @@ function showComparisonReport(){
           html += '<div class="bar-bg"><div class="bar-fill" style="width:'+pct+'%;background:'+barColor+'"></div></div></td>';
         }
       });
-
-      // Landelijk gemiddelde
       var ns = _nationalStats[fm.key];
       html += '<td style="color:#64748b;text-align:center;font-size:10px">'+(ns ? formatCompareVal(ns.avg, fm.key) : '\u2014')+'</td>';
-      // Max verschil
       if(numeric.length >= 2){
         var diff = Math.abs(Math.max.apply(null,numeric) - Math.min.apply(null,numeric));
         html += '<td style="color:#94a3b8;text-align:center;font-size:9px">\u0394 '+formatCompareVal(diff, fm.key)+'</td>';
@@ -4820,16 +5663,16 @@ function showComparisonReport(){
   });
   html += '</tbody></table></div></div>';
 
-  // DIEPGAANDE ANALYSE per gemeente
+  // ===== 4. AI GEBIEDSANALYSE =====
   html += '<div class="section">';
   html += '<div class="section-title" style="color:#7c3aed;border-color:#ddd6fe"><span class="mi" style="color:#7c3aed">psychology</span> AI Gebiedsanalyse</div>';
-  items.forEach(function(g){
+  items.forEach(function(g, idx){
     var p = g.properties;
     var displayName = p[nameField] || p.gemeentenaam || '-';
-    html += '<div class="card" style="border-left:3px solid #7c3aed">';
+    var color = itemColors[idx%itemColors.length];
+    html += '<div class="card" style="border-left:3px solid '+color+'">';
     html += '<div style="font:700 14px \'DM Sans\',sans-serif;color:#0f172a;margin-bottom:8px">'+displayName+'</div>';
 
-    // Gebiedsprofiel
     var profiel = '';
     if(p.aantal_inwoners) profiel += p.aantal_inwoners.toLocaleString('nl-NL')+' inwoners';
     if(p.bevolkingsdichtheid) profiel += ', '+Math.round(p.bevolkingsdichtheid)+'/km\u00b2';
@@ -4837,69 +5680,66 @@ function showComparisonReport(){
     if(p.gem_huishouden_grootte) profiel += ' (gem. '+p.gem_huishouden_grootte+' pers.)';
     if(profiel) html += '<div style="font-size:11px;color:#475569;margin-bottom:8px;padding:6px 8px;background:#f8fafc;border-radius:6px">'+profiel+'</div>';
 
-    // Leeftijdsopbouw
-    var leeftijd = '';
     if(p['0_15'] || p['15_25'] || p['25_45'] || p['45_65'] || p['65plus']){
-      leeftijd = '<b>Leeftijdsopbouw:</b> ';
       var parts = [];
       if(p['0_15']) parts.push('0-14: '+p['0_15']+'%');
       if(p['15_25']) parts.push('15-24: '+p['15_25']+'%');
       if(p['25_45']) parts.push('25-44: '+p['25_45']+'%');
       if(p['45_65']) parts.push('45-64: '+p['45_65']+'%');
       if(p['65plus']) parts.push('65+: '+p['65plus']+'%');
-      leeftijd += parts.join(' \u00b7 ');
-      html += '<div style="font-size:10px;color:#475569;margin-bottom:6px">'+leeftijd+'</div>';
+      html += '<div style="font-size:10px;color:#475569;margin-bottom:6px"><b>Leeftijdsopbouw:</b> '+parts.join(' \u00b7 ')+'</div>';
     }
 
-    // Insights
-    var insights = [];
+    // BAG samenvatting per gebied
+    var bs = bagStats[displayName];
+    if(bs && bs.count > 0){
+      html += '<div style="font-size:10px;color:#2563eb;margin-bottom:6px;padding:4px 8px;background:#eff6ff;border-radius:4px">';
+      html += '<b>BAG:</b> '+bs.count.toLocaleString('nl-NL')+' adressen';
+      if(bs.bouwjaren.length > 0){
+        var avgBj = Math.round(bs.bouwjaren.reduce(function(a,b){return a+b},0)/bs.bouwjaren.length);
+        html += ' \u00b7 gem. bouwjaar '+avgBj;
+      }
+      if(bs.oppervlaktes.length > 0){
+        var avgOpp = Math.round(bs.oppervlaktes.reduce(function(a,b){return a+b},0)/bs.oppervlaktes.length);
+        html += ' \u00b7 gem. '+avgOpp+' m\u00b2';
+      }
+      if(Object.keys(bs.gebruiksdoelen).length > 0){
+        var topDoel = Object.entries(bs.gebruiksdoelen).sort(function(a,b){return b[1]-a[1]});
+        html += ' \u00b7 '+topDoel.slice(0,3).map(function(d){return d[0]+' ('+d[1]+')'}).join(', ');
+      }
+      html += '</div>';
+    }
 
-    // 1. Welvaart
+    var insights = [];
     if(p.gem_woz_waarde != null || p.gem_inkomen_inwoner != null){
       var wozZ = calcZ(p.gem_woz_waarde, 'gem_woz_waarde');
       var inkZ = calcZ(p.gem_inkomen_inwoner, 'gem_inkomen_inwoner');
       var koopZ = calcZ(p.koopwoningen, 'koopwoningen');
-      if(wozZ > 0.5 && inkZ > 0.5) insights.push({icon:'\ud83d\udcb0', color:'#16a34a', text:'Welvarend gebied: WOZ-waarde \u20ac'+Math.round((p.gem_woz_waarde||0)/1000)+'k en inkomen \u20ac'+Math.round((p.gem_inkomen_inwoner||0)/1000)+'k liggen significant boven het landelijk gemiddelde. Dit duidt op een hoge sociaaleconomische status.'});
-      else if(wozZ < -0.5 && inkZ < -0.5) insights.push({icon:'\u26a0\ufe0f', color:'#dc2626', text:'Sociaaleconomisch kwetsbaar: zowel WOZ-waarde als inkomen liggen onder het gemiddelde. Extra aandacht voor sociale voorzieningen kan nodig zijn.'});
-      else if(wozZ > 0.5 && inkZ < -0.5) insights.push({icon:'\ud83c\udfe0', color:'#d97706', text:'Hoge vastgoedwaarde maar relatief laag inkomen. Dit kan duiden op gentrificatie of een gebied met veel gepensioneerden in duurdere woningen.'});
-      if(koopZ > 0.8) insights.push({icon:'\ud83d\udd11', color:'#16a34a', text:'Veel koopwoningen ('+p.koopwoningen+'%). Stabiele woonomgeving met relatief hoge eigenwoningbezit.'});
-      else if(koopZ < -0.8) insights.push({icon:'\ud83c\udfe2', color:'#2563eb', text:'Veel huurwoningen ('+(p.huurwoningen||'?')+'%). Mogelijk meer doorstroom en sociale huur.'});
+      if(wozZ > 0.5 && inkZ > 0.5) insights.push({icon:'\ud83d\udcb0', color:'#16a34a', text:'Welvarend gebied: WOZ-waarde \u20ac'+Math.round((p.gem_woz_waarde||0)/1000)+'k en inkomen \u20ac'+Math.round((p.gem_inkomen_inwoner||0)/1000)+'k liggen boven het landelijk gemiddelde.'});
+      else if(wozZ < -0.5 && inkZ < -0.5) insights.push({icon:'\u26a0\ufe0f', color:'#dc2626', text:'Sociaaleconomisch kwetsbaar: WOZ-waarde en inkomen liggen onder het gemiddelde.'});
+      else if(wozZ > 0.5 && inkZ < -0.5) insights.push({icon:'\ud83c\udfe0', color:'#d97706', text:'Hoge vastgoedwaarde maar relatief laag inkomen. Mogelijke gentrificatie.'});
+      if(koopZ > 0.8) insights.push({icon:'\ud83d\udd11', color:'#16a34a', text:'Veel koopwoningen ('+p.koopwoningen+'%). Stabiele woonomgeving.'});
+      else if(koopZ < -0.8) insights.push({icon:'\ud83c\udfe2', color:'#2563eb', text:'Veel huurwoningen ('+(p.huurwoningen||'?')+'%). Meer doorstroom en sociale huur.'});
     }
-
-    // 2. Demografie
     var oudZ = calcZ(p['65plus'], '65plus');
     var jongZ = calcZ(p['0_15'], '0_15');
-    var jong25Z = calcZ(p['15_25'], '15_25');
-    if(oudZ > 1) insights.push({icon:'\ud83d\udc74', color:'#d97706', text:'Vergrijzend: '+p['65plus']+'% is 65+, fors boven gemiddeld. Hogere vraag naar zorg en aangepaste woningen.'});
-    if(jongZ > 1) insights.push({icon:'\ud83d\udc76', color:'#16a34a', text:'Jong gezinsgebied: '+p['0_15']+'% is 0-14 jaar. Hoge behoefte aan scholen en speelruimte.'});
-    if(jong25Z > 1 && calcZ(p.huurwoningen,'huurwoningen') > 0.5) insights.push({icon:'\ud83c\udf93', color:'#2563eb', text:'Studentenbuurt-karakter: hoog % jongeren (15-24: '+p['15_25']+'%) gecombineerd met veel huurwoningen.'});
-
-    // 3. Energie
+    if(oudZ > 1) insights.push({icon:'\ud83d\udc74', color:'#d97706', text:'Vergrijzend: '+p['65plus']+'% is 65+. Hogere zorgvraag.'});
+    if(jongZ > 1) insights.push({icon:'\ud83d\udc76', color:'#16a34a', text:'Jong gezinsgebied: '+p['0_15']+'% is 0-14 jaar.'});
     var gasZ = calcZ(p.gem_aardgas, 'gem_aardgas');
-    var elekZ = calcZ(p.gem_elektriciteit, 'gem_elektriciteit');
-    if(gasZ > 1) insights.push({icon:'\ud83d\udd25', color:'#dc2626', text:'Hoog gasverbruik ('+p.gem_aardgas+' m\u00b3/jaar). Mogelijk slecht ge\u00efsoleerde woningen of oudere bouwjaren. Energietransitie-potentieel.'});
-    else if(gasZ < -0.8) insights.push({icon:'\u2744\ufe0f', color:'#0891b2', text:'Laag gasverbruik ('+p.gem_aardgas+' m\u00b3/jaar). Goede isolatie, nieuwbouw of aansluiting op warmtenet.'});
-    if(elekZ > 1) insights.push({icon:'\u26a1', color:'#d97706', text:'Hoog elektriciteitsverbruik ('+(p.gem_elektriciteit||'?')+' kWh). Mogelijk warmtepompen of meer elektrische apparatuur.'});
-
-    // 4. Economie
+    if(gasZ > 1) insights.push({icon:'\ud83d\udd25', color:'#dc2626', text:'Hoog gasverbruik ('+p.gem_aardgas+' m\u00b3/jaar). Energietransitie-potentieel.'});
+    else if(gasZ < -0.8) insights.push({icon:'\u2744\ufe0f', color:'#0891b2', text:'Laag gasverbruik ('+p.gem_aardgas+' m\u00b3/jaar). Goede isolatie of warmtenet.'});
     var arbZ = calcZ(p.arbeidsparticipatie, 'arbeidsparticipatie');
-    var bedZ = calcZ(p.bedrijfsvestigingen, 'bedrijfsvestigingen');
-    if(arbZ > 0.5 && (calcZ(p.gem_inkomen_inwoner,'gem_inkomen_inwoner') > 0.5)) insights.push({icon:'\ud83d\udcbc', color:'#16a34a', text:'Economisch sterk: hoge arbeidsparticipatie ('+(p.arbeidsparticipatie||'?')+'%) gecombineerd met bovengemiddeld inkomen.'});
-    else if(arbZ < -0.5) insights.push({icon:'\u26a0\ufe0f', color:'#dc2626', text:'Lage arbeidsparticipatie ('+(p.arbeidsparticipatie||'?')+'%). Aandachtspunt voor werkgelegenheidsbeleid.'});
-    if(bedZ > 1) insights.push({icon:'\ud83c\udfe2', color:'#2563eb', text:'Veel bedrijvigheid: '+(p.bedrijfsvestigingen||'?')+' vestigingen. Levendig economisch klimaat.'});
-
-    // 5. Voorzieningen
+    if(arbZ > 0.5 && calcZ(p.gem_inkomen_inwoner,'gem_inkomen_inwoner') > 0.5) insights.push({icon:'\ud83d\udcbc', color:'#16a34a', text:'Economisch sterk: hoge arbeidsparticipatie ('+(p.arbeidsparticipatie||'?')+'%) + bovengemiddeld inkomen.'});
+    else if(arbZ < -0.5) insights.push({icon:'\u26a0\ufe0f', color:'#dc2626', text:'Lage arbeidsparticipatie ('+(p.arbeidsparticipatie||'?')+'%).'});
     var haZ = calcZ(p.afstand_huisarts, 'afstand_huisarts', true);
     var smZ = calcZ(p.afstand_supermarkt, 'afstand_supermarkt', true);
-    if(haZ < -1) insights.push({icon:'\ud83c\udfe5', color:'#dc2626', text:'Grote afstand tot huisarts ('+(p.afstand_huisarts||'?')+' km). Beperkte gezondheidszorg bereikbaarheid.'});
-    if(smZ < -1) insights.push({icon:'\ud83d\uded2', color:'#dc2626', text:'Grote afstand tot supermarkt ('+(p.afstand_supermarkt||'?')+' km). Mogelijk voedselwoestijn.'});
-    if(haZ > 0.5 && smZ > 0.5) insights.push({icon:'\u2705', color:'#16a34a', text:'Goede voorzieningenbereikbaarheid: huisarts op '+(p.afstand_huisarts||'?')+' km en supermarkt op '+(p.afstand_supermarkt||'?')+' km.'});
-
-    // 6. Stedelijkheid
+    if(haZ < -1) insights.push({icon:'\ud83c\udfe5', color:'#dc2626', text:'Grote afstand tot huisarts ('+(p.afstand_huisarts||'?')+' km).'});
+    if(smZ < -1) insights.push({icon:'\ud83d\uded2', color:'#dc2626', text:'Grote afstand tot supermarkt ('+(p.afstand_supermarkt||'?')+' km).'});
+    if(haZ > 0.5 && smZ > 0.5) insights.push({icon:'\u2705', color:'#16a34a', text:'Goede bereikbaarheid: huisarts '+(p.afstand_huisarts||'?')+' km, supermarkt '+(p.afstand_supermarkt||'?')+' km.'});
     var dichthZ = calcZ(p.bevolkingsdichtheid, 'bevolkingsdichtheid');
     var eenZ = calcZ(p.pct_eengezins, 'pct_eengezins');
-    if(dichthZ > 1 && eenZ < -0.5) insights.push({icon:'\ud83c\udfd9\ufe0f', color:'#475569', text:'Stedelijk karakter: hoge bevolkingsdichtheid ('+(p.bevolkingsdichtheid||'?')+'/km\u00b2) met weinig eengezinswoningen. Typisch binnenstedelijk.'});
-    else if(dichthZ < -0.5 && eenZ > 0.5) insights.push({icon:'\ud83c\udfe1', color:'#475569', text:'Suburbaan/landelijk: lage dichtheid met veel eengezinswoningen ('+(p.pct_eengezins||'?')+'%). Rustige woonomgeving.'});
+    if(dichthZ > 1 && eenZ < -0.5) insights.push({icon:'\ud83c\udfd9\ufe0f', color:'#475569', text:'Stedelijk karakter: hoge dichtheid ('+(p.bevolkingsdichtheid||'?')+'/km\u00b2), weinig eengezinswoningen.'});
+    else if(dichthZ < -0.5 && eenZ > 0.5) insights.push({icon:'\ud83c\udfe1', color:'#475569', text:'Suburbaan/landelijk: lage dichtheid, veel eengezinswoningen ('+(p.pct_eengezins||'?')+'%).'});
 
     if(insights.length > 0){
       insights.forEach(function(ins){
@@ -4913,11 +5753,10 @@ function showComparisonReport(){
   });
   html += '</div>';
 
-  // DIRECTE VERGELIJKING: grootste verschillen
+  // ===== 5. GROOTSTE VERSCHILLEN =====
   html += '<div class="section">';
   html += '<div class="section-title" style="color:#d97706;border-color:#fde68a"><span class="mi" style="color:#d97706">compare_arrows</span> Grootste Verschillen</div>';
   html += '<div class="card">';
-  // Bereken verschil-ranking
   var diffs = [];
   activeInds.forEach(function(fm){
     var vals = items.map(function(g){ return g.properties[fm.key]; }).filter(function(v){ return v != null; });
@@ -4925,16 +5764,16 @@ function showComparisonReport(){
     var range = Math.max.apply(null,vals) - Math.min.apply(null,vals);
     var ns = _nationalStats[fm.key];
     var relDiff = ns && ns.stddev > 0 ? range / ns.stddev : 0;
-    diffs.push({key:fm.key, naam:fm.naam, eenheid:fm.eenheid, range:range, relDiff:relDiff, vals:vals});
+    diffs.push({key:fm.key, naam:fm.naam, eenheid:fm.eenheid, range:range, relDiff:relDiff});
   });
   diffs.sort(function(a,b){ return b.relDiff - a.relDiff; });
 
   if(diffs.length > 0){
-    html += '<table><thead><tr><th>Indicator</th><th style="text-align:center">Verschil</th><th style="text-align:center">Relatief (std.dev.)</th>';
-    items.forEach(function(g){ html += '<th style="text-align:center">'+((g.properties[nameField]||'').substring(0,15))+'</th>'; });
+    html += '<table><thead><tr><th>Indicator</th><th style="text-align:center">Verschil</th><th style="text-align:center">Relatief (\u03c3)</th>';
+    items.forEach(function(g,idx){ html += '<th style="text-align:center;border-top:3px solid '+itemColors[idx%itemColors.length]+'">'+((g.properties[nameField]||'').substring(0,15))+'</th>'; });
     html += '</tr></thead><tbody>';
-    diffs.slice(0,12).forEach(function(d,idx){
-      var bgAlpha = Math.max(0.02, 0.12 - idx * 0.01);
+    diffs.slice(0,12).forEach(function(d,didx){
+      var bgAlpha = Math.max(0.02, 0.12 - didx * 0.01);
       html += '<tr style="background:rgba(217,119,6,'+bgAlpha+')">';
       html += '<td class="ind-name">'+d.naam+'<span class="ind-unit">'+d.eenheid+'</span></td>';
       html += '<td style="text-align:center;font:700 11px \'Space Mono\',monospace;color:#d97706">'+formatCompareVal(d.range, d.key)+'</td>';
@@ -4951,13 +5790,155 @@ function showComparisonReport(){
   }
   html += '</div></div>';
 
-  // FOOTER
+  // ===== 6. AI EINDINTERPRETATIE =====
+  html += '<div class="section">';
+  html += '<div class="section-title" style="color:#e11d48;border-color:#fecdd3"><span class="mi" style="color:#e11d48">auto_awesome</span> Conclusie &amp; Interpretatie</div>';
+  html += '<div class="card" style="border-left:3px solid #e11d48;background:linear-gradient(135deg,#fff 0%,#fdf2f8 100%)">';
+
+  // Genereer AI interpretatie op basis van data
+  var names = items.map(function(g){ return g.properties[nameField]||'-'; });
+  var interpretatie = '';
+
+  // Welk gebied scoort het best overall?
+  var scores = items.map(function(g, idx){
+    var zArr = [];
+    activeInds.forEach(function(fm){
+      var v = g.properties[fm.key]; var ns = _nationalStats[fm.key];
+      if(v==null || !ns || !ns.stddev) return;
+      var z = (v-ns.avg)/ns.stddev;
+      if(reverseSet.has(fm.key)) z = -z;
+      zArr.push(z);
+    });
+    return {name: g.properties[nameField]||'-', avgZ: zArr.length>0 ? zArr.reduce(function(a,b){return a+b},0)/zArr.length : 0, props: g.properties};
+  });
+  scores.sort(function(a,b){ return b.avgZ - a.avgZ; });
+
+  interpretatie += '<div style="font:600 13px \'DM Sans\',sans-serif;color:#0f172a;margin-bottom:12px">Vergelijking van '+names.join(', ')+'</div>';
+
+  // Overall ranking
+  interpretatie += '<div style="margin-bottom:12px">';
+  interpretatie += '<div style="font:600 11px \'DM Sans\',sans-serif;color:#475569;margin-bottom:6px">Totaalranking (op basis van z-scores over alle indicatoren):</div>';
+  scores.forEach(function(s, i){
+    var medal = i === 0 ? '\ud83e\udd47' : (i === 1 ? '\ud83e\udd48' : (i === 2 ? '\ud83e\udd49' : (i+1)+'.'));
+    var zLabel = s.avgZ > 0.3 ? 'bovengemiddeld' : (s.avgZ < -0.3 ? 'ondergemiddeld' : 'gemiddeld');
+    interpretatie += '<div style="font-size:12px;margin-bottom:4px">'+medal+' <b>'+s.name+'</b> \u2014 z-score '+(s.avgZ>=0?'+':'')+s.avgZ.toFixed(2)+' ('+zLabel+')</div>';
+  });
+  interpretatie += '</div>';
+
+  // Vergelijkende analyse
+  if(diffs.length > 0){
+    interpretatie += '<div style="margin-bottom:12px">';
+    interpretatie += '<div style="font:600 11px \'DM Sans\',sans-serif;color:#475569;margin-bottom:6px">Grootste onderlinge verschillen:</div>';
+    diffs.slice(0,5).forEach(function(d){
+      var valsPerItem = items.map(function(g){return {name:g.properties[nameField]||'-', val:g.properties[d.key]}}).filter(function(x){return x.val!=null});
+      if(valsPerItem.length < 2) return;
+      valsPerItem.sort(function(a,b){return b.val-a.val});
+      var highest = valsPerItem[0];
+      var lowest = valsPerItem[valsPerItem.length-1];
+      interpretatie += '<div style="font-size:11px;margin-bottom:4px;line-height:1.6">';
+      interpretatie += '\u2022 <b>'+d.naam+'</b>: '+highest.name+' ('+formatCompareVal(highest.val, d.key)+') scoort '+d.relDiff.toFixed(1)+'\u03c3 hoger dan '+lowest.name+' ('+formatCompareVal(lowest.val, d.key)+'). ';
+      if(d.relDiff > 2) interpretatie += '<span style="color:#dc2626">Dit is een zeer groot verschil.</span>';
+      else if(d.relDiff > 1) interpretatie += '<span style="color:#d97706">Dit is een significant verschil.</span>';
+      else interpretatie += '<span style="color:#64748b">Matig verschil.</span>';
+      interpretatie += '</div>';
+    });
+    interpretatie += '</div>';
+  }
+
+  // Thematische vergelijking
+  interpretatie += '<div style="margin-bottom:12px">';
+  interpretatie += '<div style="font:600 11px \'DM Sans\',sans-serif;color:#475569;margin-bottom:6px">Thematische analyse:</div>';
+
+  // Welvaart
+  var wozVals = items.map(function(g){return {n:g.properties[nameField],v:g.properties.gem_woz_waarde}}).filter(function(x){return x.v!=null});
+  var inkVals = items.map(function(g){return {n:g.properties[nameField],v:g.properties.gem_inkomen_inwoner}}).filter(function(x){return x.v!=null});
+  if(wozVals.length > 1){
+    wozVals.sort(function(a,b){return b.v-a.v});
+    interpretatie += '<div style="font-size:11px;margin-bottom:4px">\ud83c\udfe0 <b>Vastgoed:</b> '+wozVals[0].n+' heeft de hoogste WOZ-waarde (\u20ac'+Math.round(wozVals[0].v/1000)+'k) vs. '+wozVals[wozVals.length-1].n+' (\u20ac'+Math.round(wozVals[wozVals.length-1].v/1000)+'k). ';
+    var wozDiffPct = Math.round((wozVals[0].v - wozVals[wozVals.length-1].v) / wozVals[wozVals.length-1].v * 100);
+    interpretatie += 'Verschil: '+wozDiffPct+'%.</div>';
+  }
+
+  // Demografie
+  var oudVals = items.map(function(g){return {n:g.properties[nameField],v:g.properties['65plus']}}).filter(function(x){return x.v!=null});
+  if(oudVals.length > 1){
+    oudVals.sort(function(a,b){return b.v-a.v});
+    interpretatie += '<div style="font-size:11px;margin-bottom:4px">\ud83d\udc74 <b>Vergrijzing:</b> '+oudVals[0].n+' is het meest vergrijsd ('+oudVals[0].v+'% 65+) vs. '+oudVals[oudVals.length-1].n+' ('+oudVals[oudVals.length-1].v+'%).</div>';
+  }
+
+  // Energie
+  var gasVals = items.map(function(g){return {n:g.properties[nameField],v:g.properties.gem_aardgas}}).filter(function(x){return x.v!=null});
+  if(gasVals.length > 1){
+    gasVals.sort(function(a,b){return b.v-a.v});
+    interpretatie += '<div style="font-size:11px;margin-bottom:4px">\ud83d\udd25 <b>Energieverbruik:</b> '+gasVals[0].n+' verbruikt het meeste gas ('+Math.round(gasVals[0].v)+' m\u00b3) vs. '+gasVals[gasVals.length-1].n+' ('+Math.round(gasVals[gasVals.length-1].v)+' m\u00b3). ';
+    var gasDiffPct = Math.round((gasVals[0].v - gasVals[gasVals.length-1].v) / gasVals[gasVals.length-1].v * 100);
+    interpretatie += 'Verschil: '+gasDiffPct+'%.</div>';
+  }
+
+  // BAG interpretatie
+  if(hasBag){
+    var bagItems = items.map(function(g){return {n:g.properties[nameField], bs:bagStats[g.properties[nameField]||'-']}}).filter(function(x){return x.bs && x.bs.count > 0});
+    if(bagItems.length > 1){
+      interpretatie += '<div style="font-size:11px;margin-bottom:4px">\ud83c\udfe2 <b>BAG Woningbestand:</b> ';
+      bagItems.forEach(function(bi, i){
+        if(i > 0) interpretatie += ', ';
+        interpretatie += bi.n+': '+bi.bs.count.toLocaleString('nl-NL')+' adressen';
+        if(bi.bs.bouwjaren.length > 0){
+          var avg = Math.round(bi.bs.bouwjaren.reduce(function(a,b){return a+b},0)/bi.bs.bouwjaren.length);
+          interpretatie += ' (gem. bouwjaar '+avg+')';
+        }
+      });
+      interpretatie += '.</div>';
+    }
+  }
+  interpretatie += '</div>';
+
+  // Conclusie
+  interpretatie += '<div style="padding:10px 12px;background:rgba(225,29,72,.06);border-radius:8px;margin-top:8px">';
+  interpretatie += '<div style="font:600 11px \'DM Sans\',sans-serif;color:#e11d48;margin-bottom:6px">\ud83d\udcca Samenvatting</div>';
+  var best = scores[0]; var worst = scores[scores.length-1];
+  interpretatie += '<div style="font-size:11px;line-height:1.8;color:#475569">';
+  interpretatie += 'Van de vergeleken gebieden scoort <b style="color:#16a34a">'+best.name+'</b> het best over alle CBS-indicatoren heen';
+  if(best.avgZ > 0.5) interpretatie += ' en ligt bovengemiddeld vergeleken met het landelijk gemiddelde';
+  interpretatie += '. ';
+  if(worst.avgZ < -0.3){
+    interpretatie += '<b style="color:#dc2626">'+worst.name+'</b> scoort het laagst en verdient mogelijk extra aandacht op het gebied van ';
+    // Zoek zwakste thema\'s
+    var weakThemes = [];
+    categories.forEach(function(cat){
+      var catZ = [];
+      cat.keys.forEach(function(k){
+        var v = worst.props[k]; var ns = _nationalStats[k];
+        if(v==null || !ns || !ns.stddev) return;
+        var z = (v-ns.avg)/ns.stddev;
+        if(reverseSet.has(k)) z = -z;
+        catZ.push(z);
+      });
+      if(catZ.length > 0){
+        var avg = catZ.reduce(function(a,b){return a+b},0)/catZ.length;
+        if(avg < -0.5) weakThemes.push(cat.label.toLowerCase());
+      }
+    });
+    interpretatie += weakThemes.length > 0 ? weakThemes.join(', ')+'.' : 'diverse thema\'s.';
+  } else {
+    interpretatie += 'Alle gebieden scoren relatief dicht bij het landelijk gemiddelde.';
+  }
+  if(diffs.length > 0 && diffs[0].relDiff > 1.5){
+    interpretatie += ' Het grootste verschil zit in <b>'+diffs[0].naam.toLowerCase()+'</b> ('+diffs[0].relDiff.toFixed(1)+'\u03c3).';
+  }
+  interpretatie += '</div></div>';
+
+  html += interpretatie;
+  html += '</div></div>';
+
+  // ===== FOOTER =====
   html += '<div class="footer">';
   html += '<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px">';
   html += '<div style="width:20px;height:20px;background:linear-gradient(135deg,#39ff14,#22c55e);border-radius:5px;display:flex;align-items:center;justify-content:center"><span style="font-family:\'Material Symbols Rounded\';font-size:12px;color:#0a0f1a;font-variation-settings:\'FILL\' 1">public</span></div>';
-  html += '<span style="font:700 11px \'Space Mono\',monospace;color:#16a34a">GeoInzicht</span>';
+  html += '<span style="font:700 11px \'Space Mono\',monospace;color:#16a34a">GeoInzicht</span> <span style="color:#94a3b8">&middot;</span> <span style="color:#64748b;font-size:10px">Data Consultants</span>';
   html += '</div>';
-  html += 'GeoInzicht v7.3 &middot; Data Consultants &middot; CBS/PDOK '+_activeYear+' &middot; '+new Date().toLocaleDateString('nl-NL');
+  html += 'GeoInzicht v7.4 &middot; Data Consultants &middot; CBS/PDOK '+_activeYear+' &middot; '+new Date().toLocaleDateString('nl-NL');
+  html += '<div style="font-size:9px;color:#cbd5e1;margin-top:4px">Dit rapport is automatisch gegenereerd op basis van CBS kerncijfers en BAG data. De AI-interpretatie is indicatief.</div>';
   html += '</div>';
 
   html += '</div></body></html>';
@@ -4969,8 +5950,8 @@ function showComparisonReport(){
   } else {
     toast('Popup geblokkeerd \u2014 sta popups toe');
   }
-  var names = compareType === 'buurten' ? _selectedBuurten : _selectedGemeenten;
-  logEvent('vergelijking_export', names.join(', '));
+  var reportNames = compareType === 'buurten' ? _selectedBuurten : _selectedGemeenten;
+  logEvent('vergelijking_export', reportNames.join(', '));
 }
 
 // Helper: z-score berekenen
@@ -5031,17 +6012,9 @@ function submitFeedback(){
     existing.push(feedback);
     localStorage.setItem(FEEDBACK_KEY, JSON.stringify(existing));
   } catch(e){}
-  // Sla op in SQL Server
-  if(email) saveEmailToSupabase(email);
-  analyticsPost('feedback', {
-    visitor_id: _visitorId || getVisitorId(),
-    session_id: _sessionId || getSessionId(),
-    text: text,
-    email: email,
-    year: _activeYear,
-    session_duration_min: Math.round((Date.now() - _appStartTime) / 60000),
-    submitted_at: new Date().toISOString()
-  }).catch(function(){});
+  // Sla op in IndexedDB (sync naar SQL Server als online)
+  if(email) saveEmailToAnalytics(email);
+  saveFeedbackToAnalytics(text, email, _activeYear);
   localStorage.setItem(FEEDBACK_SHOWN_KEY, '1');
   logEvent('feedback_verstuurd', text.substring(0,100));
   closeFeedback();
@@ -5246,10 +6219,10 @@ async function init(){
     // Start feedback timer (30 min)
     initFeedbackTimer();
 
-    // Start Supabase analytics (niet-blokkerend)
+    // Start analytics (IndexedDB + sync naar SQL Server als online)
     initAnalytics().catch(function(e){ console.warn('Analytics start error:', e); });
 
-    // Admin dashboard renderen als ?admin in URL
+    // Admin dashboard renderen als ?admin in URL (beveiligd met wachtwoord)
     renderAdminDashboard();
   } catch(e){
     console.error('Init error:', e);

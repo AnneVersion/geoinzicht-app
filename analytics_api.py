@@ -396,4 +396,6 @@ if __name__ == '__main__':
     print(f"  API draait op http://localhost:5000")
     print(f"  Admin dashboard: voeg ?admin toe aan GeoInzicht URL")
     print("=" * 50)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # BEVEILIGINGSTIP: host='127.0.0.1' = alleen lokaal bereikbaar
+    # Gebruik '0.0.0.0' alleen als je de API van buitenaf wilt bereiken
+    app.run(host='127.0.0.1', port=5000, debug=True)
