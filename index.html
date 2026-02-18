@@ -2289,77 +2289,159 @@ function loadBagIndex(){
   }).catch(function(){ _bagIndex = {}; return _bagIndex; });
 }
 
-// Prefetch: haal BAG aantallen per gemeente op via WFS hits (snel, geen data)
+// Prefetch: haal BAG aantallen per gemeente op via woonplaatsen
+// Stap 1: Haal alle woonplaatsen op (met bronhouder = gemeente)
+// Stap 2: Tel verblijfsobjecten per woonplaats via WFS OGC Filter
+// Stap 3: Sommeer per gemeente
 var _bagPrefetching = false;
+var _woonplaatsGemeenteMap = {}; // {woonplaatsNaam: gemeentecode}
+
 function prefetchBagCounts(){
   if(_bagPrefetching || !_gemeenteData) return;
   _bagPrefetching = true;
+  if(!_bagIndex) _bagIndex = {};
 
+  // Stap 1: Haal alle woonplaatsen op van PDOK
+  console.log('BAG prefetch: woonplaatsen ophalen...');
+  fetchAllWoonplaatsen().then(function(wpList){
+    console.log('BAG prefetch: '+wpList.length+' woonplaatsen gevonden, start tellen...');
+    // Stap 2: Tel per woonplaats
+    var gemTotals = {}; // {gemeentecode: {naam, count}}
+    var total = wpList.length;
+    var done = 0;
+    var queue = wpList.slice();
+    var concurrency = 6;
+    var running = 0;
+
+    function processNext(){
+      while(queue.length > 0 && running < concurrency){
+        var wp = queue.shift();
+        running++;
+        (function(woonplaats){
+          var wpNaam = woonplaats.naam;
+          var gemCode = woonplaats.gemeentecode;
+          var gemNaam = woonplaats.gemeentenaam;
+
+          // WFS OGC Filter: tel verblijfsobjecten in deze woonplaats
+          var filter = '<ogc:Filter xmlns:ogc="http://www.opengis.net/ogc"><ogc:PropertyIsEqualTo><ogc:PropertyName>woonplaats</ogc:PropertyName><ogc:Literal>'+escapeXml(wpNaam)+'</ogc:Literal></ogc:PropertyIsEqualTo></ogc:Filter>';
+          var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&resultType=hits&Filter='+encodeURIComponent(filter);
+
+          fetch(url).then(function(r){ return r.text(); }).then(function(xml){
+            var m = xml.match(/numberMatched="(\d+)"/);
+            var count = m ? parseInt(m[1]) : 0;
+            if(!gemTotals[gemCode]) gemTotals[gemCode] = {naam:gemNaam, count:0};
+            gemTotals[gemCode].count += count;
+          }).catch(function(){}).finally(function(){
+            running--;
+            done++;
+            if(done % 50 === 0 || done === total){
+              // Tussentijds updaten
+              for(var gc in gemTotals){
+                _bagIndex[gc] = {naam:gemTotals[gc].naam, count:gemTotals[gc].count, source:'woonplaats'};
+              }
+              updateBagCacheUI();
+              console.log('BAG prefetch: '+done+'/'+total+' woonplaatsen ('+Object.keys(gemTotals).length+' gemeenten)');
+            }
+            processNext();
+          });
+        })(wp);
+      }
+
+      if(queue.length === 0 && running === 0){
+        // Klaar — definitief updaten
+        for(var gc in gemTotals){
+          _bagIndex[gc] = {naam:gemTotals[gc].naam, count:gemTotals[gc].count, source:'woonplaats'};
+        }
+        _bagPrefetching = false;
+        updateBagCacheUI();
+        buildGemeenteFilter();
+        console.log('BAG prefetch klaar:', Object.keys(_bagIndex).length, 'gemeenten,', total, 'woonplaatsen');
+        setTimeout(function(){ prefetchBagSubareaCounts(); }, 500);
+      }
+    }
+    processNext();
+  }).catch(function(e){
+    console.warn('BAG prefetch fout:', e);
+    _bagPrefetching = false;
+    // Fallback: oude BBOX methode
+    prefetchBagCountsBbox();
+  });
+}
+
+// Haal alle woonplaatsen op via PDOK OGC API (paginated)
+function fetchAllWoonplaatsen(){
+  var allItems = [];
+  var baseUrl = 'https://api.pdok.nl/kadaster/bag/ogc/v2/collections/woonplaats/items?f=json&limit=200&status=Woonplaats%20aangewezen';
+
+  function fetchPage(url){
+    return fetch(url).then(function(r){ return r.json(); }).then(function(d){
+      var features = d.features || [];
+      features.forEach(function(f){
+        var p = f.properties || {};
+        if(p.woonplaats && p.bronhouder_identificatie){
+          var gemCode = 'GM' + ('0000'+p.bronhouder_identificatie).slice(-4);
+          var gemNaam = p.bronhouder_naam || '';
+          allItems.push({naam: p.woonplaats, gemeentecode: gemCode, gemeentenaam: gemNaam});
+          _woonplaatsGemeenteMap[p.woonplaats] = gemCode;
+        }
+      });
+      // Volgende pagina
+      var nextLink = (d.links || []).filter(function(l){ return l.rel === 'next'; })[0];
+      if(nextLink && nextLink.href && features.length > 0){
+        return fetchPage(nextLink.href);
+      }
+      return allItems;
+    });
+  }
+  return fetchPage(baseUrl);
+}
+
+// XML-escape helper
+function escapeXml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+
+// Fallback: oude BBOX methode (minder nauwkeurig maar werkt altijd)
+function prefetchBagCountsBbox(){
+  if(!_gemeenteData) return;
+  if(!_bagIndex) _bagIndex = {};
   var features = _gemeenteData.features.filter(function(f){
     var code = f.properties.gemeentecode || '';
-    return code && f.geometry && (!_bagIndex || !_bagIndex[code]);
+    return code && f.geometry && !_bagIndex[code];
   });
-
-  if(features.length === 0){ _bagPrefetching = false; return; }
-
-  if(!_bagIndex) _bagIndex = {};
-  var total = features.length;
-  var done = 0;
-  var queue = features.slice();
-  var concurrency = 4; // 4 gelijktijdige hits queries
-  var running = 0;
-
+  if(features.length === 0) return;
+  var total = features.length, done = 0, queue = features.slice(), running = 0;
   function processNext(){
-    while(queue.length > 0 && running < concurrency){
-      var f = queue.shift();
-      running++;
+    while(queue.length > 0 && running < 4){
+      var f = queue.shift(); running++;
       (function(feat){
         var code = feat.properties.gemeentecode || '';
         var naam = feat.properties.gemeentenaam || '';
-        // Bereken bbox
         var coords = [];
-        function ex(g){
-          if(!g) return;
-          if(g.type==='Polygon') g.coordinates.forEach(function(r){r.forEach(function(c){coords.push(c)})});
-          else if(g.type==='MultiPolygon') g.coordinates.forEach(function(p){p.forEach(function(r){r.forEach(function(c){coords.push(c)})})});
-        }
+        function ex(g){ if(!g) return; if(g.type==='Polygon') g.coordinates.forEach(function(r){r.forEach(function(c){coords.push(c)})}); else if(g.type==='MultiPolygon') g.coordinates.forEach(function(p){p.forEach(function(r){r.forEach(function(c){coords.push(c)})})}); }
         ex(feat.geometry);
-        if(coords.length === 0){ running--; done++; processNext(); return; }
+        if(!coords.length){ running--; done++; processNext(); return; }
         var mnLng=Infinity,mxLng=-Infinity,mnLat=Infinity,mxLat=-Infinity;
         coords.forEach(function(c){if(c[0]<mnLng)mnLng=c[0];if(c[0]>mxLng)mxLng=c[0];if(c[1]<mnLat)mnLat=c[1];if(c[1]>mxLat)mxLat=c[1]});
         var bbox = mnLat.toFixed(5)+','+mnLng.toFixed(5)+','+mxLat.toFixed(5)+','+mxLng.toFixed(5)+',EPSG:4326';
-        var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&resultType=hits&srsName=EPSG:4326&BBOX='+bbox;
-
-        fetch(url).then(function(r){ return r.text(); }).then(function(xml){
-          var m = xml.match(/numberMatched="(\d+)"/);
-          var count = m ? parseInt(m[1]) : 0;
-          if(count > 0){
-            _bagIndex[code] = {naam: naam, count: count, source: 'live'};
-          }
-        }).catch(function(){}).finally(function(){
-          running--;
-          done++;
-          if(done % 20 === 0){
-            console.log('BAG prefetch: '+done+'/'+total+' gemeenten');
-            updateBagCacheUI();
-          }
-          processNext();
-        });
+        fetch(PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&resultType=hits&srsName=EPSG:4326&BBOX='+bbox)
+          .then(function(r){ return r.text(); }).then(function(xml){
+            var m = xml.match(/numberMatched="(\d+)"/);
+            var count = m ? parseInt(m[1]) : 0;
+            if(count > 0) _bagIndex[code] = {naam:naam, count:count, source:'bbox'};
+          }).catch(function(){}).finally(function(){
+            running--; done++;
+            if(done % 20 === 0){ updateBagCacheUI(); }
+            processNext();
+          });
       })(f);
     }
-
-    // Klaar
     if(queue.length === 0 && running === 0){
-      _bagPrefetching = false;
-      updateBagCacheUI();
-      // Herrender gemeente dropdown met bijgewerkte counts
-      buildGemeenteFilter();
-      console.log('BAG prefetch klaar:', Object.keys(_bagIndex).length, 'gemeenten in index');
-      // Start buurt/wijk prefetch als data beschikbaar is
+      updateBagCacheUI(); buildGemeenteFilter();
+      console.log('BAG prefetch (bbox fallback) klaar:', Object.keys(_bagIndex).length, 'gemeenten');
       setTimeout(function(){ prefetchBagSubareaCounts(); }, 500);
     }
   }
-
   processNext();
 }
 
