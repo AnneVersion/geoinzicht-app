@@ -1225,9 +1225,9 @@ function renderChoropleth(type){
         if(!_infoPinned) document.getElementById('infoPanel').classList.remove('show');
       });
       layer.on('click', function(e){
-        // Altijd: toggle selectie voor vergelijking
+        // BAG actief: klik niet doorsturen naar CBS — BAG handler regelt dit
+        if(_layerState.bag) return;
         toggleMapSelection(feature.properties, type, layer, newLayer);
-        // Toon volledig info panel en pin het vast
         _infoPinned = true;
         showFeatureInfo(feature.properties, cfg, type, true, feature);
       });
