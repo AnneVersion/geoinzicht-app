@@ -3925,35 +3925,45 @@ function pandGetFeatureInfo(e){
 
 // WMS GetFeatureInfo voor verblijfsobjecten — fallback wanneer VT niet beschikbaar is
 function bagGetFeatureInfo(e){
-  if(!_map || !_bagWmsLayer) return;
+  if(!_map) return;
   var latlng = e.latlng;
   var clickTime = e._clickTime || Date.now();
-  var size = _map.getSize();
-  var bounds = _map.getBounds();
-  var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
-  var bbox = sw.lng+','+sw.lat+','+ne.lng+','+ne.lat;
-  var pt = _map.latLngToContainerPoint(latlng);
-  var url = PDOK_BAG_WMS+'?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo'+
-    '&FORMAT=image/png&TRANSPARENT=true'+
-    '&QUERY_LAYERS=verblijfsobject&LAYERS=verblijfsobject'+
-    '&INFO_FORMAT=application/json&FEATURE_COUNT=1&BUFFER=8'+
-    '&X='+Math.round(pt.x)+'&Y='+Math.round(pt.y)+
-    '&SRS=EPSG:4326&WIDTH='+size.x+'&HEIGHT='+size.y+'&BBOX='+bbox;
+  // WFS: zoek dichtstbijzijnde verblijfsobject via kleine BBOX rond klikpunt
+  var z = _map.getZoom();
+  // Zoekradius afhankelijk van zoomniveau (in graden)
+  var radius = z >= 17 ? 0.0002 : (z >= 15 ? 0.0005 : (z >= 13 ? 0.002 : 0.005));
+  var bbox = (latlng.lng-radius)+','+(latlng.lat-radius)+','+(latlng.lng+radius)+','+(latlng.lat+radius);
+  var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature'+
+    '&typeName=bag:verblijfsobject&outputFormat=application/json'+
+    '&count=5&srsName=EPSG:4326&BBOX='+bbox;
   fetch(url).then(function(r){return r.json()}).then(function(d){
     // Check of VectorGrid deze klik inmiddels al heeft verwerkt
     if(_bagClickConsumed > clickTime - 500) return;
     if(!d.features||!d.features.length){
-      // Geen adres gevonden via WMS — CBS selectie als fallback
+      // Geen adres gevonden — CBS selectie als fallback
       handleCbsClickAtPoint(latlng);
       return;
     }
+    // Zoek dichtstbijzijnde feature
+    var best = d.features[0], bestDist = Infinity;
+    d.features.forEach(function(f){
+      if(!f.geometry || !f.geometry.coordinates) return;
+      var c = f.geometry.coordinates;
+      var dx = c[0] - latlng.lng, dy = c[1] - latlng.lat;
+      var dist = dx*dx + dy*dy;
+      if(dist < bestDist){ bestDist = dist; best = f; }
+    });
     // Adres gevonden — markeer als verwerkt
     _bagClickConsumed = Date.now();
-    var p = d.features[0].properties;
+    var p = best.properties;
+    var adresLatlng = latlng;
+    if(best.geometry && best.geometry.coordinates){
+      adresLatlng = L.latLng(best.geometry.coordinates[1], best.geometry.coordinates[0]);
+    }
     _infoPinned = true;
-    selectBagAdres(p, latlng);
+    selectBagAdres(p, adresLatlng);
   }).catch(function(){
-    // WMS fout — CBS selectie als fallback
+    // WFS fout — CBS selectie als fallback
     if(_bagClickConsumed > clickTime - 500) return;
     handleCbsClickAtPoint(latlng);
   });
