@@ -1214,7 +1214,9 @@ function renderChoropleth(type){
         if(!_infoPinned) document.getElementById('infoPanel').classList.remove('show');
       });
       layer.on('click', function(e){
-        // Altijd: toggle selectie voor vergelijking
+        // Skip CBS klik als BAG actief is — BAG adressen hebben prioriteit
+        if(_layerState.bag) return;
+        // Toggle selectie voor vergelijking
         toggleMapSelection(feature.properties, type, layer, newLayer);
         // Toon volledig info panel en pin het vast
         _infoPinned = true;
@@ -1229,6 +1231,9 @@ function renderChoropleth(type){
 
   // Z-ordering herstellen
   fixLayerOrder();
+
+  // Als BAG actief is: ook nieuwe laag dimmen + pointer-events uitschakelen
+  if(_layerState.bag) dimChoroplethLayers(true);
 
   // Primaire laag bepaalt legenda/stats (de meest gedetailleerde actieve laag)
   var primaryType = _layerState.buurten ? 'buurten' : (_layerState.wijken ? 'wijken' : 'gemeenten');
@@ -2367,7 +2372,14 @@ function onBagZoomChange(){
 function createBagVectorTileLayer(){
   if(_bagVectorLayer){ _map.removeLayer(_bagVectorLayer); _bagVectorLayer = null; }
 
+  // Custom pane voor BAG VT boven de choropleth (overlayPane z=400)
+  if(!_map.getPane('bagVtPane')){
+    _map.createPane('bagVtPane');
+    _map.getPane('bagVtPane').style.zIndex = 450;
+  }
+
   _bagVectorLayer = L.vectorGrid.protobuf(PDOK_BAG_MVT, {
+    pane: 'bagVtPane',
     rendererFactory: L.canvas.tile,
     maxNativeZoom: 17,
     minNativeZoom: 17,
