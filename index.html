@@ -234,6 +234,11 @@ select option{background:var(--bg);color:var(--tx)}
 .tt-prim{color:#39ff14}
 .tt-sec{color:#38bdf8}
 
+/* Zoom level indicator op kaart */
+.zoom-indicator{background:rgba(10,15,26,.85);backdrop-filter:blur(12px);border:1px solid rgba(57,255,20,.2);border-radius:8px;padding:4px 8px;display:flex;align-items:center;gap:5px;margin-bottom:6px!important;cursor:default;user-select:none}
+.zi-label{font:400 9px 'DM Sans',sans-serif;color:#64748b}
+.zi-val{font:700 13px 'Space Mono',monospace;color:#39ff14;min-width:18px;text-align:center}
+
 /* Animated gradient border on active buttons */
 @property --angle{syntax:'<angle>';initial-value:0deg;inherits:false}
 @keyframes borderSpin{to{--angle:360deg}}
@@ -878,6 +883,19 @@ var _nationalStats = {}; // Cache: {key: {min, max, avg, median, stddev, count, 
 function initMap(){
   _map = L.map('map',{center:[52.1,5.1],zoom:8,zoomControl:false,preferCanvas:true});
   L.control.zoom({position:'bottomright'}).addTo(_map);
+  // Zoom level indicator naast zoom controls
+  var ZoomIndicator = L.Control.extend({
+    options: {position:'bottomright'},
+    onAdd: function(map){
+      var div = L.DomUtil.create('div','zoom-indicator');
+      div.id = 'zoomIndicator';
+      div.innerHTML = '<span class="zi-label">Zoom</span><span class="zi-val" id="zoomLevelText">'+map.getZoom()+'</span>';
+      L.DomEvent.disableClickPropagation(div);
+      map.on('zoomend', function(){ document.getElementById('zoomLevelText').textContent = map.getZoom(); });
+      return div;
+    }
+  });
+  new ZoomIndicator().addTo(_map);
   setBasemap('dark');
   // Voorkom dat scrollen in het infopanel de kaart zoomt
   var infoPanel = document.getElementById('infoPanel');
