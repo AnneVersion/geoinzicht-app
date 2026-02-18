@@ -908,6 +908,11 @@ function initMap(){
       _infoPinned = true;
       pandGetFeatureInfo(e);
     }
+    // Bij BAG actief: CBS polygonen hebben pointer-events:none,
+    // dus klikken op lege gebieden vangen we hier op voor selectie
+    if(_layerState.bag && !_bagClickConsumed){
+      handleCbsClickAtPoint(e.latlng);
+    }
   });
 }
 
@@ -1083,6 +1088,64 @@ var LAYER_CONFIG = {
   buurten:   {data:function(){return _buurtData},    nameField:'buurtnaam',    codeField:'buurtcode',    borderWeight:0.5, borderColor:'rgba(255,255,255,0.15)'},
   wijken:    {data:function(){return _wijkData},     nameField:'wijknaam',     codeField:'wijkcode',     borderWeight:1.5, borderColor:'rgba(255,255,255,0.3)'}
 };
+
+// Bij BAG actief: CBS polygonen hebben pointer-events:none, dus klikken we
+// handmatig door met point-in-polygon om selectie te behouden
+function handleCbsClickAtPoint(latlng){
+  if(!latlng) return;
+  // Bepaal het meest gedetailleerde niveau: buurten > wijken > gemeenten
+  var layers = [
+    {type:'buurten', layer:_buurtLayer, cfg:LAYER_CONFIG.buurten},
+    {type:'wijken',  layer:_wijkLayer,  cfg:LAYER_CONFIG.wijken},
+    {type:'gemeenten', layer:_gemeenteLayer, cfg:LAYER_CONFIG.gemeenten}
+  ];
+  for(var i = 0; i < layers.length; i++){
+    var entry = layers[i];
+    if(!entry.layer || !_layerState[entry.type]) continue;
+    var hit = null, hitLayer = null;
+    entry.layer.eachLayer(function(sub){
+      if(hit) return;
+      // Snelle bbox-check eerst
+      try{ if(!sub.getBounds().contains(latlng)) return; }catch(e){ return; }
+      // Nauwkeurige point-in-polygon via Leaflet's interne methode
+      if(sub.feature && sub.feature.geometry){
+        if(leafletContainsPoint(sub.feature.geometry, latlng)){
+          hit = sub.feature;
+          hitLayer = sub;
+        }
+      }
+    });
+    if(hit && hitLayer){
+      toggleMapSelection(hit.properties, entry.type, hitLayer, entry.layer);
+      _infoPinned = true;
+      showFeatureInfo(hit.properties, entry.cfg, entry.type, true, hit);
+      return;
+    }
+  }
+}
+
+// Point-in-polygon check (ray casting) voor GeoJSON geometrie
+function leafletContainsPoint(geom, latlng){
+  var lng = latlng.lng, lat = latlng.lat;
+  function inRing(ring){
+    var inside = false;
+    for(var i = 0, j = ring.length - 1; i < ring.length; j = i++){
+      var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi){
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+  if(geom.type === 'Polygon'){
+    return inRing(geom.coordinates[0]);
+  } else if(geom.type === 'MultiPolygon'){
+    for(var p = 0; p < geom.coordinates.length; p++){
+      if(inRing(geom.coordinates[p][0])) return true;
+    }
+  }
+  return false;
+}
 
 // Z-volgorde: basemap → gemeenten → wijken → buurten → BAG panden → BAG WMS → BAG vectors
 function fixLayerOrder(){
@@ -2286,6 +2349,8 @@ function dimChoroplethLayers(dim){
     layer.eachLayer(function(sub){
       try{
         sub.setStyle({fillOpacity:opacity, opacity:borderOp, weight:borderWeight});
+        // pointer-events uitschakelen op individuele SVG paths zodat BAG VT klikbaar is
+        if(sub._path) sub._path.style.pointerEvents = dim ? 'none' : '';
       }catch(e){}
     });
   });
