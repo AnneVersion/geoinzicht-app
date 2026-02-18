@@ -2357,11 +2357,14 @@ function dimChoroplethLayers(dim){
     layer.eachLayer(function(sub){
       try{
         sub.setStyle({fillOpacity:opacity, opacity:borderOp, weight:borderWeight});
-        // pointer-events uitschakelen op individuele SVG paths zodat BAG VT klikbaar is
-        if(sub._path) sub._path.style.pointerEvents = dim ? 'none' : '';
       }catch(e){}
     });
   });
+  // Canvas renderer: pointer-events op de canvas container uitschakelen
+  // (preferCanvas:true = Leaflet gebruikt Canvas i.p.v. SVG, geen _path elementen)
+  if(_map && _map._renderer && _map._renderer._container){
+    _map._renderer._container.style.pointerEvents = dim ? 'none' : '';
+  }
 }
 
 function toggleBagLayer(on){
