@@ -1579,15 +1579,63 @@ function getBagStatsForFeature(feature, type){
 
   if(type === 'gemeenten' && _bagIndex){
     var code = p.gemeentecode || '';
-    if(_bagIndex[code]) result.total = _bagIndex[code].count;
+    if(_bagIndex[code] && _bagIndex[code].count !== undefined) result.total = _bagIndex[code].count;
   } else if(type === 'wijken' && _bagWijkIndex){
     var wCode = p.wijkcode || '';
-    if(_bagWijkIndex[wCode]) result.total = _bagWijkIndex[wCode].count;
+    if(_bagWijkIndex[wCode] && _bagWijkIndex[wCode].count !== undefined) result.total = _bagWijkIndex[wCode].count;
   } else if(type === 'buurten' && _bagBuurtIndex){
     var bCode = p.buurtcode || '';
-    if(_bagBuurtIndex[bCode]) result.total = _bagBuurtIndex[bCode].count;
+    if(_bagBuurtIndex[bCode] && _bagBuurtIndex[bCode].count !== undefined) result.total = _bagBuurtIndex[bCode].count;
   }
   return result;
+}
+
+// On-demand BAG telling: als prefetch nog niet klaar is, doe een directe WFS hits query
+function fetchBagCountOnDemand(feature, type, callback){
+  if(!feature || !feature.geometry) return;
+  var p = feature.properties || {};
+
+  // Check of we het al hebben in de index
+  var existing = getBagStatsForFeature(feature, type);
+  if(existing.total !== null){ callback(existing.total); return; }
+
+  // Bereken bbox van de feature
+  var coords = [];
+  function extractCoords(g){
+    if(!g) return;
+    if(g.type==='Polygon') g.coordinates.forEach(function(r){r.forEach(function(c){coords.push(c)})});
+    else if(g.type==='MultiPolygon') g.coordinates.forEach(function(pg){pg.forEach(function(r){r.forEach(function(c){coords.push(c)})})});
+    else if(g.type==='Point') coords.push(g.coordinates);
+  }
+  extractCoords(feature.geometry);
+  if(coords.length === 0) return;
+
+  var mnLng=Infinity,mxLng=-Infinity,mnLat=Infinity,mxLat=-Infinity;
+  coords.forEach(function(c){if(c[0]<mnLng)mnLng=c[0];if(c[0]>mxLng)mxLng=c[0];if(c[1]<mnLat)mnLat=c[1];if(c[1]>mxLat)mxLat=c[1]});
+  var bbox = mnLat.toFixed(5)+','+mnLng.toFixed(5)+','+mxLat.toFixed(5)+','+mxLng.toFixed(5)+',EPSG:4326';
+  var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature&typeName=bag:verblijfsobject&resultType=hits&srsName=EPSG:4326&BBOX='+bbox;
+
+  fetch(url).then(function(r){ return r.text(); }).then(function(xml){
+    var m = xml.match(/numberMatched="(\d+)"/);
+    var count = m ? parseInt(m[1]) : 0;
+
+    // Sla op in de juiste index zodat het niet opnieuw hoeft
+    if(type === 'gemeenten'){
+      var code = p.gemeentecode || '';
+      if(code){
+        if(!_bagIndex) _bagIndex = {};
+        _bagIndex[code] = {naam: p.gemeentenaam||'', count: count, source:'ondemand'};
+      }
+    } else if(type === 'wijken'){
+      var wCode = p.wijkcode || '';
+      if(wCode) _bagWijkIndex[wCode] = {naam: p.wijknaam||'', count: count, gemeente: p.gemeentenaam||''};
+    } else if(type === 'buurten'){
+      var bCode = p.buurtcode || '';
+      if(bCode) _bagBuurtIndex[bCode] = {naam: p.buurtnaam||'', count: count, gemeente: p.gemeentenaam||''};
+    }
+    updateBagCacheUI();
+    callback(count);
+  }).catch(function(){ /* stille fout */ });
 }
 
 // Laad BAG vectordata via WFS — alle adressen in viewport
@@ -3574,29 +3622,24 @@ function showFeatureInfo(p, cfg, type, isClick, geoFeature){
     kernRows.push({icon:'real_estate_agent', label:'Huurwoningen', val:ha.toLocaleString('nl-NL')+' ('+p.huurwoningen+'%)', color:'var(--wn)'});
   }
 
-  // BAG adressen: totaal uit prefetch indexes
+  // BAG adressen: totaal uit prefetch indexes, of on-demand ophalen
   if(geoFeature){
     var gemCode = p.gemeentecode || '';
     var bagStats = getBagStatsForFeature(geoFeature, type);
-    if(bagStats.total){
-      kernRows.push({icon:'location_on', label:'BAG Adressen (totaal)', val:bagStats.total.toLocaleString('nl-NL'), color:'var(--ai)'});
-    } else if(type !== 'gemeenten'){
-      // Fallback: gemeente totaal als context
-      if(type === 'wijken'){
-        var wCode = p.wijkcode || '';
-        if(wCode && _bagWijkIndex && _bagWijkIndex[wCode]){
-          kernRows.push({icon:'location_on', label:'BAG Adressen', val:_bagWijkIndex[wCode].count.toLocaleString('nl-NL'), color:'var(--ai)'});
-        } else if(_bagIndex && gemCode && _bagIndex[gemCode]){
-          kernRows.push({icon:'location_on', label:'BAG Gem. Totaal', val:_bagIndex[gemCode].count.toLocaleString('nl-NL')+' ('+escapeHtml(_bagIndex[gemCode].naam||gemCode)+')', color:'var(--ai)'});
-        }
-      } else if(type === 'buurten'){
-        var bCode = p.buurtcode || '';
-        if(bCode && _bagBuurtIndex[bCode]){
-          kernRows.push({icon:'location_on', label:'BAG Adressen', val:_bagBuurtIndex[bCode].count.toLocaleString('nl-NL'), color:'var(--ai)'});
-        } else if(_bagIndex && gemCode && _bagIndex[gemCode]){
-          kernRows.push({icon:'location_on', label:'BAG Gem. Totaal', val:_bagIndex[gemCode].count.toLocaleString('nl-NL')+' ('+escapeHtml(_bagIndex[gemCode].naam||gemCode)+')', color:'var(--ai)'});
-        }
-      }
+    if(bagStats.total !== null){
+      kernRows.push({icon:'location_on', label:'BAG Adressen', val:bagStats.total.toLocaleString('nl-NL'), color:'var(--ai)'});
+    } else {
+      // Nog niet in index — toon placeholder en haal on-demand op
+      kernRows.push({icon:'location_on', label:'BAG Adressen', val:'<span id="bagOnDemandCount" style="opacity:.5">tellen...</span>', color:'var(--ai)'});
+      // Start on-demand fetch voor dit gebied
+      fetchBagCountOnDemand(geoFeature, type, function(count){
+        var el = document.getElementById('bagOnDemandCount');
+        if(el) el.outerHTML = count.toLocaleString('nl-NL');
+      });
+    }
+    // Extra: gemeente totaal als context bij wijken/buurten
+    if(type !== 'gemeenten' && _bagIndex && gemCode && _bagIndex[gemCode] && bagStats.total === null){
+      kernRows.push({icon:'domain', label:'BAG Gem. Totaal', val:_bagIndex[gemCode].count.toLocaleString('nl-NL')+' ('+escapeHtml(_bagIndex[gemCode].naam||gemCode)+')', color:'rgba(56,189,248,.6)'});
     }
   }
 
