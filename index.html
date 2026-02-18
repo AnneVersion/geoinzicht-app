@@ -873,6 +873,7 @@ var _bagForceReload = false;
 var _pandWmsLayer = null;
 var _searchMarker = null;
 var _infoPinned = false; // Panel vastzetten bij klik
+var _bagClickConsumed = false; // True als BAG VT klik al verwerkt is (voorkom CBS doorval)
 var _gemeenteNamen = new Set();
 var _layerState = {gemeenten: true, buurten: false, wijken: false, bag: false, panden: false};
 var _nationalStats = {}; // Cache: {key: {min, max, avg, median, stddev, count, skewness, distType}}
@@ -1214,8 +1215,8 @@ function renderChoropleth(type){
         if(!_infoPinned) document.getElementById('infoPanel').classList.remove('show');
       });
       layer.on('click', function(e){
-        // Skip CBS klik als BAG actief is — BAG adressen hebben prioriteit
-        if(_layerState.bag) return;
+        // Skip als deze klik al door een BAG adres is verwerkt (voorkom dubbelklik-effect)
+        if(_bagClickConsumed) return;
         // Toggle selectie voor vergelijking
         toggleMapSelection(feature.properties, type, layer, newLayer);
         // Toon volledig info panel en pin het vast
@@ -2435,13 +2436,19 @@ function createBagVectorTileLayer(){
       latlng = _map.mouseEventToLatLng(e.originalEvent);
     }
     if(!latlng) latlng = _map.getCenter(); // fallback
+    // Stop alle event propagation — voorkom dat CBS polygonen ook reageren
     L.DomEvent.stopPropagation(e);
+    if(e.originalEvent){
+      L.DomEvent.stop(e.originalEvent);
+    }
+    _bagClickConsumed = true; // Flag: BAG heeft deze klik verwerkt
     _infoPinned = true;
     if(layerName === 'pand'){
       showPandFeatureInfo(p, latlng);
     } else {
       showBagFeatureInfo(p, latlng);
     }
+    setTimeout(function(){ _bagClickConsumed = false; }, 50);
   });
 
   fixLayerOrder();
