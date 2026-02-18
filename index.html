@@ -1286,11 +1286,10 @@ function createBagWmsLayer(){
   fixLayerOrder();
 }
 
-// Dynamische WMS opacity: fade uit bij lage zoom
-function updateBagWmsOpacity(){
+// Dynamische Panden WMS opacity: fade in bij hogere zoom
+function updatePandWmsOpacity(){
   if(!_map) return;
   var z = _map.getZoom();
-  if(_bagWmsLayer) _bagWmsLayer.setOpacity(z >= 16 ? 0.4 : (z >= 14 ? 0.2 : (z >= 13 ? 0.1 : 0)));
   if(_pandWmsLayer) _pandWmsLayer.setOpacity(z >= 16 ? 0.6 : (z >= 14 ? 0.3 : (z >= 13 ? 0.15 : 0)));
 }
 
@@ -2115,11 +2114,14 @@ function toggleBagLayer(on){
   var statusSection = document.getElementById('bagStatusSection');
   var statusBtns = document.getElementById('bagStatusBtns');
   if(on){
-    if(_bagVectorLayer) return;
-    // === VECTOR TILES: PDOK BAG via Leaflet.VectorGrid ===
-    // Geen WFS bulk loading, geen geheugen-intensieve cache
-    // Server rendert tiles on-demand, browser toont alleen wat zichtbaar is
+    if(_bagWmsLayer) return;
+    // === HYBRIDE: WMS (alle zoom levels) + Vector Tiles (zoom 17+, klikbaar) ===
+    // WMS: server-gerenderde rasterafbeeldingen — werkt op elk zoom level
+    // Vector Tiles: alleen zoom 17 beschikbaar bij PDOK, voor klikbare punten
+    createBagWmsLayer();
     createBagVectorTileLayer();
+    _map.on('zoomend', onBagZoomChange);
+    onBagZoomChange(); // Initiele opacity
     statusSection.style.display = '';
     statusBtns.style.display = 'flex';
     document.getElementById('bagFiltersSection').style.display = 'block';
@@ -2139,8 +2141,9 @@ function toggleBagLayer(on){
         console.log('Buurtdata geladen op achtergrond:', d.features.length, 'buurten');
       }).catch(function(e){ console.warn('Buurtdata achtergrond laden mislukt:', e); });
     }
-    logEvent('bag_toggle', 'aan (vector tiles)');
+    logEvent('bag_toggle', 'aan (WMS + VT)');
   } else {
+    _map.off('zoomend', onBagZoomChange);
     if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null}
     if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
     statusSection.style.display = 'none';
@@ -2158,14 +2161,31 @@ function toggleBagLayer(on){
   }
 }
 
+// WMS/VT opacity afhankelijk van zoom
+function onBagZoomChange(){
+  if(!_map) return;
+  var z = _map.getZoom();
+  // WMS: altijd zichtbaar, faden naar onzichtbaar bij hoge zoom waar VT overneemt
+  if(_bagWmsLayer){
+    // zoom <13: niet zichtbaar (minZoom van WMS layer)
+    // zoom 13-15: laag, overzicht
+    // zoom 16: medium, VT begint ook
+    // zoom 17+: minimaal, VT toont klikbare features
+    _bagWmsLayer.setOpacity(z >= 17 ? 0.12 : (z >= 16 ? 0.35 : (z >= 14 ? 0.55 : 0.4)));
+  }
+  // Panden WMS ook bijwerken
+  updatePandWmsOpacity();
+}
+
 // === BAG VECTOR TILE LAYER ===
 function createBagVectorTileLayer(){
   if(_bagVectorLayer){ _map.removeLayer(_bagVectorLayer); _bagVectorLayer = null; }
 
   _bagVectorLayer = L.vectorGrid.protobuf(PDOK_BAG_MVT, {
     rendererFactory: L.canvas.tile,
-    maxNativeZoom: 16,
-    minZoom: 10,
+    maxNativeZoom: 17,
+    minNativeZoom: 17,
+    minZoom: 16,
     maxZoom: 22,
     interactive: true,
     getFeatureId: function(f){ return f.properties.identificatie; },
@@ -2173,26 +2193,23 @@ function createBagVectorTileLayer(){
       verblijfsobject: function(properties, zoom){
         // Filters toepassen
         if(!matchesBagVtFilter(properties)) return {radius:0, fillOpacity:0, opacity:0, fill:false, stroke:false};
-        var radius = Math.max(0.5, Math.min(6, (zoom - 9) * 0.6));
-        var weight = zoom >= 17 ? 0.5 : 0;
-        var fillOp = zoom >= 16 ? 0.85 : (zoom >= 13 ? 0.7 : 0.5);
+        var radius = zoom >= 18 ? 5 : (zoom >= 17 ? 3.5 : 2);
         return {
           radius: radius,
           fillColor: bagStatusToColor(properties.status),
           color: '#fff',
-          weight: weight,
-          fillOpacity: fillOp,
+          weight: zoom >= 17 ? 0.5 : 0,
+          fillOpacity: zoom >= 17 ? 0.85 : 0.6,
           fill: true
         };
       },
       pand: function(properties, zoom){
-        if(zoom < 14) return {fill:false, stroke:false};
         return {
           fill: true,
           fillColor: '#8B5E3C',
-          fillOpacity: zoom >= 16 ? 0.25 : 0.15,
+          fillOpacity: zoom >= 17 ? 0.25 : 0.15,
           color: '#654321',
-          weight: zoom >= 16 ? 0.8 : 0.4
+          weight: zoom >= 17 ? 0.8 : 0.4
         };
       },
       // Andere layers in de tile verbergen
