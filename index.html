@@ -16,15 +16,15 @@
 <script src="https://unpkg.com/leaflet.vectorgrid@1.3.0/dist/Leaflet.VectorGrid.bundled.min.js"></script>
 <script>
 // Patch VectorGrid 1.3.0: fix TypeError op point-feature clicks met Leaflet 1.9+
-// Probleem: punt-features (type=1) krijgen getLatLng=null wat crasht bij click-events
-// Oplossing: override _createLayer om getLatLng toe te voegen aan punt-features
+// Probleem: punt-features (type=1) missen getLatLng, crash bij click-event propagatie
+// Oplossing: override _createLayer op L.VectorGrid.prototype
 (function(){
-  if(!L.Canvas.Tile) return;
-  var origCreateLayer = L.Canvas.Tile.prototype._createLayer;
-  if(!origCreateLayer) return;
-  L.Canvas.Tile.prototype._createLayer = function(feat, pxPerExtent, layerStyle){
-    var layer = origCreateLayer.call(this, feat, pxPerExtent, layerStyle);
-    // Punt-features (type=1) missen getLatLng in VectorGrid 1.3.0
+  var VG = L.VectorGrid;
+  if(!VG || !VG.prototype || !VG.prototype._createLayer) return;
+  var orig = VG.prototype._createLayer;
+  VG.prototype._createLayer = function(feat, pxPerExtent, layerStyle){
+    var layer = orig.call(this, feat, pxPerExtent, layerStyle);
+    // Punt-features (type=1) erven van CircleMarker maar missen _latlng → getLatLng crasht
     if(feat.type === 1 && layer && !layer.getLatLng){
       layer.getLatLng = function(){ return this._latlng || L.latLng(0,0); };
     }
@@ -369,8 +369,12 @@ select option{background:var(--bg);color:var(--tx)}
       </div>
       <div id="bagCacheInfo" style="display:none;font:400 9px 'Space Mono',monospace;color:var(--mt);margin-bottom:8px;align-items:center;gap:6px">
         <span class="mi mi-sm" style="color:var(--ai)">sd_storage</span>
-        <span id="bagCacheText">Cache: 0 adressen</span>
+        <span id="bagCacheText">Totaal: tellen...</span>
         <button class="btn btn-s" onclick="if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null;createBagVectorTileLayer();toast('BAG tiles herladen')}" style="font-size:9px;padding:2px 8px;margin-left:auto"><span class="mi mi-sm" style="font-size:11px">refresh</span> Herlaad tiles</button>
+      </div>
+      <div id="bagZoomHint" style="display:none;font:400 9px 'DM Sans',sans-serif;color:var(--wn);margin-bottom:6px;padding:4px 8px;background:rgba(251,191,36,.06);border-radius:6px;border-left:3px solid var(--wn);align-items:center;gap:6px">
+        <span class="mi mi-sm" style="font-size:13px">zoom_in</span>
+        <span id="bagZoomHintText">Zoom in voor BAG adressen</span>
       </div>
       <div id="bagLoadProgress" style="display:none;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
@@ -1436,23 +1440,46 @@ function clearBagCache(){
 function updateBagCacheUI(){
   var el = document.getElementById('bagCacheText');
   var btnEl = document.getElementById('bagBtnCount');
-  // Bereken totaal BAG adressen uit prefetch index
-  var totalAvail = 0;
+  // Bereken totaal BAG adressen uit prefetch index (server-side tellingen)
+  var totalAdressen = 0;
+  var gemGeteld = 0;
+  var gemTotaal = _gemeenteData ? _gemeenteData.features.length : 342;
   if(_bagIndex && Object.keys(_bagIndex).length > 0){
-    for(var k in _bagIndex) totalAvail += (_bagIndex[k].count || 0);
-  }
-  var gemCount = _bagIndex ? Object.keys(_bagIndex).length : 0;
-  if(el){
-    if(totalAvail > 0){
-      el.textContent = 'Vector Tiles · '+totalAvail.toLocaleString('nl-NL')+' adressen ('+gemCount+' gemeenten)';
-    } else {
-      el.textContent = 'Vector Tiles · Tellen...';
+    for(var k in _bagIndex){
+      totalAdressen += (_bagIndex[k].count || 0);
+      gemGeteld++;
     }
   }
-  // Update badge op BAG knop
+  var wijkGeteld = Object.keys(_bagWijkIndex).length;
+  var buurtGeteld = Object.keys(_bagBuurtIndex).length;
+  // Cache info tekst
+  if(el){
+    if(gemGeteld > 0){
+      var parts = [];
+      parts.push(totalAdressen.toLocaleString('nl-NL')+' adressen totaal');
+      if(gemGeteld < gemTotaal){
+        parts.push(gemGeteld+'/'+gemTotaal+' gemeenten geteld');
+      } else {
+        parts.push(gemGeteld+' gemeenten');
+      }
+      if(wijkGeteld > 0) parts.push(wijkGeteld+' wijken');
+      if(buurtGeteld > 0) parts.push(buurtGeteld+' buurten');
+      if(_bagPrefetching) parts.push('⏳ telt...');
+      if(_bagSubPrefetching) parts.push('⏳ sub-areas...');
+      el.textContent = parts.join(' · ');
+    } else if(_bagPrefetching){
+      el.textContent = 'Adressen tellen per gemeente...';
+    } else {
+      el.textContent = 'Totaal: tellen...';
+    }
+  }
+  // Update badge op BAG knop: totaal adressen
   if(btnEl){
-    if(totalAvail > 0){
-      btnEl.textContent = '('+totalAvail.toLocaleString('nl-NL')+')';
+    if(totalAdressen > 0){
+      var suffix = (gemGeteld < gemTotaal) ? '+' : '';
+      btnEl.textContent = '('+totalAdressen.toLocaleString('nl-NL')+suffix+')';
+    } else if(_bagPrefetching){
+      btnEl.textContent = '(tellen...)';
     } else {
       btnEl.textContent = '';
     }
@@ -2170,6 +2197,7 @@ function toggleBagLayer(on){
     statusBtns.style.display = 'none';
     document.getElementById('bagFiltersSection').style.display = 'none';
     document.getElementById('bagCacheInfo').style.display = 'none';
+    document.getElementById('bagZoomHint').style.display = 'none';
     document.getElementById('bagBgProgress').style.display = 'none';
     // Panden ook uit zetten
     if(_layerState.panden){
@@ -2181,20 +2209,29 @@ function toggleBagLayer(on){
   }
 }
 
-// WMS/VT opacity afhankelijk van zoom
+// WMS/VT opacity afhankelijk van zoom + zoom-hint updaten
 function onBagZoomChange(){
   if(!_map) return;
   var z = _map.getZoom();
   // WMS: altijd zichtbaar, faden naar onzichtbaar bij hoge zoom waar VT overneemt
   if(_bagWmsLayer){
-    // zoom <13: niet zichtbaar (minZoom van WMS layer)
-    // zoom 13-15: laag, overzicht
-    // zoom 16: medium, VT begint ook
-    // zoom 17+: minimaal, VT toont klikbare features
     _bagWmsLayer.setOpacity(z >= 17 ? 0.12 : (z >= 16 ? 0.35 : (z >= 14 ? 0.55 : 0.4)));
   }
   // Panden WMS ook bijwerken
   updatePandWmsOpacity();
+  // Zoom-hint: toon waarschuwing als zoom te laag is voor klikbare adressen
+  var hintEl = document.getElementById('bagZoomHint');
+  if(hintEl){
+    if(z < 13){
+      hintEl.style.display = 'flex';
+      document.getElementById('bagZoomHintText').innerHTML = '<b>Zoom in om BAG adressen te zien</b> (nu zoom '+z+', zichtbaar vanaf 13, klikbaar vanaf 16)';
+    } else if(z < 16){
+      hintEl.style.display = 'flex';
+      document.getElementById('bagZoomHintText').innerHTML = 'Adressen zichtbaar (WMS) · <b>Zoom in voor klikbare punten</b> (nu zoom '+z+', klikbaar vanaf 16)';
+    } else {
+      hintEl.style.display = 'none';
+    }
+  }
 }
 
 // === BAG VECTOR TILE LAYER ===
@@ -2569,6 +2606,7 @@ function prefetchBagSubareaCounts(){
             // Herrender dropdowns tussentijds
             if(_wijkData && Object.keys(_bagWijkIndex).length > 0) buildWijkFilter();
             if(_buurtData && Object.keys(_bagBuurtIndex).length > 0) buildBuurtFilter();
+            updateBagCacheUI();
           }
           processNext();
         });
@@ -2581,6 +2619,7 @@ function prefetchBagSubareaCounts(){
       // Definitieve dropdown update
       if(_wijkData) buildWijkFilter();
       if(_buurtData) buildBuurtFilter();
+      updateBagCacheUI();
     }
   }
 
@@ -3459,7 +3498,7 @@ function showFeatureInfo(p, cfg, type, isClick, geoFeature){
     var gemCode = p.gemeentecode || '';
     var bagStats = getBagStatsForFeature(geoFeature, type);
     if(bagStats.total){
-      kernRows.push({icon:'location_on', label:'BAG Adressen', val:bagStats.total.toLocaleString('nl-NL'), color:'var(--ai)'});
+      kernRows.push({icon:'location_on', label:'BAG Adressen (totaal)', val:bagStats.total.toLocaleString('nl-NL'), color:'var(--ai)'});
     } else if(type !== 'gemeenten'){
       // Fallback: gemeente totaal als context
       if(type === 'wijken'){
@@ -4145,7 +4184,7 @@ function buildWijkFilter(){
     var bagInfo = '';
     if(code && _bagWijkIndex[code]){
       var cnt = _bagWijkIndex[code].count;
-      bagInfo = '<span style="font:400 8px Space Mono,monospace;color:var(--ai);margin-left:auto;flex-shrink:0">'+cnt.toLocaleString('nl-NL')+'</span>';
+      bagInfo = '<span style="font:400 8px Space Mono,monospace;color:var(--ai);margin-left:auto;flex-shrink:0">'+cnt.toLocaleString('nl-NL')+' adr.</span>';
     }
     html += '<div class="ms-opt" data-name="'+n.replace(/"/g,'&quot;')+'" onclick="toggleMsOption(\'msWijk\',\''+n.replace(/'/g,"\\'")+'\')" style="display:flex;align-items:center;gap:4px">';
     html += '<span class="ms-check"><span class="mi" style="font-size:10px">check</span></span>';
@@ -4182,7 +4221,7 @@ function buildBuurtFilter(){
     var bagInfo = '';
     if(code && _bagBuurtIndex[code]){
       var cnt = _bagBuurtIndex[code].count;
-      bagInfo = '<span style="font:400 8px Space Mono,monospace;color:var(--ai);margin-left:auto;flex-shrink:0">'+cnt.toLocaleString('nl-NL')+'</span>';
+      bagInfo = '<span style="font:400 8px Space Mono,monospace;color:var(--ai);margin-left:auto;flex-shrink:0">'+cnt.toLocaleString('nl-NL')+' adr.</span>';
     }
     html += '<div class="ms-opt" data-name="'+n.replace(/"/g,'&quot;')+'" onclick="toggleMsOption(\'msBuurt\',\''+n.replace(/'/g,"\\'")+'\')" style="display:flex;align-items:center;gap:4px">';
     html += '<span class="ms-check"><span class="mi" style="font-size:10px">check</span></span>';
