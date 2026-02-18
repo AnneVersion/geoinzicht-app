@@ -14,6 +14,24 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.vectorgrid@1.3.0/dist/Leaflet.VectorGrid.bundled.min.js"></script>
+<script>
+// Patch VectorGrid 1.3.0: fix TypeError op point-feature clicks met Leaflet 1.9+
+// Probleem: punt-features (type=1) krijgen getLatLng=null wat crasht bij click-events
+// Oplossing: override _createLayer om getLatLng toe te voegen aan punt-features
+(function(){
+  if(!L.Canvas.Tile) return;
+  var origCreateLayer = L.Canvas.Tile.prototype._createLayer;
+  if(!origCreateLayer) return;
+  L.Canvas.Tile.prototype._createLayer = function(feat, pxPerExtent, layerStyle){
+    var layer = origCreateLayer.call(this, feat, pxPerExtent, layerStyle);
+    // Punt-features (type=1) missen getLatLng in VectorGrid 1.3.0
+    if(feat.type === 1 && layer && !layer.getLatLng){
+      layer.getLatLng = function(){ return this._latlng || L.latLng(0,0); };
+    }
+    return layer;
+  };
+})();
+</script>
 <style>
 :root{--bg:#0a0f1a;--p:rgba(15,20,35,.85);--p2:rgba(25,32,52,.7);--bd:rgba(55,65,90,.5);--tx:#e2e8f0;--mt:#64748b;--ac:#39ff14;--ac2:#22c55e;--up:#22c55e;--dn:#ef4444;--pu:#39ff14;--ai:#38bdf8;--wn:#fbbf24;--cyan:#06b6d4;--radius:12px;--glass:rgba(20,28,50,.6);--glass-bd:rgba(80,100,140,.15);--shadow:0 8px 32px rgba(0,0,0,.4)}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -349,10 +367,10 @@ select option{background:var(--bg);color:var(--tx)}
           <button class="btn btn-s" onclick="resetBagFilters()" style="font-size:9px;padding:2px 8px"><span class="mi mi-sm" style="font-size:11px">filter_alt_off</span> Reset</button>
         </div>
       </div>
-      <div id="bagCacheInfo" style="display:none;font:400 9px 'Space Mono',monospace;color:var(--mt);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+      <div id="bagCacheInfo" style="display:none;font:400 9px 'Space Mono',monospace;color:var(--mt);margin-bottom:8px;align-items:center;gap:6px">
         <span class="mi mi-sm" style="color:var(--ai)">sd_storage</span>
         <span id="bagCacheText">Cache: 0 adressen</span>
-        <button class="btn btn-s" onclick="if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null;createBagVectorTileLayer()}toast('BAG tiles herladen')" style="font-size:9px;padding:2px 8px;margin-left:auto"><span class="mi mi-sm" style="font-size:11px">refresh</span> Herlaad tiles</button>
+        <button class="btn btn-s" onclick="if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null;createBagVectorTileLayer();toast('BAG tiles herladen')}" style="font-size:9px;padding:2px 8px;margin-left:auto"><span class="mi mi-sm" style="font-size:11px">refresh</span> Herlaad tiles</button>
       </div>
       <div id="bagLoadProgress" style="display:none;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
@@ -1687,6 +1705,8 @@ function updateBagStatusCountsFromData(){
 }
 
 function renderBagVectors(){
+  // Als hybride WMS+VT actief is, niet overschrijven met GeoJSON
+  if(_bagWmsLayer) return;
   if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null}
   if(!_bagVectorData || !_bagVectorData.length) return;
   // Gemeente-filter: alleen adressen tonen binnen geselecteerde gemeenten
@@ -2231,12 +2251,18 @@ function createBagVectorTileLayer(){
     if(!e.layer || !e.layer.properties) return;
     var p = e.layer.properties;
     var layerName = e.layer._layerName || e.layerName || '';
+    // Latlng bepalen: VectorGrid geeft soms geen latlng mee bij punt-features
+    var latlng = e.latlng;
+    if(!latlng && e.originalEvent && _map){
+      latlng = _map.mouseEventToLatLng(e.originalEvent);
+    }
+    if(!latlng) latlng = _map.getCenter(); // fallback
     L.DomEvent.stopPropagation(e);
     _infoPinned = true;
     if(layerName === 'pand'){
-      showPandFeatureInfo(p, e.latlng);
+      showPandFeatureInfo(p, latlng);
     } else {
-      showBagFeatureInfo(p, e.latlng);
+      showBagFeatureInfo(p, latlng);
     }
   });
 
