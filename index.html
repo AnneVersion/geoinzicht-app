@@ -15,9 +15,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.vectorgrid@1.3.0/dist/Leaflet.VectorGrid.bundled.min.js"></script>
 <script>
-// Polyfill L.DomEvent.fakeStop voor Leaflet 1.9+ (verwijderd sinds 1.4)
-// VectorGrid 1.3.0 gebruikt fakeStop in L.Canvas.Tile._onClick
-// Zonder deze polyfill crasht elke klik op een VT feature met TypeError
+// Polyfill L.DomEvent.fakeStop — verwijderd in Leaflet 1.4+, nodig voor VectorGrid 1.3.0 clicks
 if(L.DomEvent && !L.DomEvent.fakeStop){
   L.DomEvent.fakeStop = function(e){
     e._stopped = true;
@@ -886,10 +884,6 @@ var _bagForceReload = false;
 var _pandWmsLayer = null;
 var _searchMarker = null;
 var _infoPinned = false; // Panel vastzetten bij klik
-var _bagClickConsumed = 0; // Timestamp van laatste BAG VT klik (voorkom CBS doorval)
-var _selectedAdressen = []; // Max 2 adressen voor vergelijking [{props, latlng, marker}]
-var _bagTooltip = null; // Leaflet tooltip voor BAG hover
-var _bagHoverCache = {}; // Cache: buurt/gemeente lookup per latlng-key
 var _gemeenteNamen = new Set();
 var _layerState = {gemeenten: true, buurten: false, wijken: false, bag: false, panden: false};
 var _nationalStats = {}; // Cache: {key: {min, max, avg, median, stddev, count, skewness, distType}}
@@ -920,24 +914,9 @@ function initMap(){
   L.DomEvent.disableClickPropagation(infoPanel);
 
   _map.on('click', function(e){
-    // Panden: WMS GetFeatureInfo als panden-only modus (zonder BAG adressen)
     if(_map.getZoom() >= 16 && _pandWmsLayer && !_bagVectorLayer){
       _infoPinned = true;
       pandGetFeatureInfo(e);
-    }
-    // BAG actief: wacht even zodat VectorGrid click eerst kan vuren
-    if(_layerState.bag){
-      var latlng = e.latlng;
-      var z = _map.getZoom();
-      var clickTime = Date.now();
-      setTimeout(function(){
-        if(_bagClickConsumed > clickTime - 500) return;
-        if(z >= 13){
-          bagGetFeatureInfo({latlng: latlng, _clickTime: clickTime});
-        } else {
-          handleCbsClickAtPoint(latlng);
-        }
-      }, 150);
     }
   });
 }
@@ -1115,64 +1094,6 @@ var LAYER_CONFIG = {
   wijken:    {data:function(){return _wijkData},     nameField:'wijknaam',     codeField:'wijkcode',     borderWeight:1.5, borderColor:'rgba(255,255,255,0.3)'}
 };
 
-// Bij BAG actief: CBS polygonen hebben pointer-events:none, dus klikken we
-// handmatig door met point-in-polygon om selectie te behouden
-function handleCbsClickAtPoint(latlng){
-  if(!latlng) return;
-  // Bepaal het meest gedetailleerde niveau: buurten > wijken > gemeenten
-  var layers = [
-    {type:'buurten', layer:_buurtLayer, cfg:LAYER_CONFIG.buurten},
-    {type:'wijken',  layer:_wijkLayer,  cfg:LAYER_CONFIG.wijken},
-    {type:'gemeenten', layer:_gemeenteLayer, cfg:LAYER_CONFIG.gemeenten}
-  ];
-  for(var i = 0; i < layers.length; i++){
-    var entry = layers[i];
-    if(!entry.layer || !_layerState[entry.type]) continue;
-    var hit = null, hitLayer = null;
-    entry.layer.eachLayer(function(sub){
-      if(hit) return;
-      // Snelle bbox-check eerst
-      try{ if(!sub.getBounds().contains(latlng)) return; }catch(e){ return; }
-      // Nauwkeurige point-in-polygon via Leaflet's interne methode
-      if(sub.feature && sub.feature.geometry){
-        if(leafletContainsPoint(sub.feature.geometry, latlng)){
-          hit = sub.feature;
-          hitLayer = sub;
-        }
-      }
-    });
-    if(hit && hitLayer){
-      toggleMapSelection(hit.properties, entry.type, hitLayer, entry.layer);
-      _infoPinned = true;
-      showFeatureInfo(hit.properties, entry.cfg, entry.type, true, hit);
-      return;
-    }
-  }
-}
-
-// Point-in-polygon check (ray casting) voor GeoJSON geometrie
-function leafletContainsPoint(geom, latlng){
-  var lng = latlng.lng, lat = latlng.lat;
-  function inRing(ring){
-    var inside = false;
-    for(var i = 0, j = ring.length - 1; i < ring.length; j = i++){
-      var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
-      if((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi){
-        inside = !inside;
-      }
-    }
-    return inside;
-  }
-  if(geom.type === 'Polygon'){
-    return inRing(geom.coordinates[0]);
-  } else if(geom.type === 'MultiPolygon'){
-    for(var p = 0; p < geom.coordinates.length; p++){
-      if(inRing(geom.coordinates[p][0])) return true;
-    }
-  }
-  return false;
-}
-
 // Z-volgorde: basemap → gemeenten → wijken → buurten → BAG panden → BAG WMS → BAG vectors
 function fixLayerOrder(){
   if(_currentBasemap) _currentBasemap.bringToBack();
@@ -1304,9 +1225,7 @@ function renderChoropleth(type){
         if(!_infoPinned) document.getElementById('infoPanel').classList.remove('show');
       });
       layer.on('click', function(e){
-        // BAG actief: NIET selecteren — map click handler regelt CBS selectie
-        if(_layerState.bag) return;
-        // Toggle selectie voor vergelijking
+        // Altijd: toggle selectie voor vergelijking
         toggleMapSelection(feature.properties, type, layer, newLayer);
         // Toon volledig info panel en pin het vast
         _infoPinned = true;
@@ -1321,9 +1240,6 @@ function renderChoropleth(type){
 
   // Z-ordering herstellen
   fixLayerOrder();
-
-  // Als BAG actief is: ook nieuwe laag dimmen + pointer-events uitschakelen
-  if(_layerState.bag) dimChoroplethLayers(true);
 
   // Primaire laag bepaalt legenda/stats (de meest gedetailleerde actieve laag)
   var primaryType = _layerState.buurten ? 'buurten' : (_layerState.wijken ? 'wijken' : 'gemeenten');
@@ -2022,15 +1938,8 @@ function renderBagVectors(){
     onEachFeature: function(feature, layer){
       layer.on('click', function(e){
         L.DomEvent.stopPropagation(e);
-        _bagClickConsumed = Date.now();
         _infoPinned = true;
-        selectBagAdres(feature.properties, e.latlng);
-      });
-      layer.on('mouseover', function(e){
-        showBagHoverTooltip(feature.properties, e.latlng);
-      });
-      layer.on('mouseout', function(){
-        closeBagHoverTooltip();
+        showBagFeatureInfo(feature.properties, e.latlng);
       });
     }
   }).addTo(_map);
@@ -2065,307 +1974,6 @@ function showBagFeatureInfo(p, latlng){
   document.getElementById('infoContent').innerHTML = html;
   document.getElementById('infoPanel').classList.add('show');
   logEvent('adres_klik', (straat+' '+hnr).trim() + (p.woonplaats ? ', '+p.woonplaats : ''));
-}
-
-// ============================================================
-// BAG ADRES SELECTIE & VERGELIJKING
-// ============================================================
-function bagAdresId(p){
-  return p.identificatie || ((p.openbare_ruimte_naam||p.openbare_ruimte||'')+'_'+(p.huisnummer||'')+'_'+(p.postcode||''));
-}
-
-function selectBagAdres(p, latlng){
-  var id = bagAdresId(p);
-  // Check of dit adres al geselecteerd is → deselecteer
-  var existIdx = -1;
-  for(var i = 0; i < _selectedAdressen.length; i++){
-    if(bagAdresId(_selectedAdressen[i].props) === id){ existIdx = i; break; }
-  }
-  if(existIdx >= 0){
-    // Deselecteer: verwijder marker en uit array
-    if(_selectedAdressen[existIdx].marker){
-      _map.removeLayer(_selectedAdressen[existIdx].marker);
-    }
-    _selectedAdressen.splice(existIdx, 1);
-    toast('\u2796 Adres verwijderd');
-    // Toon resterende selectie of leeg panel
-    if(_selectedAdressen.length === 1){
-      showBagFeatureInfo(_selectedAdressen[0].props, _selectedAdressen[0].latlng);
-    } else {
-      _infoPinned = false;
-      document.getElementById('infoPanel').classList.remove('show');
-    }
-    return;
-  }
-  // Nieuw adres toevoegen
-  if(_selectedAdressen.length >= 2){
-    // Vervang oudste (index 0)
-    if(_selectedAdressen[0].marker) _map.removeLayer(_selectedAdressen[0].marker);
-    _selectedAdressen.shift();
-  }
-  // Maak highlight-marker
-  var colors = ['#39ff14', '#38bdf8']; // groen, blauw
-  var colorIdx = _selectedAdressen.length; // 0 of 1
-  var markerOpts = {radius: 10, fillColor: 'transparent', color: colors[colorIdx], weight: 3, opacity: 1, fillOpacity: 0};
-  if(_map.getPane('bagVtPane')) markerOpts.pane = 'bagVtPane';
-  var marker = L.circleMarker(latlng, markerOpts).addTo(_map);
-  _selectedAdressen.push({props: p, latlng: latlng, marker: marker});
-  // Update kleuren (eerste = groen, tweede = blauw)
-  _selectedAdressen.forEach(function(a, i){
-    if(a.marker) a.marker.setStyle({color: colors[i]});
-  });
-  if(_selectedAdressen.length === 2){
-    // Side-by-side vergelijking
-    showAdresVergelijking();
-  } else {
-    // Toon info voor dit ene adres
-    showBagFeatureInfo(p, latlng);
-  }
-  var straat = p.openbare_ruimte_naam || p.openbare_ruimte || '';
-  var hnr = (p.huisnummer||'') + (p.huisletter||'');
-  toast('\u2795 ' + (straat+' '+hnr).trim() + ' geselecteerd (' + _selectedAdressen.length + '/2)');
-}
-
-function clearAdresSelection(){
-  _selectedAdressen.forEach(function(a){
-    if(a.marker) _map.removeLayer(a.marker);
-  });
-  _selectedAdressen = [];
-}
-
-function showAdresVergelijking(){
-  if(_selectedAdressen.length < 2) return;
-  var a = _selectedAdressen[0].props, b = _selectedAdressen[1].props;
-  var aLatlng = _selectedAdressen[0].latlng, bLatlng = _selectedAdressen[1].latlng;
-  if(!_nationalStats || Object.keys(_nationalStats).length === 0) computeNationalStats();
-
-  var aStraat = a.openbare_ruimte_naam || a.openbare_ruimte || '';
-  var bStraat = b.openbare_ruimte_naam || b.openbare_ruimte || '';
-  var aHnr = (a.huisnummer||'')+(a.huisletter||'')+(a.toevoeging?' '+a.toevoeging:'');
-  var bHnr = (b.huisnummer||'')+(b.huisletter||'')+(b.toevoeging?' '+b.toevoeging:'');
-  var aLabel = (aStraat+' '+aHnr).trim() || 'Adres A';
-  var bLabel = (bStraat+' '+bHnr).trim() || 'Adres B';
-
-  document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">compare_arrows</span> Adresvergelijking';
-  var html = '';
-  // Header met twee adressen
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
-  html += '<div style="padding:8px 10px;background:rgba(57,255,20,.08);border-radius:8px;border-left:3px solid #39ff14">';
-  html += '<div style="font:700 11px Space Mono,monospace;color:#39ff14;margin-bottom:2px"><span class="mi mi-sm" style="font-size:12px">location_on</span> A</div>';
-  html += '<div style="font:600 10px DM Sans,sans-serif;color:var(--tx)">'+aLabel+'</div>';
-  if(a.postcode) html += '<div style="font:400 9px Space Mono,monospace;color:var(--mt)">'+a.postcode+' '+(a.woonplaats_naam||a.woonplaats||'')+'</div>';
-  html += '</div>';
-  html += '<div style="padding:8px 10px;background:rgba(56,189,248,.08);border-radius:8px;border-left:3px solid #38bdf8">';
-  html += '<div style="font:700 11px Space Mono,monospace;color:#38bdf8;margin-bottom:2px"><span class="mi mi-sm" style="font-size:12px">location_on</span> B</div>';
-  html += '<div style="font:600 10px DM Sans,sans-serif;color:var(--tx)">'+bLabel+'</div>';
-  if(b.postcode) html += '<div style="font:400 9px Space Mono,monospace;color:var(--mt)">'+b.postcode+' '+(b.woonplaats_naam||b.woonplaats||'')+'</div>';
-  html += '</div></div>';
-
-  // Vergelijkingsrijen
-  var rows = [
-    {label:'Oppervlakte', icon:'straighten', a:a.oppervlakte, b:b.oppervlakte, unit:'m²', higher:'better'},
-    {label:'Bouwjaar', icon:'calendar_month', a:a.bouwjaar, b:b.bouwjaar, unit:'', higher:'newer'},
-    {label:'Gebruiksdoel', icon:'category', a:a.gebruiksdoel, b:b.gebruiksdoel, unit:'', type:'text'},
-    {label:'Status', icon:'info', a:a.status, b:b.status, unit:'', type:'status'},
-    {label:'Pandstatus', icon:'apartment', a:a.pandstatus, b:b.pandstatus, unit:'', type:'text'}
-  ];
-
-  html += '<div style="border-radius:10px;overflow:hidden;border:1px solid var(--glass-bd)">';
-  // Tabel header
-  html += '<div style="display:grid;grid-template-columns:auto 1fr 1fr;background:rgba(255,255,255,.03);padding:6px 10px;border-bottom:1px solid var(--glass-bd)">';
-  html += '<span style="font:600 9px DM Sans,sans-serif;color:var(--mt);min-width:90px">Kenmerk</span>';
-  html += '<span style="font:700 9px Space Mono,monospace;color:#39ff14;text-align:right">A</span>';
-  html += '<span style="font:700 9px Space Mono,monospace;color:#38bdf8;text-align:right">B</span>';
-  html += '</div>';
-
-  rows.forEach(function(r){
-    var aVal = r.a, bVal = r.b;
-    if(aVal === undefined || aVal === null) aVal = '-';
-    if(bVal === undefined || bVal === null) bVal = '-';
-    var aStr = aVal, bStr = bVal;
-    var aColor = 'var(--tx)', bColor = 'var(--tx)';
-    if(r.type === 'text' || r.type === 'status'){
-      aStr = String(aVal);
-      bStr = String(bVal);
-      if(r.type === 'status'){
-        aColor = bagStatusToColor(aVal);
-        bColor = bagStatusToColor(bVal);
-      }
-    } else if(typeof aVal === 'number' && typeof bVal === 'number'){
-      aStr = aVal.toLocaleString('nl-NL') + (r.unit ? ' '+r.unit : '');
-      bStr = bVal.toLocaleString('nl-NL') + (r.unit ? ' '+r.unit : '');
-      // Verschil indicator
-      var diff = bVal - aVal;
-      if(r.higher === 'better'){
-        if(aVal > bVal) aColor = '#39ff14';
-        else if(bVal > aVal) bColor = '#38bdf8';
-      } else if(r.higher === 'newer'){
-        if(aVal > bVal) aColor = '#39ff14';
-        else if(bVal > aVal) bColor = '#38bdf8';
-      }
-      // Verschil tonen
-      if(diff !== 0 && r.unit){
-        var sign = diff > 0 ? '+' : '';
-        bStr += ' <span style="font-size:8px;opacity:.6">('+sign+diff.toLocaleString('nl-NL')+')</span>';
-      }
-    }
-    html += '<div style="display:grid;grid-template-columns:auto 1fr 1fr;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.03);align-items:center">';
-    html += '<span style="font-size:10px;color:var(--mt);display:flex;align-items:center;gap:4px;min-width:90px"><span class="mi mi-sm" style="font-size:12px">'+r.icon+'</span>'+r.label+'</span>';
-    html += '<span style="font:700 10px Space Mono,monospace;color:'+aColor+';text-align:right;word-break:break-word;font-size:9px">'+aStr+'</span>';
-    html += '<span style="font:700 10px Space Mono,monospace;color:'+bColor+';text-align:right;word-break:break-word;font-size:9px">'+bStr+'</span>';
-    html += '</div>';
-  });
-  html += '</div>';
-
-  // Buurt & gemeente context voor beide adressen
-  html += buildDualAdresContext(aLatlng, bLatlng);
-
-  // Wis-knop
-  html += '<div style="text-align:center;margin-top:10px"><button onclick="clearAdresSelection();_infoPinned=false;document.getElementById(\'infoPanel\').classList.remove(\'show\')" style="padding:5px 16px;font:600 10px DM Sans,sans-serif;background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.2);border-radius:6px;cursor:pointer"><span class="mi mi-sm" style="font-size:12px;vertical-align:-2px">delete</span> Selectie wissen</button></div>';
-
-  document.getElementById('infoContent').innerHTML = html;
-  document.getElementById('infoPanel').classList.add('show');
-}
-
-function buildDualAdresContext(aLatlng, bLatlng){
-  var html = '';
-  var levels = [
-    {data:_buurtData, layer:_buurtLayer, name:'Buurt', icon:'grid_on', nameField:'buurtnaam', color:'var(--ac)'},
-    {data:_gemeenteData, layer:_gemeenteLayer, name:'Gemeente', icon:'domain', nameField:'gemeentenaam', color:'var(--cyan)'}
-  ];
-  levels.forEach(function(l){
-    var aFeat = null, bFeat = null;
-    if(l.layer){
-      aFeat = findFeatureAtPoint(l.layer, aLatlng);
-      bFeat = findFeatureAtPoint(l.layer, bLatlng);
-    }
-    if(!aFeat && l.data) aFeat = findFeatureInData(l.data, aLatlng);
-    if(!bFeat && l.data) bFeat = findFeatureInData(l.data, bLatlng);
-    if(!aFeat && !bFeat) return;
-    var aNaam = aFeat ? (aFeat.properties[l.nameField] || '-') : '-';
-    var bNaam = bFeat ? (bFeat.properties[l.nameField] || '-') : '-';
-    var sameArea = aNaam === bNaam;
-    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
-    html += '<div style="font:700 11px Space Mono,monospace;color:'+l.color+';margin-bottom:6px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:14px;color:'+l.color+'">'+l.icon+'</span> '+l.name;
-    if(sameArea) html += ': '+aNaam;
-    html += '</div>';
-    if(!sameArea){
-      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">';
-      html += '<div style="font:600 9px DM Sans,sans-serif;color:#39ff14">A: '+aNaam+'</div>';
-      html += '<div style="font:600 9px DM Sans,sans-serif;color:#38bdf8">B: '+bNaam+'</div>';
-      html += '</div>';
-    }
-    // Kerncijfers vergelijken
-    var keys = ['aantal_inwoners','woningvoorraad','gem_woz_waarde','koopwoningen','huishoudens'];
-    var ap = aFeat ? aFeat.properties : {}, bp = bFeat ? bFeat.properties : {};
-    if(sameArea){
-      // Zelfde gebied — toon eenmalig
-      keys.forEach(function(k){
-        var v = ap[k];
-        if(v === undefined || v === null || v < 0) return;
-        var ind = null;
-        INDICATORS.forEach(function(i){ if(i.key === k) ind = i; });
-        if(!ind) return;
-        html += '<div style="display:flex;justify-content:space-between;padding:2px 0">';
-        html += '<span style="font-size:10px;color:var(--mt)"><span class="mi mi-sm" style="font-size:11px">'+ind.icon+'</span> '+ind.naam+'</span>';
-        html += '<span style="font:700 10px Space Mono,monospace;color:var(--tx)">'+v.toLocaleString('nl-NL')+(ind.eenheid?' <span style="font-size:8px;opacity:.5">'+ind.eenheid+'</span>':'')+'</span>';
-        html += '</div>';
-      });
-    } else {
-      // Verschillend gebied — vergelijk side-by-side
-      keys.forEach(function(k){
-        var av = ap[k], bv = bp[k];
-        if((av === undefined || av === null) && (bv === undefined || bv === null)) return;
-        var ind = null;
-        INDICATORS.forEach(function(i){ if(i.key === k) ind = i; });
-        if(!ind) return;
-        var avStr = (av !== undefined && av !== null && av >= 0) ? av.toLocaleString('nl-NL') : '-';
-        var bvStr = (bv !== undefined && bv !== null && bv >= 0) ? bv.toLocaleString('nl-NL') : '-';
-        html += '<div style="display:grid;grid-template-columns:auto 1fr 1fr;padding:2px 0;align-items:center">';
-        html += '<span style="font-size:9px;color:var(--mt);min-width:80px"><span class="mi mi-sm" style="font-size:10px">'+ind.icon+'</span> '+ind.naam+'</span>';
-        html += '<span style="font:700 9px Space Mono,monospace;color:#39ff14;text-align:right">'+avStr+'</span>';
-        html += '<span style="font:700 9px Space Mono,monospace;color:#38bdf8;text-align:right">'+bvStr+'</span>';
-        html += '</div>';
-      });
-    }
-    html += '</div>';
-  });
-  return html;
-}
-
-// ============================================================
-// BAG HOVER TOOLTIP
-// ============================================================
-function showBagHoverTooltip(p, latlng){
-  if(!latlng || _infoPinned) return;
-  closeBagHoverTooltip();
-  var straat = p.openbare_ruimte_naam || p.openbare_ruimte || '';
-  var hnr = (p.huisnummer||'')+(p.huisletter||'')+(p.toevoeging?' '+p.toevoeging:'');
-  var adres = (straat+' '+hnr).trim();
-
-  var html = '<div class="tt-header">';
-  html += '<span class="tt-name" style="color:#38bdf8"><span class="mi" style="font-size:13px;vertical-align:-2px">location_on</span> '+adres+'</span>';
-  html += '</div><div class="tt-body">';
-
-  // Basisgegevens
-  if(p.oppervlakte) html += '<div class="tt-row"><span class="tt-label"><span class="mi" style="font-size:12px">straighten</span> Oppervlakte</span><span class="tt-val tt-prim">'+p.oppervlakte+' m²</span></div>';
-  if(p.bouwjaar && p.bouwjaar > 1000) html += '<div class="tt-row"><span class="tt-label"><span class="mi" style="font-size:12px">calendar_month</span> Bouwjaar</span><span class="tt-val tt-sec">'+p.bouwjaar+'</span></div>';
-  if(p.gebruiksdoel) html += '<div class="tt-row"><span class="tt-label"><span class="mi" style="font-size:12px">category</span> Gebruiksdoel</span><span class="tt-val" style="color:var(--tx);font-size:9px">'+p.gebruiksdoel+'</span></div>';
-  if(p.status) html += '<div class="tt-row"><span class="tt-label"><span class="mi" style="font-size:12px">info</span> Status</span><span class="tt-val" style="color:'+bagStatusToColor(p.status)+';font-size:9px">'+p.status+'</span></div>';
-
-  // Buurt & gemeente context (gecacht voor snelheid)
-  var cacheKey = Math.round(latlng.lat*1000)+'_'+Math.round(latlng.lng*1000);
-  var ctx = _bagHoverCache[cacheKey];
-  if(!ctx){
-    ctx = {};
-    var buurt = _buurtLayer ? findFeatureAtPoint(_buurtLayer, latlng) : null;
-    if(!buurt && _buurtData) buurt = findFeatureInData(_buurtData, latlng);
-    var gem = _gemeenteLayer ? findFeatureAtPoint(_gemeenteLayer, latlng) : null;
-    if(!gem && _gemeenteData) gem = findFeatureInData(_gemeenteData, latlng);
-    if(buurt && buurt.properties){
-      ctx.buurtNaam = buurt.properties.buurtnaam || '';
-      ctx.buurtWoz = buurt.properties.gem_woz_waarde;
-      ctx.buurtInw = buurt.properties.aantal_inwoners;
-      ctx.buurtWoningen = buurt.properties.woningvoorraad;
-    }
-    if(gem && gem.properties){
-      ctx.gemNaam = gem.properties.gemeentenaam || '';
-      ctx.gemWoz = gem.properties.gem_woz_waarde;
-    }
-    _bagHoverCache[cacheKey] = ctx;
-  }
-
-  // Context weergeven
-  if(ctx.buurtNaam || ctx.gemNaam){
-    html += '<div style="border-top:1px solid rgba(255,255,255,.06);margin-top:3px;padding-top:4px">';
-    if(ctx.buurtNaam) html += '<div class="tt-row"><span class="tt-label"><span class="mi" style="font-size:12px;color:var(--ac)">grid_on</span> Buurt</span><span class="tt-val" style="color:var(--ac);font-size:9px">'+ctx.buurtNaam+'</span></div>';
-    if(ctx.gemNaam) html += '<div class="tt-row"><span class="tt-label"><span class="mi" style="font-size:12px;color:var(--cyan)">domain</span> Gemeente</span><span class="tt-val" style="color:var(--cyan);font-size:9px">'+ctx.gemNaam+'</span></div>';
-    // WOZ vergelijking
-    if(ctx.buurtWoz && p.oppervlakte){
-      var wozPerM2 = Math.round(ctx.buurtWoz * 1000 / (ctx.buurtWoningen || 1));
-      html += '<div class="tt-row"><span class="tt-label"><span class="mi" style="font-size:12px;color:#f59e0b">payments</span> WOZ buurt</span><span class="tt-val" style="color:#f59e0b;font-size:9px">\u20ac'+ctx.buurtWoz.toLocaleString('nl-NL')+'k gem.</span></div>';
-    }
-    html += '</div>';
-  }
-
-  // Hint
-  html += '<div style="font:400 8px DM Sans,sans-serif;color:var(--mt);text-align:center;padding-top:4px;opacity:.6">Klik om te selecteren \u00b7 2 adressen = vergelijking</div>';
-  html += '</div>';
-
-  _bagTooltip = L.tooltip({
-    className: 'map-tooltip',
-    direction: 'right',
-    offset: [15, 0],
-    opacity: 1,
-    permanent: true
-  }).setLatLng(latlng).setContent(html).addTo(_map);
-}
-
-function closeBagHoverTooltip(){
-  if(_bagTooltip){
-    _map.removeLayer(_bagTooltip);
-    _bagTooltip = null;
-  }
 }
 
 // Bereken volledige descriptive statistics van een gesorteerde array
@@ -2674,6 +2282,7 @@ function updateBagStatusCounts(counts){
 
 function dimChoroplethLayers(dim){
   // Bij BAG actief: choropleth subtiel dimmen maar duidelijk zichtbaar houden
+  // Hogere waarden dan voorheen zodat buurten/wijken ook op satellite goed zichtbaar zijn
   var opacity = dim ? 0.5 : 0.65;
   var borderOp = dim ? 0.6 : 0.5;
   var borderWeight = dim ? 2.0 : 1.0;
@@ -2724,9 +2333,6 @@ function toggleBagLayer(on){
     _map.off('zoomend', onBagZoomChange);
     if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null}
     if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
-    clearAdresSelection();
-    closeBagHoverTooltip();
-    _bagHoverCache = {};
     statusSection.style.display = 'none';
     statusBtns.style.display = 'none';
     document.getElementById('bagFiltersSection').style.display = 'none';
@@ -2753,12 +2359,15 @@ function onBagZoomChange(){
   }
   // Panden WMS ook bijwerken
   updatePandWmsOpacity();
-  // Zoom-hint: toon info over beschikbare interactie op dit zoomlevel
+  // Zoom-hint: toon waarschuwing als zoom te laag is voor klikbare adressen
   var hintEl = document.getElementById('bagZoomHint');
   if(hintEl){
     if(z < 13){
       hintEl.style.display = 'flex';
-      document.getElementById('bagZoomHintText').innerHTML = '<b>Zoom in om BAG adressen te zien</b> (nu zoom '+z+', zichtbaar + klikbaar vanaf 13)';
+      document.getElementById('bagZoomHintText').innerHTML = '<b>Zoom in om BAG adressen te zien</b> (nu zoom '+z+', zichtbaar vanaf 13, klikbaar vanaf 16)';
+    } else if(z < 16){
+      hintEl.style.display = 'flex';
+      document.getElementById('bagZoomHintText').innerHTML = 'Adressen zichtbaar (WMS) · <b>Zoom in voor klikbare punten</b> (nu zoom '+z+', klikbaar vanaf 16)';
     } else {
       hintEl.style.display = 'none';
     }
@@ -2769,14 +2378,7 @@ function onBagZoomChange(){
 function createBagVectorTileLayer(){
   if(_bagVectorLayer){ _map.removeLayer(_bagVectorLayer); _bagVectorLayer = null; }
 
-  // Custom pane voor BAG VT boven de choropleth (overlayPane z=400)
-  if(!_map.getPane('bagVtPane')){
-    _map.createPane('bagVtPane');
-    _map.getPane('bagVtPane').style.zIndex = 450;
-  }
-
   _bagVectorLayer = L.vectorGrid.protobuf(PDOK_BAG_MVT, {
-    pane: 'bagVtPane',
     rendererFactory: L.canvas.tile,
     maxNativeZoom: 17,
     minNativeZoom: 17,
@@ -2832,33 +2434,13 @@ function createBagVectorTileLayer(){
       latlng = _map.mouseEventToLatLng(e.originalEvent);
     }
     if(!latlng) latlng = _map.getCenter(); // fallback
-    // Stop alle event propagation — voorkom dat CBS polygonen ook reageren
     L.DomEvent.stopPropagation(e);
-    if(e.originalEvent){
-      L.DomEvent.stop(e.originalEvent);
-    }
-    _bagClickConsumed = Date.now(); // Timestamp: BAG heeft deze klik verwerkt
     _infoPinned = true;
     if(layerName === 'pand'){
       showPandFeatureInfo(p, latlng);
     } else {
-      selectBagAdres(p, latlng);
+      showBagFeatureInfo(p, latlng);
     }
-  });
-
-  // Hover: tooltip met adresgegevens + buurt/gemeente context
-  _bagVectorLayer.on('mouseover', function(e){
-    if(!e.layer || !e.layer.properties) return;
-    var layerName = e.layer._layerName || e.layerName || '';
-    if(layerName === 'pand' || layerName === 'woonplaats' || layerName === 'adres') return;
-    var p = e.layer.properties;
-    var latlng = e.latlng;
-    if(!latlng && e.originalEvent && _map) latlng = _map.mouseEventToLatLng(e.originalEvent);
-    if(!latlng) return;
-    showBagHoverTooltip(p, latlng);
-  });
-  _bagVectorLayer.on('mouseout', function(e){
-    closeBagHoverTooltip();
   });
 
   fixLayerOrder();
@@ -3941,49 +3523,6 @@ function pandGetFeatureInfo(e){
   }).catch(function(){});
 }
 
-// WFS BBOX query voor verblijfsobjecten — fallback wanneer VT klik niet beschikbaar is
-function bagGetFeatureInfo(e){
-  if(!_map) return;
-  var latlng = e.latlng;
-  var clickTime = e._clickTime || Date.now();
-  // WFS: zoek dichtstbijzijnde verblijfsobject via kleine BBOX rond klikpunt
-  var z = _map.getZoom();
-  // Zoekradius afhankelijk van zoomniveau (in graden)
-  var radius = z >= 17 ? 0.0003 : (z >= 15 ? 0.0008 : (z >= 13 ? 0.003 : 0.008));
-  // WFS 2.0 + EPSG:4326: BBOX = lat_min,lon_min,lat_max,lon_max,crs
-  var bbox = (latlng.lat-radius)+','+(latlng.lng-radius)+','+(latlng.lat+radius)+','+(latlng.lng+radius)+',urn:ogc:def:crs:EPSG::4326';
-  var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature'+
-    '&typeName=bag:verblijfsobject&outputFormat=application/json'+
-    '&count=5&srsName=EPSG:4326&BBOX='+bbox;
-  fetch(url).then(function(r){return r.json()}).then(function(d){
-    if(_bagClickConsumed > clickTime - 500) return;
-    if(!d.features||!d.features.length){
-      handleCbsClickAtPoint(latlng);
-      return;
-    }
-    // Zoek dichtstbijzijnde feature
-    var best = d.features[0], bestDist = Infinity;
-    d.features.forEach(function(f){
-      if(!f.geometry || !f.geometry.coordinates) return;
-      var c = f.geometry.coordinates;
-      var dx = c[0] - latlng.lng, dy = c[1] - latlng.lat;
-      var dist = dx*dx + dy*dy;
-      if(dist < bestDist){ bestDist = dist; best = f; }
-    });
-    _bagClickConsumed = Date.now();
-    var p = best.properties;
-    var adresLatlng = latlng;
-    if(best.geometry && best.geometry.coordinates){
-      adresLatlng = L.latLng(best.geometry.coordinates[1], best.geometry.coordinates[0]);
-    }
-    _infoPinned = true;
-    selectBagAdres(p, adresLatlng);
-  }).catch(function(err){
-    if(_bagClickConsumed > clickTime - 500) return;
-    handleCbsClickAtPoint(latlng);
-  });
-}
-
 // ============================================================
 // PDOK ZOEKBALK
 // ============================================================
@@ -4925,20 +4464,18 @@ function toggleMapSelection(props, type, clickedLayer, parentLayer){
     addSelectionHighlight(clickedLayer);
   }
 
-  // Update UI: filters, chips, vergelijk-knop + synchroniseer dropdown
+  // Update UI: filters, chips, vergelijk-knop
   if(type === 'gemeenten') buildGemeenteFilter();
   else if(type === 'wijken') buildWijkFilter();
   else if(type === 'buurten') buildBuurtFilter();
 
-  // Synchroniseer dropdown UI (chips, label, selected-state)
+  // Synchroniseer dropdown UI (chips, labels, selected-state)
   var wrapId = type === 'gemeenten' ? 'msGemeente' : (type === 'wijken' ? 'msWijk' : 'msBuurt');
   updateMsUI(wrapId);
+  onFilterChange();
 
   // Vergelijk-knop: ook voor wijken
   updateCompareButton();
-
-  // Trigger filter cascade (zoom, auto-load, re-render)
-  onFilterChange();
 
   logEvent('kaart_selectie', type + ': ' + name + ' (' + arr.length + ' geselecteerd)');
 }
