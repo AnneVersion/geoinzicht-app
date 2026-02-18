@@ -873,7 +873,7 @@ var _bagForceReload = false;
 var _pandWmsLayer = null;
 var _searchMarker = null;
 var _infoPinned = false; // Panel vastzetten bij klik
-var _bagClickConsumed = false; // True als BAG VT klik al verwerkt is (voorkom CBS doorval)
+var _bagClickConsumed = 0; // Timestamp van laatste BAG VT klik (voorkom CBS doorval)
 var _gemeenteNamen = new Set();
 var _layerState = {gemeenten: true, buurten: false, wijken: false, bag: false, panden: false};
 var _nationalStats = {}; // Cache: {key: {min, max, avg, median, stddev, count, skewness, distType}}
@@ -909,17 +909,20 @@ function initMap(){
       _infoPinned = true;
       pandGetFeatureInfo(e);
     }
-    // BAG actief: CBS polygonen hebben pointer-events:none
-    if(_layerState.bag && !_bagClickConsumed){
+    // BAG actief: wacht even zodat VectorGrid click eerst kan vuren
+    if(_layerState.bag){
+      var latlng = e.latlng;
       var z = _map.getZoom();
-      if(z >= 13){
-        // WMS GetFeatureInfo: klik op adres-punt → adresinfo via server
-        // Als geen adres gevonden → fallback naar CBS selectie (in bagGetFeatureInfo)
-        bagGetFeatureInfo(e);
-      } else {
-        // Zoom te laag voor WMS — alleen CBS selectie
-        handleCbsClickAtPoint(e.latlng);
-      }
+      var clickTime = Date.now();
+      setTimeout(function(){
+        // Als VectorGrid de klik al heeft verwerkt (binnen 500ms), niets doen
+        if(_bagClickConsumed > clickTime - 500) return;
+        if(z >= 13){
+          bagGetFeatureInfo({latlng: latlng, _clickTime: clickTime});
+        } else {
+          handleCbsClickAtPoint(latlng);
+        }
+      }, 150);
     }
   });
 }
@@ -1286,7 +1289,7 @@ function renderChoropleth(type){
         if(!_infoPinned) document.getElementById('infoPanel').classList.remove('show');
       });
       layer.on('click', function(e){
-        // BAG actief: NIET selecteren — BAG adresklik of map click handler regelt het
+        // BAG actief: NIET selecteren — map click handler regelt CBS selectie
         if(_layerState.bag) return;
         // Toggle selectie voor vergelijking
         toggleMapSelection(feature.properties, type, layer, newLayer);
@@ -2508,14 +2511,13 @@ function createBagVectorTileLayer(){
     if(e.originalEvent){
       L.DomEvent.stop(e.originalEvent);
     }
-    _bagClickConsumed = true; // Flag: BAG heeft deze klik verwerkt
+    _bagClickConsumed = Date.now(); // Timestamp: BAG heeft deze klik verwerkt
     _infoPinned = true;
     if(layerName === 'pand'){
       showPandFeatureInfo(p, latlng);
     } else {
       showBagFeatureInfo(p, latlng);
     }
-    setTimeout(function(){ _bagClickConsumed = false; }, 50);
   });
 
   fixLayerOrder();
@@ -3601,11 +3603,13 @@ function pandGetFeatureInfo(e){
 // WMS GetFeatureInfo voor verblijfsobjecten — fallback wanneer VT niet beschikbaar is
 function bagGetFeatureInfo(e){
   if(!_map || !_bagWmsLayer) return;
+  var latlng = e.latlng;
+  var clickTime = e._clickTime || Date.now();
   var size = _map.getSize();
   var bounds = _map.getBounds();
   var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
   var bbox = sw.lng+','+sw.lat+','+ne.lng+','+ne.lat;
-  var pt = _map.latLngToContainerPoint(e.latlng);
+  var pt = _map.latLngToContainerPoint(latlng);
   var url = PDOK_BAG_WMS+'?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo'+
     '&FORMAT=image/png&TRANSPARENT=true'+
     '&QUERY_LAYERS=verblijfsobject&LAYERS=verblijfsobject'+
@@ -3613,17 +3617,23 @@ function bagGetFeatureInfo(e){
     '&X='+Math.round(pt.x)+'&Y='+Math.round(pt.y)+
     '&SRS=EPSG:4326&WIDTH='+size.x+'&HEIGHT='+size.y+'&BBOX='+bbox;
   fetch(url).then(function(r){return r.json()}).then(function(d){
+    // Check of VectorGrid deze klik inmiddels al heeft verwerkt
+    if(_bagClickConsumed > clickTime - 500) return;
     if(!d.features||!d.features.length){
-      // Geen adres gevonden — probeer CBS selectie als fallback
-      if(!_bagClickConsumed) handleCbsClickAtPoint(e.latlng);
+      // Geen adres gevonden via WMS — CBS selectie als fallback
+      handleCbsClickAtPoint(latlng);
       return;
     }
-    _bagClickConsumed = true;
+    // Adres gevonden — markeer als verwerkt
+    _bagClickConsumed = Date.now();
     var p = d.features[0].properties;
     _infoPinned = true;
-    showBagFeatureInfo(p, e.latlng);
-    setTimeout(function(){ _bagClickConsumed = false; }, 50);
-  }).catch(function(){});
+    showBagFeatureInfo(p, latlng);
+  }).catch(function(){
+    // WMS fout — CBS selectie als fallback
+    if(_bagClickConsumed > clickTime - 500) return;
+    handleCbsClickAtPoint(latlng);
+  });
 }
 
 // ============================================================
