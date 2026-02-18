@@ -2022,8 +2022,15 @@ function renderBagVectors(){
     onEachFeature: function(feature, layer){
       layer.on('click', function(e){
         L.DomEvent.stopPropagation(e);
+        _bagClickConsumed = Date.now();
         _infoPinned = true;
-        showBagFeatureInfo(feature.properties, e.latlng);
+        selectBagAdres(feature.properties, e.latlng);
+      });
+      layer.on('mouseover', function(e){
+        showBagHoverTooltip(feature.properties, e.latlng);
+      });
+      layer.on('mouseout', function(){
+        closeBagHoverTooltip();
       });
     }
   }).addTo(_map);
@@ -2068,7 +2075,6 @@ function bagAdresId(p){
 }
 
 function selectBagAdres(p, latlng){
-  console.log('[selectBagAdres] id:', bagAdresId(p), 'latlng:', latlng, 'huidige selectie:', _selectedAdressen.length);
   var id = bagAdresId(p);
   // Check of dit adres al geselecteerd is → deselecteer
   var existIdx = -1;
@@ -2100,10 +2106,9 @@ function selectBagAdres(p, latlng){
   // Maak highlight-marker
   var colors = ['#39ff14', '#38bdf8']; // groen, blauw
   var colorIdx = _selectedAdressen.length; // 0 of 1
-  var marker = L.circleMarker(latlng, {
-    radius: 10, fillColor: 'transparent', color: colors[colorIdx],
-    weight: 3, opacity: 1, fillOpacity: 0, pane: 'bagVtPane'
-  }).addTo(_map);
+  var markerOpts = {radius: 10, fillColor: 'transparent', color: colors[colorIdx], weight: 3, opacity: 1, fillOpacity: 0};
+  if(_map.getPane('bagVtPane')) markerOpts.pane = 'bagVtPane';
+  var marker = L.circleMarker(latlng, markerOpts).addTo(_map);
   _selectedAdressen.push({props: p, latlng: latlng, marker: marker});
   // Update kleuren (eerste = groen, tweede = blauw)
   _selectedAdressen.forEach(function(a, i){
