@@ -1286,8 +1286,8 @@ function renderChoropleth(type){
         if(!_infoPinned) document.getElementById('infoPanel').classList.remove('show');
       });
       layer.on('click', function(e){
-        // Skip als deze klik al door een BAG adres is verwerkt (voorkom dubbelklik-effect)
-        if(_bagClickConsumed) return;
+        // BAG actief: NIET selecteren — BAG adresklik of map click handler regelt het
+        if(_layerState.bag) return;
         // Toggle selectie voor vergelijking
         toggleMapSelection(feature.properties, type, layer, newLayer);
         // Toon volledig info panel en pin het vast
@@ -2348,7 +2348,6 @@ function updateBagStatusCounts(counts){
 
 function dimChoroplethLayers(dim){
   // Bij BAG actief: choropleth subtiel dimmen maar duidelijk zichtbaar houden
-  // Hogere waarden dan voorheen zodat buurten/wijken ook op satellite goed zichtbaar zijn
   var opacity = dim ? 0.5 : 0.65;
   var borderOp = dim ? 0.6 : 0.5;
   var borderWeight = dim ? 2.0 : 1.0;
@@ -2360,11 +2359,6 @@ function dimChoroplethLayers(dim){
       }catch(e){}
     });
   });
-  // Canvas renderer: pointer-events op de canvas container uitschakelen
-  // (preferCanvas:true = Leaflet gebruikt Canvas i.p.v. SVG, geen _path elementen)
-  if(_map && _map._renderer && _map._renderer._container){
-    _map._renderer._container.style.pointerEvents = dim ? 'none' : '';
-  }
 }
 
 function toggleBagLayer(on){
