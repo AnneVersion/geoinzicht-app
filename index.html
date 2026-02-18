@@ -4472,7 +4472,6 @@ function toggleMapSelection(props, type, clickedLayer, parentLayer){
   // Synchroniseer dropdown UI (chips, labels, selected-state)
   var wrapId = type === 'gemeenten' ? 'msGemeente' : (type === 'wijken' ? 'msWijk' : 'msBuurt');
   updateMsUI(wrapId);
-  onFilterChange();
 
   // Vergelijk-knop: ook voor wijken
   updateCompareButton();
