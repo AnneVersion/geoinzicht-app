@@ -904,14 +904,22 @@ function initMap(){
   L.DomEvent.disableClickPropagation(infoPanel);
 
   _map.on('click', function(e){
+    // Panden: WMS GetFeatureInfo als panden-only modus (zonder BAG adressen)
     if(_map.getZoom() >= 16 && _pandWmsLayer && !_bagVectorLayer){
       _infoPinned = true;
       pandGetFeatureInfo(e);
     }
-    // Bij BAG actief: CBS polygonen hebben pointer-events:none,
-    // dus klikken op lege gebieden vangen we hier op voor selectie
+    // BAG actief: CBS polygonen hebben pointer-events:none
     if(_layerState.bag && !_bagClickConsumed){
-      handleCbsClickAtPoint(e.latlng);
+      var z = _map.getZoom();
+      if(z >= 13){
+        // WMS GetFeatureInfo: klik op adres-punt → adresinfo via server
+        // Als geen adres gevonden → fallback naar CBS selectie (in bagGetFeatureInfo)
+        bagGetFeatureInfo(e);
+      } else {
+        // Zoom te laag voor WMS — alleen CBS selectie
+        handleCbsClickAtPoint(e.latlng);
+      }
     }
   });
 }
@@ -2419,15 +2427,12 @@ function onBagZoomChange(){
   }
   // Panden WMS ook bijwerken
   updatePandWmsOpacity();
-  // Zoom-hint: toon waarschuwing als zoom te laag is voor klikbare adressen
+  // Zoom-hint: toon info over beschikbare interactie op dit zoomlevel
   var hintEl = document.getElementById('bagZoomHint');
   if(hintEl){
     if(z < 13){
       hintEl.style.display = 'flex';
-      document.getElementById('bagZoomHintText').innerHTML = '<b>Zoom in om BAG adressen te zien</b> (nu zoom '+z+', zichtbaar vanaf 13, klikbaar vanaf 16)';
-    } else if(z < 16){
-      hintEl.style.display = 'flex';
-      document.getElementById('bagZoomHintText').innerHTML = 'Adressen zichtbaar (WMS) · <b>Zoom in voor klikbare punten</b> (nu zoom '+z+', klikbaar vanaf 16)';
+      document.getElementById('bagZoomHintText').innerHTML = '<b>Zoom in om BAG adressen te zien</b> (nu zoom '+z+', zichtbaar + klikbaar vanaf 13)';
     } else {
       hintEl.style.display = 'none';
     }
@@ -3593,6 +3598,34 @@ function pandGetFeatureInfo(e){
     html += buildAreaStatsHtml(e.latlng);
     document.getElementById('infoContent').innerHTML = html;
     document.getElementById('infoPanel').classList.add('show');
+  }).catch(function(){});
+}
+
+// WMS GetFeatureInfo voor verblijfsobjecten — fallback wanneer VT niet beschikbaar is
+function bagGetFeatureInfo(e){
+  if(!_map || !_bagWmsLayer) return;
+  var size = _map.getSize();
+  var bounds = _map.getBounds();
+  var sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+  var bbox = sw.lng+','+sw.lat+','+ne.lng+','+ne.lat;
+  var pt = _map.latLngToContainerPoint(e.latlng);
+  var url = PDOK_BAG_WMS+'?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetFeatureInfo'+
+    '&FORMAT=image/png&TRANSPARENT=true'+
+    '&QUERY_LAYERS=verblijfsobject&LAYERS=verblijfsobject'+
+    '&INFO_FORMAT=application/json&FEATURE_COUNT=1&BUFFER=8'+
+    '&X='+Math.round(pt.x)+'&Y='+Math.round(pt.y)+
+    '&SRS=EPSG:4326&WIDTH='+size.x+'&HEIGHT='+size.y+'&BBOX='+bbox;
+  fetch(url).then(function(r){return r.json()}).then(function(d){
+    if(!d.features||!d.features.length){
+      // Geen adres gevonden — probeer CBS selectie als fallback
+      if(!_bagClickConsumed) handleCbsClickAtPoint(e.latlng);
+      return;
+    }
+    _bagClickConsumed = true;
+    var p = d.features[0].properties;
+    _infoPinned = true;
+    showBagFeatureInfo(p, e.latlng);
+    setTimeout(function(){ _bagClickConsumed = false; }, 50);
   }).catch(function(){});
 }
 
