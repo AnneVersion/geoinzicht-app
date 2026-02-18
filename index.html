@@ -220,7 +220,19 @@ select option{background:var(--bg);color:var(--tx)}
 .ind-item .ind-badge{font:700 8px 'Space Mono',monospace;padding:2px 5px;border-radius:4px;background:rgba(57,255,20,.15);color:var(--ac);display:none;letter-spacing:.5px;flex-shrink:0}
 .ind-item.primary .ind-badge{display:block}
 
-/* (stats zijn nu in de tooltip i.p.v. sidebar) */
+/* Kaart hover-tooltip */
+.map-tooltip{background:rgba(10,15,26,.92)!important;backdrop-filter:blur(12px);border:1px solid rgba(57,255,20,.25)!important;border-radius:10px!important;padding:0!important;box-shadow:0 8px 32px rgba(0,0,0,.5)!important;color:#e2e8f0!important;font-family:'DM Sans',sans-serif!important;min-width:200px;max-width:320px}
+.map-tooltip .leaflet-tooltip-content{padding:0!important}
+.map-tooltip::before{border-right-color:rgba(10,15,26,.92)!important}
+.tt-header{padding:8px 12px 6px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:6px}
+.tt-name{font:700 12px 'DM Sans',sans-serif;color:#39ff14;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt-type{font:400 9px 'Space Mono',monospace;color:#64748b;flex-shrink:0}
+.tt-body{padding:6px 12px 8px}
+.tt-row{display:flex;justify-content:space-between;align-items:center;padding:2px 0;gap:8px}
+.tt-label{font:400 10px 'DM Sans',sans-serif;color:#94a3b8;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.tt-val{font:700 10px 'Space Mono',monospace;text-align:right;white-space:nowrap}
+.tt-prim{color:#39ff14}
+.tt-sec{color:#38bdf8}
 
 /* Animated gradient border on active buttons */
 @property --angle{syntax:'<angle>';initial-value:0deg;inherits:false}
@@ -1064,6 +1076,47 @@ function fixLayerOrder(){
   if(_bagVectorLayer) _bagVectorLayer.bringToFront();
 }
 
+// Bouw compacte tooltip-inhoud voor hover op kaart
+function buildMapTooltip(p, cfg, type){
+  var name = p[cfg.nameField] || '-';
+  var typeLabel = {gemeenten:'Gemeente', wijken:'Wijk', buurten:'Buurt'}[type] || type;
+  var html = '<div class="tt-header">';
+  html += '<span class="tt-name">'+name+'</span>';
+  html += '<span class="tt-type">'+typeLabel+'</span>';
+  html += '</div><div class="tt-body">';
+  // Toon actieve indicatoren met waarden
+  var indLookup = {};
+  INDICATORS.forEach(function(ind){ indLookup[ind.key] = ind; });
+  _activeIndicators.forEach(function(key, i){
+    var ind = indLookup[key];
+    if(!ind) return;
+    var v = p[key];
+    var valStr = (v !== undefined && v !== null && v >= 0) ? v.toLocaleString('nl-NL') : '-';
+    var cls = i === 0 ? 'tt-prim' : 'tt-sec';
+    html += '<div class="tt-row">';
+    html += '<span class="tt-label"><span class="mi" style="font-size:12px">'+ind.icon+'</span> '+ind.naam+'</span>';
+    html += '<span class="tt-val '+cls+'">'+valStr;
+    if(ind.eenheid && v !== undefined && v !== null && v >= 0) html += ' <span style="font-weight:400;opacity:.5;font-size:8px">'+ind.eenheid+'</span>';
+    html += '</span></div>';
+  });
+  // BAG adressen als beschikbaar
+  var bagCount = null;
+  if(type === 'gemeenten' && _bagIndex && p.gemeentecode && _bagIndex[p.gemeentecode]){
+    bagCount = _bagIndex[p.gemeentecode].count;
+  } else if(type === 'wijken' && _bagWijkIndex && p.wijkcode && _bagWijkIndex[p.wijkcode]){
+    bagCount = _bagWijkIndex[p.wijkcode].count;
+  } else if(type === 'buurten' && _bagBuurtIndex && p.buurtcode && _bagBuurtIndex[p.buurtcode]){
+    bagCount = _bagBuurtIndex[p.buurtcode].count;
+  }
+  if(bagCount !== null){
+    html += '<div class="tt-row" style="border-top:1px solid rgba(255,255,255,.06);margin-top:2px;padding-top:4px">';
+    html += '<span class="tt-label"><span class="mi" style="font-size:12px;color:#38bdf8">location_on</span> BAG Adressen</span>';
+    html += '<span class="tt-val tt-sec">'+bagCount.toLocaleString('nl-NL')+'</span></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function renderChoropleth(type){
   try {
   var cfg = LAYER_CONFIG[type];
@@ -1113,12 +1166,22 @@ function renderChoropleth(type){
       return {fillColor:getColor(v,breaks,colors),fillOpacity:0.65,weight:cfg.borderWeight,color:cfg.borderColor,opacity:0.5};
     },
     onEachFeature: function(feature, layer){
+      // Tooltip voor hover: compacte info direct op de kaart
+      layer.bindTooltip('', {
+        className: 'map-tooltip',
+        direction: 'right',
+        offset: [12, 0],
+        opacity: 1,
+        sticky: true
+      });
       layer.on('mouseover', function(e){
         // Skip hover als BAG/panden actief zijn (choropleth is gedimd)
         if(_layerState.bag || _layerState.panden) return;
         e.target.setStyle({weight:2.5,color:'#39ff14',fillOpacity:0.9});
         e.target.bringToFront();
-        showFeatureInfo(e.target.feature.properties, cfg, type, false, e.target.feature);
+        // Tooltip updaten met actuele indicator waarden
+        var ttHtml = buildMapTooltip(feature.properties, cfg, type);
+        layer.setTooltipContent(ttHtml);
       });
       layer.on('mouseout', function(e){
         if(_layerState.bag || _layerState.panden) return;
@@ -1135,7 +1198,7 @@ function renderChoropleth(type){
       layer.on('click', function(e){
         // Altijd: toggle selectie voor vergelijking
         toggleMapSelection(feature.properties, type, layer, newLayer);
-        // Toon info en pin het panel vast
+        // Toon volledig info panel en pin het vast
         _infoPinned = true;
         showFeatureInfo(feature.properties, cfg, type, true, feature);
       });
@@ -6823,7 +6886,7 @@ function showComparisonReport(){
   // ===== HEADER =====
   html += '<div class="header">';
   html += '<div class="logo">';
-  html += '<div style="width:40px;height:40px;background:linear-gradient(135deg,#39ff14,#22c55e);border-radius:10px;display:flex;align-items:center;justify-content:center"><span style="font-family:\'Material Symbols Rounded\';font-size:24px;color:#0a0f1a;font-variation-settings:\'FILL\' 1">public</span></div>';
+  html += globeLogoSvg(40);
   html += '<div><div class="logo-text">GeoInzicht</div><div style="font-size:10px;color:#64748b">Data Consultants</div></div>';
   html += '</div>';
   html += '<h1>Vergelijkingsrapport</h1>';
@@ -7601,6 +7664,64 @@ var _appStartTime = Date.now();
 // ============================================================
 // RAPPORT EXPORT (PRINT/PDF)
 // ============================================================
+
+// Statische globe SVG logo (gebaseerd op logo.svg, zonder animaties)
+function globeLogoSvg(size){
+  var s = size || 52;
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'+s+'" height="'+s+'" viewBox="0 0 1000 1000" style="flex-shrink:0">';
+  svg += '<defs>';
+  svg += '<radialGradient id="gs3d" cx="38%" cy="32%" r="65%"><stop offset="0%" stop-color="#1a5c2a" stop-opacity="0.7"/><stop offset="50%" stop-color="#092810" stop-opacity="0.45"/><stop offset="100%" stop-color="#041a08" stop-opacity="0.2"/></radialGradient>';
+  svg += '<radialGradient id="gspec" cx="35%" cy="28%" r="35%"><stop offset="0%" stop-color="#39ff14" stop-opacity="0.12"/><stop offset="100%" stop-color="transparent"/></radialGradient>';
+  svg += '<radialGradient id="gland" cx="38%" cy="32%" r="65%"><stop offset="0%" stop-color="#2aff4e" stop-opacity="0.35"/><stop offset="50%" stop-color="#1a8c2e" stop-opacity="0.25"/><stop offset="100%" stop-color="#0d4a18" stop-opacity="0.18"/></radialGradient>';
+  svg += '<clipPath id="ggc"><circle cx="500" cy="500" r="380"/></clipPath>';
+  svg += '</defs>';
+  // 3D bol
+  svg += '<circle cx="500" cy="500" r="380" fill="url(#gs3d)"/>';
+  svg += '<circle cx="500" cy="500" r="380" fill="url(#gspec)"/>';
+  // Grid
+  svg += '<g clip-path="url(#ggc)" opacity="0.08" stroke="#39ff14" fill="none" stroke-width="1">';
+  svg += '<ellipse cx="500" cy="380" rx="375" ry="64"/><ellipse cx="500" cy="500" rx="380" ry="72"/><ellipse cx="500" cy="620" rx="375" ry="64"/>';
+  svg += '<ellipse cx="500" cy="500" rx="100" ry="380"/><ellipse cx="500" cy="500" rx="220" ry="380"/><ellipse cx="500" cy="500" rx="330" ry="380"/>';
+  svg += '</g>';
+  // Globe outline
+  svg += '<circle cx="500" cy="500" r="380" fill="none" stroke="#39ff14" stroke-width="2" opacity="0.2"/>';
+  // Continenten (vereenvoudigd)
+  svg += '<g clip-path="url(#ggc)" fill="url(#gland)" stroke="#39ff14" stroke-width="0.8" stroke-opacity="0.4">';
+  // Europa
+  svg += '<path d="M389,378 L403,365 L430,340 L453,328 L470,309 L491,271 L500,253 L508,241 L523,230 L541,234 L561,256 L580,273 L596,310 L591,338 L579,360 L547,383 L523,370 L500,356 L478,336 L459,315 L440,307 L423,319 L404,337 L387,363Z"/>';
+  // Afrika
+  svg += '<path d="M316,522 L321,485 L340,444 L378,405 L411,387 L460,377 L500,377 L531,405 L575,424 L624,464 L670,516 L716,595 L741,625 L726,687 L694,741 L661,785 L616,824 L567,833 L533,807 L521,770 L507,723 L471,643 L442,607 L413,591 L386,560 L347,534Z"/>';
+  // Noord-Amerika
+  svg += '<path d="M122,317 L161,276 L215,237 L275,215 L313,172 L357,129 L386,114 L405,105 L422,88 L400,97 L378,105 L261,222 L213,258 L137,294Z"/>';
+  // Zuid-Amerika
+  svg += '<path d="M86,432 L84,489 L101,517 L137,572 L164,639 L207,725 L211,756 L193,777 L193,785 L114,666 L90,592 L83,546 L81,473Z"/>';
+  // Azië
+  svg += '<path d="M607,336 L631,292 L658,245 L672,199 L661,159 L630,129 L655,125 L718,142 L875,367 L875,443 L849,428 L815,382 L781,366 L762,404 L720,387 L675,353 L632,333Z"/>';
+  svg += '</g>';
+  // Data netwerk lijnen
+  svg += '<g clip-path="url(#ggc)" stroke="#39ff14" stroke-width="1.2" opacity="0.2">';
+  svg += '<line x1="477" y1="275" x2="609" y2="245"/><line x1="609" y1="245" x2="632" y2="419"/>';
+  svg += '<line x1="477" y1="275" x2="183" y2="254"/><line x1="632" y1="419" x2="770" y2="423"/>';
+  svg += '<line x1="770" y1="423" x2="809" y2="216"/><line x1="609" y1="245" x2="809" y2="216"/>';
+  svg += '<line x1="632" y1="419" x2="452" y2="597"/><line x1="452" y1="597" x2="689" y2="637"/>';
+  svg += '<line x1="689" y1="637" x2="616" y2="797"/><line x1="183" y1="254" x2="178" y2="730"/>';
+  svg += '</g>';
+  // Data punten (gloeiende nodes)
+  svg += '<g fill="#39ff14">';
+  svg += '<circle cx="477" cy="275" r="8" opacity="0.9"/><circle cx="609" cy="245" r="7" opacity="0.85"/>';
+  svg += '<circle cx="632" cy="419" r="7" opacity="0.85"/><circle cx="183" cy="254" r="8" opacity="0.9"/>';
+  svg += '<circle cx="809" cy="216" r="7" opacity="0.85"/><circle cx="770" cy="423" r="6" opacity="0.8"/>';
+  svg += '<circle cx="452" cy="597" r="6" opacity="0.8"/><circle cx="689" cy="637" r="6" opacity="0.75"/>';
+  svg += '<circle cx="178" cy="730" r="6" opacity="0.75"/><circle cx="616" cy="797" r="6" opacity="0.7"/>';
+  svg += '</g>';
+  // Orbit ring
+  svg += '<g transform="translate(500,500) rotate(-8)">';
+  svg += '<ellipse rx="440" ry="110" fill="none" stroke="#39ff14" stroke-width="1.5" opacity="0.15"/>';
+  svg += '</g>';
+  svg += '</svg>';
+  return svg;
+}
+
 function printInfoPanel(){
   var locationName = document.getElementById('infoBuurtNaam').textContent || 'GeoInzicht Rapport';
   var content = document.getElementById('infoContent').innerHTML;
@@ -7671,14 +7792,8 @@ function printInfoPanel(){
   // Header met logo en branding
   html += '<div class="rh">';
   html += '<div style="display:flex;align-items:center;gap:14px">';
-  // Inline SVG mini-logo (gestripte versie van het globe logo)
-  html += '<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 1000 1000" style="flex-shrink:0">';
-  html += '<defs><radialGradient id="rs" cx="38%" cy="32%" r="65%"><stop offset="0%" stop-color="#1a5c2a" stop-opacity="0.7"/><stop offset="100%" stop-color="#041a08" stop-opacity="0.2"/></radialGradient></defs>';
-  html += '<circle cx="500" cy="500" r="380" fill="url(#rs)"/><circle cx="500" cy="500" r="380" fill="none" stroke="#16a34a" stroke-width="8" opacity="0.5"/>';
-  html += '<g fill="none" stroke="#16a34a" stroke-width="3" opacity="0.25"><ellipse cx="500" cy="500" rx="380" ry="72"/><ellipse cx="500" cy="500" rx="220" ry="380"/></g>';
-  html += '<g fill="#16a34a" opacity="0.7"><circle cx="477" cy="275" r="18"/><circle cx="609" cy="245" r="16"/><circle cx="632" cy="419" r="16"/><circle cx="183" cy="254" r="18"/><circle cx="809" cy="216" r="16"/></g>';
-  html += '<g stroke="#16a34a" stroke-width="3" opacity="0.3"><line x1="477" y1="275" x2="609" y2="245"/><line x1="609" y1="245" x2="632" y2="419"/><line x1="477" y1="275" x2="183" y2="254"/><line x1="609" y1="245" x2="809" y2="216"/></g>';
-  html += '</svg>';
+  // Inline SVG globe logo — statische versie van logo.svg
+  html += globeLogoSvg(52);
   html += '<div>';
   html += '<h1 style="background:linear-gradient(135deg,#16a34a,#0284c7);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">GeoInzicht</h1>';
   html += '<div style="font:900 10px Space Mono,monospace;color:#16a34a;letter-spacing:3px;margin-top:2px">DATA CONSULTANTS</div>';
