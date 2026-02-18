@@ -917,12 +917,18 @@ function initMap(){
       var latlng = e.latlng;
       var z = _map.getZoom();
       var clickTime = Date.now();
+      console.log('[BAG CLICK] map click, zoom='+z+', latlng='+latlng.lat.toFixed(4)+','+latlng.lng.toFixed(4)+', _bagClickConsumed='+_bagClickConsumed+', clickTime='+clickTime);
       setTimeout(function(){
         // Als VectorGrid de klik al heeft verwerkt (binnen 500ms), niets doen
-        if(_bagClickConsumed > clickTime - 500) return;
+        if(_bagClickConsumed > clickTime - 500){
+          console.log('[BAG CLICK] SKIP: VectorGrid consumed');
+          return;
+        }
         if(z >= 13){
+          console.log('[BAG CLICK] → bagGetFeatureInfo (WFS)');
           bagGetFeatureInfo({latlng: latlng, _clickTime: clickTime});
         } else {
+          console.log('[BAG CLICK] → handleCbsClickAtPoint (zoom te laag)');
           handleCbsClickAtPoint(latlng);
         }
       }, 150);
@@ -2056,6 +2062,7 @@ function bagAdresId(p){
 }
 
 function selectBagAdres(p, latlng){
+  console.log('[selectBagAdres] id:', bagAdresId(p), 'latlng:', latlng, 'huidige selectie:', _selectedAdressen.length);
   var id = bagAdresId(p);
   // Check of dit adres al geselecteerd is → deselecteer
   var existIdx = -1;
@@ -2805,6 +2812,7 @@ function createBagVectorTileLayer(){
 
   // Klik-handler voor feature info
   _bagVectorLayer.on('click', function(e){
+    console.log('[BAG VT CLICK] e.layer:', !!e.layer, 'props:', !!(e.layer&&e.layer.properties), 'layerName:', e.layer&&(e.layer._layerName||e.layerName));
     if(!e.layer || !e.layer.properties) return;
     var p = e.layer.properties;
     var layerName = e.layer._layerName || e.layerName || '';
@@ -3925,7 +3933,7 @@ function pandGetFeatureInfo(e){
 
 // WMS GetFeatureInfo voor verblijfsobjecten — fallback wanneer VT niet beschikbaar is
 function bagGetFeatureInfo(e){
-  if(!_map) return;
+  if(!_map){ console.log('[BAG WFS] SKIP: no map'); return; }
   var latlng = e.latlng;
   var clickTime = e._clickTime || Date.now();
   // WFS: zoek dichtstbijzijnde verblijfsobject via kleine BBOX rond klikpunt
@@ -3936,11 +3944,16 @@ function bagGetFeatureInfo(e){
   var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature'+
     '&typeName=bag:verblijfsobject&outputFormat=application/json'+
     '&count=5&srsName=EPSG:4326&BBOX='+bbox;
+  console.log('[BAG WFS] fetch:', url.substring(0, 120)+'...');
   fetch(url).then(function(r){return r.json()}).then(function(d){
+    console.log('[BAG WFS] response: '+(d.features?d.features.length:0)+' features');
     // Check of VectorGrid deze klik inmiddels al heeft verwerkt
-    if(_bagClickConsumed > clickTime - 500) return;
+    if(_bagClickConsumed > clickTime - 500){
+      console.log('[BAG WFS] SKIP: VT consumed');
+      return;
+    }
     if(!d.features||!d.features.length){
-      // Geen adres gevonden — CBS selectie als fallback
+      console.log('[BAG WFS] geen adres → CBS fallback');
       handleCbsClickAtPoint(latlng);
       return;
     }
@@ -3960,9 +3973,11 @@ function bagGetFeatureInfo(e){
     if(best.geometry && best.geometry.coordinates){
       adresLatlng = L.latLng(best.geometry.coordinates[1], best.geometry.coordinates[0]);
     }
+    console.log('[BAG WFS] selectBagAdres:', p.openbare_ruimte, p.huisnummer);
     _infoPinned = true;
     selectBagAdres(p, adresLatlng);
-  }).catch(function(){
+  }).catch(function(err){
+    console.error('[BAG WFS] ERROR:', err);
     // WFS fout — CBS selectie als fallback
     if(_bagClickConsumed > clickTime - 500) return;
     handleCbsClickAtPoint(latlng);
