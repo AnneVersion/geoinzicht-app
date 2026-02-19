@@ -1226,7 +1226,11 @@ function renderChoropleth(type){
       });
       layer.on('click', function(e){
         // BAG actief: klik niet doorsturen naar CBS — BAG handler regelt dit
-        if(_layerState.bag) return;
+        if(_layerState.bag || _layerState.panden){
+          console.log('[CBS CLICK] BLOCKED: bag='+_layerState.bag+' panden='+_layerState.panden);
+          return;
+        }
+        console.log('[CBS CLICK] ALLOWED: '+type+' '+feature.properties[cfg.nameField]);
         toggleMapSelection(feature.properties, type, layer, newLayer);
         _infoPinned = true;
         showFeatureInfo(feature.properties, cfg, type, true, feature);
@@ -1937,6 +1941,7 @@ function renderBagVectors(){
     },
     onEachFeature: function(feature, layer){
       layer.on('click', function(e){
+        console.log('[BAG GeoJSON CLICK] '+feature.properties.openbare_ruimte+' '+feature.properties.huisnummer);
         L.DomEvent.stopPropagation(e);
         _infoPinned = true;
         showBagFeatureInfo(feature.properties, e.latlng);
@@ -2425,6 +2430,7 @@ function createBagVectorTileLayer(){
 
   // Klik-handler voor feature info
   _bagVectorLayer.on('click', function(e){
+    console.log('[BAG VT CLICK] fired, layer:', !!e.layer);
     if(!e.layer || !e.layer.properties) return;
     var p = e.layer.properties;
     var layerName = e.layer._layerName || e.layerName || '';
