@@ -922,6 +922,7 @@ var _bagVtClickHandler = null; // map-level click fallback voor VectorGrid
 var _bagVtMoveHandler = null; // mousemove handler voor hover tooltip
 var _bagHoverTooltip = null; // Leaflet tooltip voor BAG hover
 var _bagHoverLastId = null; // voorkom herhaalde tooltip updates
+var _selectedAdressen = []; // Max 2 adressen voor vergelijking [{props, latlng, marker}]
 var _bagVectorData = null; // raw WFS features cache
 var _bagLoading = false;
 var _bagForceReload = false;
@@ -2396,6 +2397,7 @@ function toggleBagLayer(on){
       _layerState.panden = false;
       togglePandLayer(false);
     }
+    clearAdresSelection();
     dimChoroplethLayers(false);
     logEvent('bag_toggle', 'uit');
   }
@@ -2443,29 +2445,75 @@ function _handleBagVtClick(layer, rawLatlng, originalEvent){
     showPandFeatureInfo(p, latlng);
     return;
   }
-  // VT properties zijn beperkt — verrijk met WFS voor volledige adresgegevens
-  showBagFeatureInfo(p, latlng); // direct tonen met wat we hebben
-  enrichBagFeatureViaWfs(p, latlng);
+  // Selecteer adres voor vergelijking (max 2)
+  selectBagAdres(p, latlng);
 }
 
-// Verrijk BAG VT feature met volledige adresgegevens via WFS BBOX query
-function enrichBagFeatureViaWfs(vtProps, latlng){
-  var radius = 0.0002; // ~20m rond klikpunt
+// BAG adres selectie: max 2 adressen, met highlight-markers en vergelijking
+function selectBagAdres(p, latlng){
+  var id = p.identificatie || ((p.openbare_ruimte_naam||p.openbare_ruimte||'')+'_'+(p.huisnummer||''));
+  // Check of dit adres al geselecteerd is → deselecteer
+  var existIdx = -1;
+  for(var i = 0; i < _selectedAdressen.length; i++){
+    if((_selectedAdressen[i].props.identificatie || '') === (p.identificatie || '') &&
+       _selectedAdressen[i].props.identificatie){ existIdx = i; break; }
+  }
+  if(existIdx >= 0){
+    if(_selectedAdressen[existIdx].marker) _map.removeLayer(_selectedAdressen[existIdx].marker);
+    _selectedAdressen.splice(existIdx, 1);
+    toast('➖ Adres verwijderd');
+    if(_selectedAdressen.length === 1){
+      showBagFeatureInfo(_selectedAdressen[0].props, _selectedAdressen[0].latlng);
+    } else {
+      _infoPinned = false;
+      document.getElementById('infoPanel').classList.remove('show');
+    }
+    return;
+  }
+  // Max 2: vervang oudste als vol
+  if(_selectedAdressen.length >= 2){
+    if(_selectedAdressen[0].marker) _map.removeLayer(_selectedAdressen[0].marker);
+    _selectedAdressen.shift();
+  }
+  // Highlight-marker
+  var colors = ['#39ff14', '#38bdf8'];
+  var colorIdx = _selectedAdressen.length;
+  var markerOpts = {radius: 10, fillColor: 'transparent', color: colors[colorIdx], weight: 3, opacity: 1, fillOpacity: 0};
+  if(_map.getPane('bagVtPane')) markerOpts.pane = 'bagVtPane';
+  var marker = L.circleMarker(latlng, markerOpts).addTo(_map);
+  _selectedAdressen.push({props: p, latlng: latlng, marker: marker});
+  // Update kleuren
+  _selectedAdressen.forEach(function(a, i){ if(a.marker) a.marker.setStyle({color: colors[i]}); });
+  // Toon info
+  if(_selectedAdressen.length === 2){
+    showAdresVergelijking();
+  } else {
+    showBagFeatureInfo(p, latlng);
+  }
+  var straat = p.openbare_ruimte_naam || p.openbare_ruimte || '';
+  var hnr = (p.huisnummer||'') + (p.huisletter||'');
+  toast('➕ ' + ((straat+' '+hnr).trim() || 'Adres') + ' geselecteerd (' + _selectedAdressen.length + '/2)');
+  // Verrijk met WFS data
+  enrichBagAdresViaWfs(_selectedAdressen.length - 1, latlng);
+}
+
+// Verrijk geselecteerd adres met WFS data en update UI
+function enrichBagAdresViaWfs(adresIdx, latlng){
+  var radius = 0.0002;
   var bbox = (latlng.lat-radius)+','+(latlng.lng-radius)+','+(latlng.lat+radius)+','+(latlng.lng+radius)+',urn:ogc:def:crs:EPSG::4326';
   var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature'+
     '&typeName=bag:verblijfsobject&outputFormat=application/json'+
     '&count=10&srsName=EPSG:4326&BBOX='+bbox;
   fetch(url).then(function(r){return r.json()}).then(function(d){
     if(!d.features || !d.features.length) return;
-    // Zoek best matching feature (zelfde identificatie of dichtstbijzijnde)
+    if(adresIdx >= _selectedAdressen.length) return; // selectie al veranderd
+    var vtProps = _selectedAdressen[adresIdx].props;
     var best = null, bestDist = Infinity;
     d.features.forEach(function(f){
       if(!f.properties) return;
-      // Match op identificatie als beschikbaar
       if(vtProps.identificatie && f.properties.identificatie === vtProps.identificatie){
         best = f; bestDist = -1; return;
       }
-      // Anders: dichtstbijzijnde
       if(f.geometry && f.geometry.coordinates){
         var dx = f.geometry.coordinates[0] - latlng.lng;
         var dy = f.geometry.coordinates[1] - latlng.lat;
@@ -2474,21 +2522,112 @@ function enrichBagFeatureViaWfs(vtProps, latlng){
       }
     });
     if(!best) return;
-    // Merge WFS properties over VT properties en update panel
+    // Merge
     var merged = {};
     for(var k in vtProps) merged[k] = vtProps[k];
     for(var k in best.properties){
-      if(best.properties[k] !== null && best.properties[k] !== undefined){
-        merged[k] = best.properties[k];
-      }
+      if(best.properties[k] !== null && best.properties[k] !== undefined) merged[k] = best.properties[k];
     }
-    // Update latlng met exacte WFS positie als beschikbaar
-    var exactLatlng = latlng;
+    _selectedAdressen[adresIdx].props = merged;
     if(best.geometry && best.geometry.coordinates){
-      exactLatlng = L.latLng(best.geometry.coordinates[1], best.geometry.coordinates[0]);
+      _selectedAdressen[adresIdx].latlng = L.latLng(best.geometry.coordinates[1], best.geometry.coordinates[0]);
     }
-    showBagFeatureInfo(merged, exactLatlng);
+    // Update UI
+    if(_selectedAdressen.length === 2) showAdresVergelijking();
+    else if(_selectedAdressen.length === 1) showBagFeatureInfo(merged, _selectedAdressen[0].latlng);
   }).catch(function(){});
+}
+
+function clearAdresSelection(){
+  _selectedAdressen.forEach(function(a){ if(a.marker) _map.removeLayer(a.marker); });
+  _selectedAdressen = [];
+}
+
+// Side-by-side vergelijking van 2 geselecteerde adressen
+function showAdresVergelijking(){
+  if(_selectedAdressen.length < 2) return;
+  var a = _selectedAdressen[0].props, b = _selectedAdressen[1].props;
+  var aLatlng = _selectedAdressen[0].latlng, bLatlng = _selectedAdressen[1].latlng;
+  var aStraat = a.openbare_ruimte_naam || a.openbare_ruimte || '';
+  var bStraat = b.openbare_ruimte_naam || b.openbare_ruimte || '';
+  var aHnr = (a.huisnummer||'')+(a.huisletter||'')+(a.toevoeging?' '+a.toevoeging:'');
+  var bHnr = (b.huisnummer||'')+(b.huisletter||'')+(b.toevoeging?' '+b.toevoeging:'');
+  var aLabel = (aStraat+' '+aHnr).trim() || 'Adres A';
+  var bLabel = (bStraat+' '+bHnr).trim() || 'Adres B';
+
+  document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">compare_arrows</span> Adresvergelijking';
+  var html = '';
+  // Headers
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+  html += '<div style="padding:8px 10px;background:rgba(57,255,20,.08);border-radius:8px;border-left:3px solid #39ff14">';
+  html += '<div style="font:700 11px Space Mono,monospace;color:#39ff14;margin-bottom:2px">A</div>';
+  html += '<div style="font:600 10px DM Sans,sans-serif;color:var(--tx)">'+aLabel+'</div>';
+  if(a.postcode) html += '<div style="font:400 9px Space Mono,monospace;color:var(--mt)">'+a.postcode+' '+(a.woonplaats_naam||a.woonplaats||'')+'</div>';
+  html += '</div>';
+  html += '<div style="padding:8px 10px;background:rgba(56,189,248,.08);border-radius:8px;border-left:3px solid #38bdf8">';
+  html += '<div style="font:700 11px Space Mono,monospace;color:#38bdf8;margin-bottom:2px">B</div>';
+  html += '<div style="font:600 10px DM Sans,sans-serif;color:var(--tx)">'+bLabel+'</div>';
+  if(b.postcode) html += '<div style="font:400 9px Space Mono,monospace;color:var(--mt)">'+b.postcode+' '+(b.woonplaats_naam||b.woonplaats||'')+'</div>';
+  html += '</div></div>';
+
+  // Vergelijkingsrijen
+  var rows = [
+    {label:'Oppervlakte', icon:'straighten', a:a.oppervlakte, b:b.oppervlakte, unit:'m²'},
+    {label:'Bouwjaar', icon:'calendar_month', a:a.bouwjaar, b:b.bouwjaar, unit:''},
+    {label:'Gebruiksdoel', icon:'category', a:a.gebruiksdoel, b:b.gebruiksdoel, type:'text'},
+    {label:'Status', icon:'info', a:a.status, b:b.status, type:'status'}
+  ];
+  html += '<div style="border-radius:10px;overflow:hidden;border:1px solid var(--glass-bd)">';
+  html += '<div style="display:grid;grid-template-columns:auto 1fr 1fr;background:rgba(255,255,255,.03);padding:6px 10px;border-bottom:1px solid var(--glass-bd)">';
+  html += '<span style="font:600 9px DM Sans,sans-serif;color:var(--mt);min-width:80px">Kenmerk</span>';
+  html += '<span style="font:700 9px Space Mono,monospace;color:#39ff14;text-align:right">A</span>';
+  html += '<span style="font:700 9px Space Mono,monospace;color:#38bdf8;text-align:right">B</span>';
+  html += '</div>';
+  rows.forEach(function(r){
+    var aVal = r.a !== undefined && r.a !== null ? r.a : '-';
+    var bVal = r.b !== undefined && r.b !== null ? r.b : '-';
+    var aColor = 'var(--tx)', bColor = 'var(--tx)';
+    if(r.type === 'status'){ aColor = bagStatusToColor(aVal); bColor = bagStatusToColor(bVal); }
+    else if(r.type !== 'text' && typeof aVal === 'number' && typeof bVal === 'number'){
+      if(aVal > bVal) aColor = '#39ff14';
+      else if(bVal > aVal) bColor = '#38bdf8';
+    }
+    var aStr = typeof aVal === 'number' ? aVal.toLocaleString('nl-NL')+(r.unit?' '+r.unit:'') : String(aVal);
+    var bStr = typeof bVal === 'number' ? bVal.toLocaleString('nl-NL')+(r.unit?' '+r.unit:'') : String(bVal);
+    html += '<div style="display:grid;grid-template-columns:auto 1fr 1fr;padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.03)">';
+    html += '<span style="font-size:10px;color:var(--mt);min-width:80px"><span class="mi mi-sm" style="font-size:12px">'+r.icon+'</span> '+r.label+'</span>';
+    html += '<span style="font:700 9px Space Mono,monospace;color:'+aColor+';text-align:right">'+aStr+'</span>';
+    html += '<span style="font:700 9px Space Mono,monospace;color:'+bColor+';text-align:right">'+bStr+'</span>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Buurt/gemeente context
+  var aBuurt = findFeatureAtPoint(_buurtLayer, aLatlng);
+  var bBuurt = findFeatureAtPoint(_buurtLayer, bLatlng);
+  var aGem = findFeatureAtPoint(_gemeenteLayer, aLatlng);
+  var bGem = findFeatureAtPoint(_gemeenteLayer, bLatlng);
+  if(aBuurt || bBuurt || aGem || bGem){
+    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd);font-size:9px;color:var(--mt)">';
+    if(aBuurt && bBuurt){
+      var same = aBuurt.properties.buurtnaam === bBuurt.properties.buurtnaam;
+      html += '<span class="mi" style="font-size:10px">grid_on</span> Buurt: ';
+      html += same ? aBuurt.properties.buurtnaam : '<span style="color:#39ff14">'+aBuurt.properties.buurtnaam+'</span> vs <span style="color:#38bdf8">'+bBuurt.properties.buurtnaam+'</span>';
+      html += '<br>';
+    }
+    if(aGem && bGem){
+      var same = aGem.properties.gemeentenaam === bGem.properties.gemeentenaam;
+      html += '<span class="mi" style="font-size:10px">domain</span> Gemeente: ';
+      html += same ? aGem.properties.gemeentenaam : '<span style="color:#39ff14">'+aGem.properties.gemeentenaam+'</span> vs <span style="color:#38bdf8">'+bGem.properties.gemeentenaam+'</span>';
+    }
+    html += '</div>';
+  }
+
+  // Wis-knop
+  html += '<div style="text-align:center;margin-top:10px"><button onclick="clearAdresSelection();_infoPinned=false;document.getElementById(\'infoPanel\').classList.remove(\'show\')" style="padding:5px 16px;font:600 10px DM Sans,sans-serif;background:rgba(239,68,68,.1);color:#ef4444;border:1px solid rgba(239,68,68,.2);border-radius:6px;cursor:pointer"><span class="mi mi-sm" style="font-size:12px;vertical-align:-2px">delete</span> Selectie wissen</button></div>';
+
+  document.getElementById('infoContent').innerHTML = html;
+  document.getElementById('infoPanel').classList.add('show');
 }
 
 // BAG hover tooltip: toon adresgegevens + buurt/gemeente context bij mouseover
