@@ -42,6 +42,44 @@ if(L.DomEvent && !L.DomEvent.fakeStop){
     return layer;
   };
 })();
+
+// Patch VectorGrid 1.3.0: Canvas.Tile click-detectie werkt niet met Leaflet 1.9+ preferCanvas
+// Probleem: Canvas.Tile._onClick coördinaatberekening faalt, features worden niet gevonden
+// Oplossing: override _onClick met robuustere hit-detectie + grotere tolerantie
+(function(){
+  var CT = L.Canvas.Tile;
+  if(!CT || !CT.prototype) return;
+  CT.prototype._onClick = function(e){
+    if(!this._map || e.type !== 'click') return;
+    try {
+      var point = this._map.mouseEventToLayerPoint(e).subtract(this.getOffset());
+      var found = null;
+      var tolerance = 4; // extra px tolerantie voor punt-features
+      for(var id in this._layers){
+        var layer = this._layers[id];
+        if(!layer.options || !layer.options.interactive) continue;
+        // Standaard _containsPoint check
+        if(layer._containsPoint && layer._containsPoint(point)){
+          if(!this._map._draggableMoved(layer)){ found = layer; }
+        }
+        // Fallback: ruimere cirkel-check voor punt-features (CircleMarker)
+        if(!found && layer._point && layer._radius !== undefined){
+          var dist = point.distanceTo(layer._point);
+          if(dist <= layer._radius + tolerance){
+            if(!this._map._draggableMoved(layer)){ found = layer; }
+          }
+        }
+      }
+      if(found){
+        e._bagVtHandled = true;
+        L.DomEvent.fakeStop(e);
+        this._fireEvent([found], e);
+      }
+    } catch(err){
+      // Hit-detectie of event-firing gefaald — fallback DOM-level handler vangt dit op
+    }
+  };
+})();
 </script>
 <style>
 :root{--bg:#0a0f1a;--p:rgba(15,20,35,.85);--p2:rgba(25,32,52,.7);--bd:rgba(55,65,90,.5);--tx:#e2e8f0;--mt:#64748b;--ac:#39ff14;--ac2:#22c55e;--up:#22c55e;--dn:#ef4444;--pu:#39ff14;--ai:#38bdf8;--wn:#fbbf24;--cyan:#06b6d4;--radius:12px;--glass:rgba(20,28,50,.6);--glass-bd:rgba(80,100,140,.15);--shadow:0 8px 32px rgba(0,0,0,.4)}
@@ -878,6 +916,7 @@ var _buurtData = null, _buurtLayer = null;
 var _wijkData = null, _wijkLayer = null;
 var _bagWmsLayer = null;
 var _bagVectorLayer = null;
+var _bagVtClickHandler = null; // map-level click fallback voor VectorGrid
 var _bagVectorData = null; // raw WFS features cache
 var _bagLoading = false;
 var _bagForceReload = false;
@@ -2330,6 +2369,11 @@ function toggleBagLayer(on){
     logEvent('bag_toggle', 'aan (WMS + VT)');
   } else {
     _map.off('zoomend', onBagZoomChange);
+    if(_bagVtClickHandler){
+      var vtPane = _map.getPane('bagVtPane');
+      if(vtPane) vtPane.removeEventListener('click', _bagVtClickHandler, false);
+      _bagVtClickHandler=null;
+    }
     if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null}
     if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
     statusSection.style.display = 'none';
@@ -2373,8 +2417,77 @@ function onBagZoomChange(){
   }
 }
 
+// === BAG VECTOR TILE CLICK HELPERS ===
+// Gemeenschappelijke click-handler voor BAG VT features (aangeroepen door zowel VectorGrid events als fallback)
+function _handleBagVtClick(layer, rawLatlng, originalEvent){
+  if(!layer || !layer.properties) return;
+  var p = layer.properties;
+  var layerName = layer._layerName || '';
+  // Latlng: gebruik mouseEvent als VectorGrid een onjuiste latlng geeft (bijv. 0,0)
+  var latlng = rawLatlng;
+  if((!latlng || (Math.abs(latlng.lat) < 0.01 && Math.abs(latlng.lng) < 0.01)) && originalEvent && _map){
+    latlng = _map.mouseEventToLatLng(originalEvent);
+  }
+  if(!latlng) latlng = _map.getCenter();
+  _infoPinned = true;
+  if(layerName === 'pand'){
+    showPandFeatureInfo(p, latlng);
+  } else {
+    showBagFeatureInfo(p, latlng);
+  }
+}
+
+// Zoek een BAG VT feature op een klikpositie door alle geladen tiles te doorzoeken
+function _findBagVtFeatureAtEvent(mapEvent){
+  if(!_bagVectorLayer || !_map) return null;
+  var latlng = mapEvent.latlng;
+  var layerPoint = mapEvent.layerPoint;
+  if(!layerPoint && mapEvent.containerPoint){
+    layerPoint = _map.containerPointToLayerPoint(mapEvent.containerPoint);
+  }
+  if(!layerPoint) return null;
+  var tolerance = 6; // px extra klik-tolerantie
+  // Itereer alle geladen tiles (VectorGrid slaat renderers op in _vectorTiles)
+  var tiles = _bagVectorLayer._vectorTiles;
+  if(!tiles) return null;
+  var bestDist = Infinity, bestLayer = null;
+  for(var key in tiles){
+    var renderer = tiles[key];
+    if(!renderer || !renderer._layers || !renderer._map) continue;
+    var offset = renderer.getOffset();
+    var tilePoint = layerPoint.subtract(offset);
+    for(var id in renderer._layers){
+      var feat = renderer._layers[id];
+      if(!feat.options || !feat.options.interactive) continue;
+      if(!feat.properties) continue;
+      // Punt-features: cirkel hit-detectie
+      if(feat._point && feat._radius !== undefined){
+        var dist = tilePoint.distanceTo(feat._point);
+        if(dist <= feat._radius + tolerance && dist < bestDist){
+          bestDist = dist;
+          bestLayer = feat;
+        }
+      }
+      // Polygoon/lijn-features: _containsPoint
+      else if(feat._containsPoint && feat._containsPoint(tilePoint)){
+        bestLayer = feat;
+        bestDist = 0;
+      }
+    }
+  }
+  if(bestLayer){
+    return { layer: bestLayer, latlng: latlng };
+  }
+  return null;
+}
+
 // === BAG VECTOR TILE LAYER ===
 function createBagVectorTileLayer(){
+  if(_bagVtClickHandler){
+    var oldPane = _map.getPane('bagVtPane');
+    if(oldPane) oldPane.removeEventListener('click', _bagVtClickHandler, false);
+    _bagVtClickHandler = null;
+  }
   if(_bagVectorLayer){ _map.removeLayer(_bagVectorLayer); _bagVectorLayer = null; }
 
   // Eigen pane zodat BAG VT boven CBS choropleth zit (overlayPane = 400)
@@ -2429,25 +2542,35 @@ function createBagVectorTileLayer(){
     }
   }).addTo(_map);
 
-  // Klik-handler voor feature info
+  // Klik-handler voor feature info (via VectorGrid event-propagatie)
   _bagVectorLayer.on('click', function(e){
     if(!e.layer || !e.layer.properties) return;
-    var p = e.layer.properties;
-    var layerName = e.layer._layerName || e.layerName || '';
-    // Latlng bepalen: VectorGrid geeft soms geen latlng mee bij punt-features
-    var latlng = e.latlng;
-    if(!latlng && e.originalEvent && _map){
-      latlng = _map.mouseEventToLatLng(e.originalEvent);
-    }
-    if(!latlng) latlng = _map.getCenter(); // fallback
-    L.DomEvent.stopPropagation(e);
-    _infoPinned = true;
-    if(layerName === 'pand'){
-      showPandFeatureInfo(p, latlng);
-    } else {
-      showBagFeatureInfo(p, latlng);
-    }
+    // Markeer als afgehandeld zodat de fallback handler niet nogmaals vuurdt
+    if(e.originalEvent) e.originalEvent._bagVtHandled = true;
+    _handleBagVtClick(e.layer, e.latlng, e.originalEvent);
   });
+
+  // Fallback: DOM-level click handler op bagVtPane voor wanneer Canvas.Tile events falen
+  // Dit vangt klikken op de tile-canvassen op en doet handmatige hit-detectie
+  var pane = _map.getPane('bagVtPane');
+  _bagVtClickHandler = function(domEvent){
+    if(!_bagVectorLayer || !_map) return;
+    if(_map.getZoom() < 16) return;
+    // Controleer of de klik al afgehandeld is door Canvas.Tile._onClick + VectorGrid event
+    if(domEvent._bagVtHandled) return;
+    // Converteer DOM event naar map-coordinaten
+    var containerPoint = _map.mouseEventToContainerPoint(domEvent);
+    var layerPoint = _map.containerPointToLayerPoint(containerPoint);
+    var latlng = _map.containerPointToLatLng(containerPoint);
+    var hit = _findBagVtFeatureAtEvent({layerPoint: layerPoint, containerPoint: containerPoint, latlng: latlng});
+    if(hit){
+      domEvent._bagVtHandled = true;
+      // Stop propagatie zodat CBS-canvas click niet ook vuurt
+      domEvent.stopPropagation();
+      _handleBagVtClick(hit.layer, latlng, domEvent);
+    }
+  };
+  pane.addEventListener('click', _bagVtClickHandler, false);
 
   fixLayerOrder();
   toast('BAG Vector Tiles geladen · Zoom in voor meer detail');
