@@ -2432,18 +2432,63 @@ function _handleBagVtClick(layer, rawLatlng, originalEvent){
   if(!layer || !layer.properties) return;
   var p = layer.properties;
   var layerName = layer._layerName || '';
-  // Latlng: gebruik mouseEvent als VectorGrid een onjuiste latlng geeft (bijv. 0,0)
   var latlng = rawLatlng;
   if((!latlng || (Math.abs(latlng.lat) < 0.01 && Math.abs(latlng.lng) < 0.01)) && originalEvent && _map){
     latlng = _map.mouseEventToLatLng(originalEvent);
   }
   if(!latlng) latlng = _map.getCenter();
+  closeBagHoverTooltip();
   _infoPinned = true;
   if(layerName === 'pand'){
     showPandFeatureInfo(p, latlng);
-  } else {
-    showBagFeatureInfo(p, latlng);
+    return;
   }
+  // VT properties zijn beperkt — verrijk met WFS voor volledige adresgegevens
+  showBagFeatureInfo(p, latlng); // direct tonen met wat we hebben
+  enrichBagFeatureViaWfs(p, latlng);
+}
+
+// Verrijk BAG VT feature met volledige adresgegevens via WFS BBOX query
+function enrichBagFeatureViaWfs(vtProps, latlng){
+  var radius = 0.0002; // ~20m rond klikpunt
+  var bbox = (latlng.lat-radius)+','+(latlng.lng-radius)+','+(latlng.lat+radius)+','+(latlng.lng+radius)+',urn:ogc:def:crs:EPSG::4326';
+  var url = PDOK_BAG_WFS+'?service=WFS&version=2.0.0&request=GetFeature'+
+    '&typeName=bag:verblijfsobject&outputFormat=application/json'+
+    '&count=10&srsName=EPSG:4326&BBOX='+bbox;
+  fetch(url).then(function(r){return r.json()}).then(function(d){
+    if(!d.features || !d.features.length) return;
+    // Zoek best matching feature (zelfde identificatie of dichtstbijzijnde)
+    var best = null, bestDist = Infinity;
+    d.features.forEach(function(f){
+      if(!f.properties) return;
+      // Match op identificatie als beschikbaar
+      if(vtProps.identificatie && f.properties.identificatie === vtProps.identificatie){
+        best = f; bestDist = -1; return;
+      }
+      // Anders: dichtstbijzijnde
+      if(f.geometry && f.geometry.coordinates){
+        var dx = f.geometry.coordinates[0] - latlng.lng;
+        var dy = f.geometry.coordinates[1] - latlng.lat;
+        var dist = dx*dx + dy*dy;
+        if(dist < bestDist){ bestDist = dist; best = f; }
+      }
+    });
+    if(!best) return;
+    // Merge WFS properties over VT properties en update panel
+    var merged = {};
+    for(var k in vtProps) merged[k] = vtProps[k];
+    for(var k in best.properties){
+      if(best.properties[k] !== null && best.properties[k] !== undefined){
+        merged[k] = best.properties[k];
+      }
+    }
+    // Update latlng met exacte WFS positie als beschikbaar
+    var exactLatlng = latlng;
+    if(best.geometry && best.geometry.coordinates){
+      exactLatlng = L.latLng(best.geometry.coordinates[1], best.geometry.coordinates[0]);
+    }
+    showBagFeatureInfo(merged, exactLatlng);
+  }).catch(function(){});
 }
 
 // BAG hover tooltip: toon adresgegevens + buurt/gemeente context bij mouseover
