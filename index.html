@@ -3079,6 +3079,13 @@ function createBagVectorTileLayer(){
       domEvent._bagVtHandled = true;
       domEvent.stopPropagation();
       _handleBagVtClick(hit.layer, latlng, domEvent);
+    } else if(_selectedAdressen.length > 0 || _infoPinned){
+      // Klik op lege ruimte: deselecteer alles (net als CBS gemeenten)
+      clearAdresSelection();
+      _infoPinned = false;
+      closeBagHoverTooltip();
+      document.getElementById('infoPanel').classList.remove('show');
+      toast('Selectie gewist');
     }
   };
   mapContainer.addEventListener('click', _bagVtClickHandler, true);
