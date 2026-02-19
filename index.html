@@ -2370,8 +2370,7 @@ function toggleBagLayer(on){
   } else {
     _map.off('zoomend', onBagZoomChange);
     if(_bagVtClickHandler){
-      var vtPane = _map.getPane('bagVtPane');
-      if(vtPane) vtPane.removeEventListener('click', _bagVtClickHandler, false);
+      _map.getContainer().removeEventListener('click', _bagVtClickHandler, true);
       _bagVtClickHandler=null;
     }
     if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null}
@@ -2484,8 +2483,7 @@ function _findBagVtFeatureAtEvent(mapEvent){
 // === BAG VECTOR TILE LAYER ===
 function createBagVectorTileLayer(){
   if(_bagVtClickHandler){
-    var oldPane = _map.getPane('bagVtPane');
-    if(oldPane) oldPane.removeEventListener('click', _bagVtClickHandler, false);
+    _map.getContainer().removeEventListener('click', _bagVtClickHandler, true);
     _bagVtClickHandler = null;
   }
   if(_bagVectorLayer){ _map.removeLayer(_bagVectorLayer); _bagVectorLayer = null; }
@@ -2550,27 +2548,25 @@ function createBagVectorTileLayer(){
     _handleBagVtClick(e.layer, e.latlng, e.originalEvent);
   });
 
-  // Fallback: DOM-level click handler op bagVtPane voor wanneer Canvas.Tile events falen
-  // Dit vangt klikken op de tile-canvassen op en doet handmatige hit-detectie
-  var pane = _map.getPane('bagVtPane');
+  // Fallback: DOM-level click handler op map container (capture phase)
+  // Canvas.Tile bindt geen events op tile-canvassen, dus we vangen clicks hier op
+  // useCapture=true zodat we VOOR de CBS canvas renderer de klik zien
+  var mapContainer = _map.getContainer();
   _bagVtClickHandler = function(domEvent){
     if(!_bagVectorLayer || !_map) return;
     if(_map.getZoom() < 16) return;
-    // Controleer of de klik al afgehandeld is door Canvas.Tile._onClick + VectorGrid event
     if(domEvent._bagVtHandled) return;
-    // Converteer DOM event naar map-coordinaten
     var containerPoint = _map.mouseEventToContainerPoint(domEvent);
     var layerPoint = _map.containerPointToLayerPoint(containerPoint);
     var latlng = _map.containerPointToLatLng(containerPoint);
     var hit = _findBagVtFeatureAtEvent({layerPoint: layerPoint, containerPoint: containerPoint, latlng: latlng});
     if(hit){
       domEvent._bagVtHandled = true;
-      // Stop propagatie zodat CBS-canvas click niet ook vuurt
       domEvent.stopPropagation();
       _handleBagVtClick(hit.layer, latlng, domEvent);
     }
   };
-  pane.addEventListener('click', _bagVtClickHandler, false);
+  mapContainer.addEventListener('click', _bagVtClickHandler, true);
 
   fixLayerOrder();
   toast('BAG Vector Tiles geladen · Zoom in voor meer detail');
