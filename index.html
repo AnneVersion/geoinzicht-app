@@ -683,7 +683,7 @@ select option{background:var(--bg);color:var(--tx)}
 
       <div class="sh"><span class="mi">verified</span> Bron &amp; Versie</div>
       <div class="card">
-        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v7.4</div>
+        <div style="font:700 14px 'Space Mono',monospace;color:var(--ac);display:flex;align-items:center;gap:6px"><span class="mi" style="color:var(--ac)">public</span> GeoInzicht v7.5</div>
         <div style="font-size:11px;color:var(--mt);margin-top:8px;line-height:1.7">
           Buurten + Wijken + BAG Adressen + BAG Panden + Zoeken
           <div style="margin-top:6px">
@@ -937,6 +937,7 @@ var _nationalStats = {}; // Cache: {key: {min, max, avg, median, stddev, count, 
 // MAP
 // ============================================================
 function initMap(){
+  console.log('%c[GeoInzicht v7.5] Pagina geladen', 'color:#39ff14;font-weight:bold');
   _map = L.map('map',{center:[52.1,5.1],zoom:8,zoomControl:false,preferCanvas:true});
   L.control.zoom({position:'bottomright'}).addTo(_map);
   // Zoom level indicator naast zoom controls
@@ -8520,7 +8521,7 @@ function showComparisonReport(){
   html += '<div style="width:20px;height:20px;background:linear-gradient(135deg,#39ff14,#22c55e);border-radius:5px;display:flex;align-items:center;justify-content:center"><span style="font-family:\'Material Symbols Rounded\';font-size:12px;color:#0a0f1a;font-variation-settings:\'FILL\' 1">public</span></div>';
   html += '<span style="font:700 11px \'Space Mono\',monospace;color:#16a34a">GeoInzicht</span> <span style="color:#94a3b8">&middot;</span> <span style="color:#64748b;font-size:10px">Data Consultants</span>';
   html += '</div>';
-  html += 'GeoInzicht v7.4 &middot; Data Consultants &middot; CBS/PDOK '+_activeYear+' &middot; '+new Date().toLocaleDateString('nl-NL');
+  html += 'GeoInzicht v7.5 &middot; Data Consultants &middot; CBS/PDOK '+_activeYear+' &middot; '+new Date().toLocaleDateString('nl-NL');
   html += '<div style="font-size:9px;color:#cbd5e1;margin-top:4px">Dit rapport is automatisch gegenereerd op basis van CBS kerncijfers en BAG data. De AI-interpretatie is indicatief.</div>';
   html += '</div>';
 
