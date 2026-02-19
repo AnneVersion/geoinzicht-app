@@ -2010,7 +2010,7 @@ function showBagFeatureInfo(p, latlng){
   html += '<div style="font:400 9px \'Space Mono\',monospace;color:var(--mt);padding:4px 8px;margin:2px 0 6px;background:rgba(139,94,60,.08);border-radius:6px;border-left:2px solid #8B5E3C;line-height:1.5"><span class="mi mi-sm" style="font-size:11px;vertical-align:-2px;color:#8B5E3C">info</span> Panden (bruin op de kaart) kunnen meerdere verblijfsobjecten (adressen) bevatten.</div>';
 
   // === ADRES IN CONTEXT: oppervlakte/bouwjaar t.o.v. buurt/wijk/gemeente ===
-  html += buildAdresContextHtml(p, latlng);
+  try { html += buildAdresContextHtml(p, latlng); } catch(e){ console.warn('buildAdresContextHtml error:', e); }
 
   // === VERGELIJKING: dit adres vs buurt ===
   html += buildBagCompareHtml(p, latlng);
@@ -2651,10 +2651,14 @@ function selectBagAdres(p, latlng){
   // Update kleuren
   _selectedAdressen.forEach(function(a, i){ if(a.marker) a.marker.setStyle({color: colors[i]}); });
   // Toon info
-  if(_selectedAdressen.length === 2){
-    showAdresVergelijking();
-  } else {
-    showBagFeatureInfo(p, latlng);
+  try {
+    if(_selectedAdressen.length === 2){
+      showAdresVergelijking();
+    } else {
+      showBagFeatureInfo(p, latlng);
+    }
+  } catch(e){
+    console.error('[selectBagAdres] Fout bij tonen info:', e);
   }
   var straat = p.openbare_ruimte_naam || p.openbare_ruimte || '';
   var hnr = (p.huisnummer||'') + (p.huisletter||'');
@@ -3122,16 +3126,24 @@ function createBagVectorTileLayer(){
   var mapContainer = _map.getContainer();
   _bagVtClickHandler = function(domEvent){
     if(!_bagVectorLayer || !_map) return;
-    if(_map.getZoom() < 16) return;
+    if(_map.getZoom() < 16){ console.log('[BAG klik] zoom < 16, genegeerd'); return; }
     if(domEvent._bagVtHandled) return;
     var containerPoint = _map.mouseEventToContainerPoint(domEvent);
     var layerPoint = _map.containerPointToLayerPoint(containerPoint);
     var latlng = _map.containerPointToLatLng(containerPoint);
+    console.log('[BAG klik] DOM capture handler, latlng:', latlng.lat.toFixed(5), latlng.lng.toFixed(5));
     var hit = _findBagVtFeatureAtEvent({layerPoint: layerPoint, containerPoint: containerPoint, latlng: latlng});
     if(hit){
+      console.log('[BAG klik] HIT gevonden:', hit.layer.properties ? (hit.layer.properties.openbare_ruimte_naam||hit.layer.properties.openbare_ruimte||'?') : 'geen props');
       domEvent._bagVtHandled = true;
       domEvent.stopPropagation();
-      _handleBagVtClick(hit.layer, latlng, domEvent);
+      try {
+        _handleBagVtClick(hit.layer, latlng, domEvent);
+      } catch(e){
+        console.error('[BAG klik] Error in _handleBagVtClick:', e);
+      }
+    } else {
+      console.log('[BAG klik] Geen hit gevonden bij deze positie');
     }
   };
   mapContainer.addEventListener('click', _bagVtClickHandler, true);
