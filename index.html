@@ -2009,6 +2009,9 @@ function showBagFeatureInfo(p, latlng){
   // Pand uitleg
   html += '<div style="font:400 9px \'Space Mono\',monospace;color:var(--mt);padding:4px 8px;margin:2px 0 6px;background:rgba(139,94,60,.08);border-radius:6px;border-left:2px solid #8B5E3C;line-height:1.5"><span class="mi mi-sm" style="font-size:11px;vertical-align:-2px;color:#8B5E3C">info</span> Panden (bruin op de kaart) kunnen meerdere verblijfsobjecten (adressen) bevatten.</div>';
 
+  // === ADRES IN CONTEXT: oppervlakte/bouwjaar t.o.v. buurt/wijk/gemeente ===
+  html += buildAdresContextHtml(p, latlng);
+
   // === VERGELIJKING: dit adres vs buurt ===
   html += buildBagCompareHtml(p, latlng);
 
@@ -2222,6 +2225,169 @@ function buildBagCompareHtml(p, latlng){
   html += '</div>';
   return html;
   // Einde uitgeschakelde code */
+}
+
+// Adres in context: oppervlakte/bouwjaar t.o.v. buurt, wijk, gemeente — visueel met bar charts
+function buildAdresContextHtml(p, latlng){
+  var html = '';
+  if(!latlng) return html;
+
+  // Zoek buurt, wijk, gemeente features
+  var buurtF = null, wijkF = null, gemF = null;
+  if(_buurtLayer) buurtF = findFeatureAtPoint(_buurtLayer, latlng);
+  if(!buurtF && _buurtData) buurtF = findFeatureInData(_buurtData, latlng);
+  if(_wijkLayer) wijkF = findFeatureAtPoint(_wijkLayer, latlng);
+  if(!wijkF && _wijkData) wijkF = findFeatureInData(_wijkData, latlng);
+  if(_gemeenteLayer) gemF = findFeatureAtPoint(_gemeenteLayer, latlng);
+  if(!gemF && _gemeenteData) gemF = findFeatureInData(_gemeenteData, latlng);
+
+  if(!buurtF && !wijkF && !gemF) return html;
+
+  html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
+  html += '<div style="font:700 12px \'Space Mono\',monospace;color:var(--ac);margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">analytics</span> Dit adres in context</div>';
+
+  // Helper: bouw horizontale bar chart SVG voor vergelijking
+  function miniBarChart(items, unit){
+    if(!items.length) return '';
+    var maxVal = 0;
+    items.forEach(function(it){ if(it.value > maxVal) maxVal = it.value; });
+    if(maxVal <= 0) return '';
+    var barH = 20, gap = 4, w = 340, labelW = 90;
+    var svgH = items.length * (barH + gap) + 4;
+    var s = '<svg width="100%" viewBox="0 0 '+w+' '+svgH+'" style="display:block;margin:4px 0;max-width:'+w+'px">';
+    items.forEach(function(d, i){
+      var y = i * (barH + gap);
+      var barW = maxVal > 0 ? Math.max(2, (d.value / maxVal) * (w - labelW - 65)) : 0;
+      s += '<text x="0" y="'+(y+14)+'" font-family="DM Sans,sans-serif" font-size="9" fill="'+(d.highlight?d.color:'#94a3b8')+'">'+d.label+'</text>';
+      s += '<rect x="'+labelW+'" y="'+y+'" width="'+barW+'" height="'+barH+'" rx="4" fill="'+d.color+'" opacity="'+(d.highlight?'0.9':'0.4')+'"/>';
+      var valText = typeof d.value === 'number' ? d.value.toLocaleString('nl-NL') : d.value;
+      if(unit) valText += ' '+unit;
+      s += '<text x="'+(labelW + barW + 4)+'" y="'+(y+14)+'" font-family="Space Mono,monospace" font-size="9" font-weight="'+(d.highlight?'700':'400')+'" fill="'+d.color+'">'+valText+'</text>';
+    });
+    s += '</svg>';
+    return s;
+  }
+
+  // === Oppervlakte vergelijking ===
+  var opp = p.oppervlakte ? Number(p.oppervlakte) : 0;
+  if(opp > 0){
+    var oppItems = [{label:'Dit adres', value:opp, color:'#39ff14', highlight:true}];
+    if(buurtF && buurtF.properties){
+      // Gemiddelde oppervlakte buurt — niet direct in CBS, maar we kunnen woningvoorraad/oppervlakte schatten
+      // Gebruik WOZ als proxy of toon "geen data" als niet beschikbaar
+      var bn = buurtF.properties.buurtnaam || 'Buurt';
+      if(buurtF.properties.gem_oppervlakte && buurtF.properties.gem_oppervlakte > 0){
+        oppItems.push({label:bn, value:Math.round(buurtF.properties.gem_oppervlakte), color:'#38bdf8', highlight:false});
+      }
+    }
+    if(wijkF && wijkF.properties){
+      var wn = wijkF.properties.wijknaam || 'Wijk';
+      if(wijkF.properties.gem_oppervlakte && wijkF.properties.gem_oppervlakte > 0){
+        oppItems.push({label:wn, value:Math.round(wijkF.properties.gem_oppervlakte), color:'#fbbf24', highlight:false});
+      }
+    }
+    if(gemF && gemF.properties){
+      var gn = gemF.properties.gemeentenaam || 'Gemeente';
+      if(gemF.properties.gem_oppervlakte && gemF.properties.gem_oppervlakte > 0){
+        oppItems.push({label:gn, value:Math.round(gemF.properties.gem_oppervlakte), color:'#a78bfa', highlight:false});
+      }
+    }
+    // Altijd oppervlakte tonen, zelfs als geen vergelijkingsdata
+    html += '<div style="margin-bottom:8px;padding:8px 10px;background:rgba(15,20,35,.4);border-radius:8px">';
+    html += '<div style="font:600 11px DM Sans,sans-serif;color:var(--tx);margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:14px;color:var(--ai)">straighten</span> Oppervlakte</div>';
+    if(oppItems.length > 1){
+      html += miniBarChart(oppItems, 'm²');
+      // Verschil berekening t.o.v. eerste vergelijkingsniveau
+      var refVal = oppItems[1].value;
+      var diff = opp - refVal;
+      var pctDiff = refVal > 0 ? ((diff/refVal)*100) : 0;
+      var diffColor = diff >= 0 ? '#39ff14' : '#ef4444';
+      var diffSign = diff >= 0 ? '+' : '';
+      html += '<div style="font:400 10px Space Mono,monospace;color:'+diffColor+';margin-top:2px">'+diffSign+diff.toLocaleString('nl-NL')+' m² ('+diffSign+pctDiff.toFixed(0)+'%) t.o.v. '+oppItems[1].label+'</div>';
+    } else {
+      html += '<div style="font:700 14px Space Mono,monospace;color:#39ff14">'+opp.toLocaleString('nl-NL')+' m²</div>';
+    }
+    html += '</div>';
+  }
+
+  // === Bouwjaar vergelijking ===
+  var bouwjaar = p.bouwjaar ? Number(p.bouwjaar) : 0;
+  if(bouwjaar > 1000){
+    var bjItems = [{label:'Dit adres', value:bouwjaar, color:'#39ff14', highlight:true}];
+    if(buurtF && buurtF.properties && buurtF.properties.gem_bouwjaar && buurtF.properties.gem_bouwjaar > 1000){
+      bjItems.push({label:buurtF.properties.buurtnaam||'Buurt', value:Math.round(buurtF.properties.gem_bouwjaar), color:'#38bdf8', highlight:false});
+    }
+    if(wijkF && wijkF.properties && wijkF.properties.gem_bouwjaar && wijkF.properties.gem_bouwjaar > 1000){
+      bjItems.push({label:wijkF.properties.wijknaam||'Wijk', value:Math.round(wijkF.properties.gem_bouwjaar), color:'#fbbf24', highlight:false});
+    }
+    if(gemF && gemF.properties && gemF.properties.gem_bouwjaar && gemF.properties.gem_bouwjaar > 1000){
+      bjItems.push({label:gemF.properties.gemeentenaam||'Gemeente', value:Math.round(gemF.properties.gem_bouwjaar), color:'#a78bfa', highlight:false});
+    }
+    html += '<div style="margin-bottom:8px;padding:8px 10px;background:rgba(15,20,35,.4);border-radius:8px">';
+    html += '<div style="font:600 11px DM Sans,sans-serif;color:var(--tx);margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:14px;color:var(--ai)">calendar_month</span> Bouwjaar</div>';
+    if(bjItems.length > 1){
+      html += miniBarChart(bjItems, '');
+      var refBj = bjItems[1].value;
+      var diffBj = bouwjaar - refBj;
+      var bjColor = diffBj >= 0 ? '#39ff14' : '#ef4444';
+      var bjSign = diffBj >= 0 ? '+' : '';
+      var bjLabel = diffBj > 0 ? 'nieuwer' : (diffBj < 0 ? 'ouder' : 'gelijk');
+      html += '<div style="font:400 10px Space Mono,monospace;color:'+bjColor+';margin-top:2px">'+bjSign+diffBj+' jaar ('+bjLabel+') t.o.v. '+bjItems[1].label+'</div>';
+    } else {
+      html += '<div style="font:700 14px Space Mono,monospace;color:#39ff14">'+bouwjaar+'</div>';
+    }
+    html += '</div>';
+  }
+
+  // === WOZ-waarde context (uit buurt/gemeente CBS data) ===
+  var levels = [
+    {f:buurtF, name:'Buurt', nameField:'buurtnaam', color:'#38bdf8', icon:'grid_on'},
+    {f:wijkF, name:'Wijk', nameField:'wijknaam', color:'#fbbf24', icon:'grid_view'},
+    {f:gemF, name:'Gemeente', nameField:'gemeentenaam', color:'#a78bfa', icon:'domain'}
+  ];
+  // Kerncijfers per niveau — compact overzicht
+  var hasAnyData = false;
+  var compactRows = [];
+  var keyMetrics = ['gem_woz_waarde','gem_inkomen_inwoner','bevolkingsdichtheid','koopwoningen','65plus'];
+  keyMetrics.forEach(function(key){
+    var fm = getIndicator(key);
+    var vals = [];
+    levels.forEach(function(lv){
+      if(lv.f && lv.f.properties && lv.f.properties[key] !== undefined && lv.f.properties[key] !== null && lv.f.properties[key] >= 0){
+        vals.push({name:lv.f.properties[lv.nameField]||lv.name, value:lv.f.properties[key], color:lv.color, level:lv.name});
+        hasAnyData = true;
+      }
+    });
+    if(vals.length > 0) compactRows.push({key:key, fm:fm, vals:vals});
+  });
+
+  if(hasAnyData){
+    html += '<div style="margin-bottom:8px;padding:8px 10px;background:rgba(15,20,35,.4);border-radius:8px">';
+    html += '<div style="font:600 11px DM Sans,sans-serif;color:var(--tx);margin-bottom:6px;display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:14px;color:var(--ai)">insights</span> Omgevingsstatistieken</div>';
+    compactRows.forEach(function(row){
+      html += '<div style="margin-bottom:6px">';
+      html += '<div style="font:500 10px DM Sans,sans-serif;color:var(--mt);margin-bottom:2px;display:flex;align-items:center;gap:3px"><span class="mi" style="font-size:12px">'+row.fm.icon+'</span> '+row.fm.naam+' <span style="opacity:.5">('+row.fm.eenheid+')</span></div>';
+      html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+      row.vals.forEach(function(v){
+        // Z-score berekenen als national stats beschikbaar
+        var ns = _nationalStats[row.key];
+        var zColor = 'var(--mt)';
+        if(ns && ns.stddev > 0){
+          var z = (v.value - ns.avg) / ns.stddev;
+          zColor = getBarColor(z);
+        }
+        html += '<div style="flex:1;min-width:80px;padding:4px 6px;background:rgba(255,255,255,.03);border-radius:4px;border-left:2px solid '+v.color+'">';
+        html += '<div style="font:400 8px DM Sans,sans-serif;color:'+v.color+'">'+v.level+'</div>';
+        html += '<div style="font:700 11px Space Mono,monospace;color:'+zColor+'">'+formatVal(v.value)+'</div>';
+        html += '</div>';
+      });
+      html += '</div></div>';
+    });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 // Uitgebreide statistiekkaart
@@ -2543,9 +2709,10 @@ function clearAdresSelection(){
   _selectedAdressen = [];
 }
 
-// Side-by-side vergelijking van 2 geselecteerde adressen
+// Side-by-side vergelijking van 2 geselecteerde adressen — met CBS statistieken en grafieken
 function showAdresVergelijking(){
   if(_selectedAdressen.length < 2) return;
+  if(!_nationalStats || Object.keys(_nationalStats).length === 0) computeNationalStats();
   var a = _selectedAdressen[0].props, b = _selectedAdressen[1].props;
   var aLatlng = _selectedAdressen[0].latlng, bLatlng = _selectedAdressen[1].latlng;
   var aStraat = a.openbare_ruimte_naam || a.openbare_ruimte || '';
@@ -2557,7 +2724,8 @@ function showAdresVergelijking(){
 
   document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">compare_arrows</span> Adresvergelijking';
   var html = '';
-  // Headers
+
+  // === HEADERS: twee adresblokken ===
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
   html += '<div style="padding:8px 10px;background:rgba(57,255,20,.08);border-radius:8px;border-left:3px solid #39ff14">';
   html += '<div style="font:700 11px Space Mono,monospace;color:#39ff14;margin-bottom:2px">A</div>';
@@ -2570,7 +2738,8 @@ function showAdresVergelijking(){
   if(b.postcode) html += '<div style="font:400 9px Space Mono,monospace;color:var(--mt)">'+b.postcode+' '+(b.woonplaats_naam||b.woonplaats||'')+'</div>';
   html += '</div></div>';
 
-  // Vergelijkingsrijen
+  // === DIRECTE VERGELIJKING: adreseigen kenmerken ===
+  html += '<div style="font:700 11px Space Mono,monospace;color:var(--ai);margin:8px 0 6px;display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:14px">home</span> Adreskenmerken</div>';
   var rows = [
     {label:'Oppervlakte', icon:'straighten', a:a.oppervlakte, b:b.oppervlakte, unit:'m²'},
     {label:'Bouwjaar', icon:'calendar_month', a:a.bouwjaar, b:b.bouwjaar, unit:''},
@@ -2602,24 +2771,148 @@ function showAdresVergelijking(){
   });
   html += '</div>';
 
-  // Buurt/gemeente context
-  var aBuurt = findFeatureAtPoint(_buurtLayer, aLatlng);
-  var bBuurt = findFeatureAtPoint(_buurtLayer, bLatlng);
-  var aGem = findFeatureAtPoint(_gemeenteLayer, aLatlng);
-  var bGem = findFeatureAtPoint(_gemeenteLayer, bLatlng);
+  // === BUURT/WIJK/GEMEENTE CONTEXT ===
+  // Zoek features voor beide adressen op alle niveaus
+  var aBuurt = null, bBuurt = null, aWijk = null, bWijk = null, aGem = null, bGem = null;
+  if(_buurtLayer){ aBuurt = findFeatureAtPoint(_buurtLayer, aLatlng); bBuurt = findFeatureAtPoint(_buurtLayer, bLatlng); }
+  if(!aBuurt && _buurtData) aBuurt = findFeatureInData(_buurtData, aLatlng);
+  if(!bBuurt && _buurtData) bBuurt = findFeatureInData(_buurtData, bLatlng);
+  if(_wijkLayer){ aWijk = findFeatureAtPoint(_wijkLayer, aLatlng); bWijk = findFeatureAtPoint(_wijkLayer, bLatlng); }
+  if(!aWijk && _wijkData) aWijk = findFeatureInData(_wijkData, aLatlng);
+  if(!bWijk && _wijkData) bWijk = findFeatureInData(_wijkData, bLatlng);
+  if(_gemeenteLayer){ aGem = findFeatureAtPoint(_gemeenteLayer, aLatlng); bGem = findFeatureAtPoint(_gemeenteLayer, bLatlng); }
+  if(!aGem && _gemeenteData) aGem = findFeatureInData(_gemeenteData, aLatlng);
+  if(!bGem && _gemeenteData) bGem = findFeatureInData(_gemeenteData, bLatlng);
+
+  // Locatie-info
   if(aBuurt || bBuurt || aGem || bGem){
-    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd);font-size:9px;color:var(--mt)">';
+    html += '<div style="margin-top:10px;padding:8px 10px;background:rgba(15,20,35,.4);border-radius:8px;font-size:10px;color:var(--mt)">';
+    html += '<div style="font:600 10px DM Sans,sans-serif;color:var(--tx);margin-bottom:4px"><span class="mi" style="font-size:12px">place</span> Locatie</div>';
     if(aBuurt && bBuurt){
       var same = aBuurt.properties.buurtnaam === bBuurt.properties.buurtnaam;
-      html += '<span class="mi" style="font-size:10px">grid_on</span> Buurt: ';
+      html += '<div style="margin-bottom:2px"><span class="mi" style="font-size:10px">grid_on</span> Buurt: ';
       html += same ? aBuurt.properties.buurtnaam : '<span style="color:#39ff14">'+aBuurt.properties.buurtnaam+'</span> vs <span style="color:#38bdf8">'+bBuurt.properties.buurtnaam+'</span>';
-      html += '<br>';
+      html += '</div>';
+    }
+    if(aWijk && bWijk){
+      var same = aWijk.properties.wijknaam === bWijk.properties.wijknaam;
+      html += '<div style="margin-bottom:2px"><span class="mi" style="font-size:10px">grid_view</span> Wijk: ';
+      html += same ? aWijk.properties.wijknaam : '<span style="color:#39ff14">'+aWijk.properties.wijknaam+'</span> vs <span style="color:#38bdf8">'+bWijk.properties.wijknaam+'</span>';
+      html += '</div>';
     }
     if(aGem && bGem){
       var same = aGem.properties.gemeentenaam === bGem.properties.gemeentenaam;
-      html += '<span class="mi" style="font-size:10px">domain</span> Gemeente: ';
+      html += '<div><span class="mi" style="font-size:10px">domain</span> Gemeente: ';
       html += same ? aGem.properties.gemeentenaam : '<span style="color:#39ff14">'+aGem.properties.gemeentenaam+'</span> vs <span style="color:#38bdf8">'+bGem.properties.gemeentenaam+'</span>';
+      html += '</div>';
     }
+    html += '</div>';
+  }
+
+  // === CBS STATISTIEKEN VERGELIJKING ===
+  // Vergelijk buurt-statistieken van beide adressen met bell curves
+  var cbsLevels = [
+    {aF:aBuurt, bF:bBuurt, name:'Buurt', icon:'grid_on', color:'var(--ac)', aNameField:'buurtnaam', bNameField:'buurtnaam'},
+    {aF:aWijk, bF:bWijk, name:'Wijk', icon:'grid_view', color:'var(--wn)', aNameField:'wijknaam', bNameField:'wijknaam'},
+    {aF:aGem, bF:bGem, name:'Gemeente', icon:'domain', color:'var(--cyan)', aNameField:'gemeentenaam', bNameField:'gemeentenaam'}
+  ];
+  var scoreA = 0, scoreB = 0, totalCompared = 0;
+
+  cbsLevels.forEach(function(lv){
+    if(!lv.aF || !lv.bF) return;
+    var ap = lv.aF.properties, bp = lv.bF.properties;
+    var aName = ap[lv.aNameField] || lv.name+' A';
+    var bName = bp[lv.bNameField] || lv.name+' B';
+    var sameName = aName === bName;
+
+    html += '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--glass-bd)">';
+    html += '<div style="font:700 11px Space Mono,monospace;color:'+lv.color+';margin-bottom:8px;display:flex;align-items:center;gap:4px">';
+    html += '<span class="mi" style="font-size:14px;color:'+lv.color+'">'+lv.icon+'</span> '+lv.name+': ';
+    html += sameName ? aName : '<span style="color:#39ff14">'+aName+'</span> vs <span style="color:#38bdf8">'+bName+'</span>';
+    html += '</div>';
+
+    _activeIndicators.forEach(function(key){
+      var aVal = ap[key], bVal = bp[key];
+      if(aVal === undefined || aVal === null || bVal === undefined || bVal === null) return;
+      var ns = _nationalStats[key];
+      if(!ns || !ns.stddev || ns.stddev <= 0) return;
+      var fm = getIndicator(key);
+      var zA = (aVal - ns.avg) / ns.stddev;
+      var zB = (bVal - ns.avg) / ns.stddev;
+      var isReverse = REVERSE_KEYS.indexOf(key) >= 0;
+
+      // Score berekening: wie scoort "beter"?
+      if(isReverse){
+        if(aVal < bVal) scoreA++; else if(bVal < aVal) scoreB++;
+      } else {
+        if(aVal > bVal) scoreA++; else if(bVal > aVal) scoreB++;
+      }
+      totalCompared++;
+
+      // Kaart met dual bell curve
+      html += '<div style="margin-bottom:10px;padding:8px 10px;background:rgba(15,20,35,.4);border-radius:8px;border-left:3px solid '+getBarColor((zA+zB)/2)+'">';
+      // Header: indicator naam
+      html += '<div style="font:600 11px DM Sans,sans-serif;color:var(--tx);margin-bottom:4px;display:flex;align-items:center;gap:4px">';
+      html += '<span class="mi" style="font-size:14px;color:var(--ai)">'+fm.icon+'</span> '+fm.naam;
+      html += '</div>';
+      // Waarden A vs B
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:4px">';
+      html += '<div style="padding:3px 6px;background:rgba(57,255,20,.06);border-radius:4px">';
+      html += '<span style="font:700 13px Space Mono,monospace;color:#39ff14">'+formatVal(aVal)+'</span>';
+      html += '<span style="font:400 9px Space Mono,monospace;color:var(--mt)"> '+fm.eenheid+'</span>';
+      html += '<div style="font:400 9px DM Sans,sans-serif;color:var(--mt)">z='+zA.toFixed(1)+'</div>';
+      html += '</div>';
+      html += '<div style="padding:3px 6px;background:rgba(56,189,248,.06);border-radius:4px">';
+      html += '<span style="font:700 13px Space Mono,monospace;color:#38bdf8">'+formatVal(bVal)+'</span>';
+      html += '<span style="font:400 9px Space Mono,monospace;color:var(--mt)"> '+fm.eenheid+'</span>';
+      html += '<div style="font:400 9px DM Sans,sans-serif;color:var(--mt)">z='+zB.toFixed(1)+'</div>';
+      html += '</div></div>';
+      // Verschil
+      var diff = aVal - bVal;
+      var pctDiff = bVal !== 0 ? ((diff / Math.abs(bVal)) * 100) : 0;
+      var diffColor = diff > 0 ? (isReverse ? '#ef4444' : '#39ff14') : (diff < 0 ? (isReverse ? '#39ff14' : '#38bdf8') : 'var(--mt)');
+      var diffSign = diff >= 0 ? '+' : '';
+      html += '<div style="font:400 9px Space Mono,monospace;color:'+diffColor+';margin-bottom:4px">\u0394 '+diffSign+formatVal(diff)+' '+fm.eenheid+' ('+diffSign+pctDiff.toFixed(0)+'%)</div>';
+      // Dual bell curve
+      html += buildDualDistSvg(zA, zB, ns.distType);
+      // Interpretatie per adres
+      html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:3px;font-size:9px">';
+      html += '<div style="color:#39ff14">A: '+interpretZScore(zA, key, fm).replace(/<[^>]+>/g,'')+'</div>';
+      html += '<div style="color:#38bdf8">B: '+interpretZScore(zB, key, fm).replace(/<[^>]+>/g,'')+'</div>';
+      html += '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  // === SAMENVATTENDE ANALYSE ===
+  if(totalCompared > 0){
+    html += '<div style="margin-top:12px;padding:10px 12px;background:rgba(57,255,20,.04);border-radius:10px;border:1px solid rgba(57,255,20,.1)">';
+    html += '<div style="font:700 12px Space Mono,monospace;color:var(--ac);margin-bottom:8px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px">emoji_events</span> Samenvatting</div>';
+    // Score
+    html += '<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-bottom:8px">';
+    html += '<div style="text-align:center"><div style="font:700 24px Space Mono,monospace;color:#39ff14">'+scoreA+'</div><div style="font:400 9px DM Sans,sans-serif;color:var(--mt)">Adres A</div></div>';
+    html += '<div style="font:700 14px Space Mono,monospace;color:var(--mt)">vs</div>';
+    html += '<div style="text-align:center"><div style="font:700 24px Space Mono,monospace;color:#38bdf8">'+scoreB+'</div><div style="font:400 9px DM Sans,sans-serif;color:var(--mt)">Adres B</div></div>';
+    html += '</div>';
+    // Balk
+    var total = scoreA + scoreB || 1;
+    var pctA = (scoreA / total * 100).toFixed(0);
+    html += '<div style="height:6px;border-radius:3px;background:rgba(56,189,248,.3);overflow:hidden">';
+    html += '<div style="width:'+pctA+'%;height:100%;background:#39ff14;border-radius:3px"></div>';
+    html += '</div>';
+    // Uitleg
+    var winner = scoreA > scoreB ? 'A' : (scoreB > scoreA ? 'B' : null);
+    var winnerColor = winner === 'A' ? '#39ff14' : '#38bdf8';
+    html += '<div style="font:400 10px DM Sans,sans-serif;color:var(--mt);margin-top:6px;line-height:1.6">';
+    if(winner){
+      html += '<span class="mi mi-sm" style="font-size:12px;color:'+winnerColor+'">lightbulb</span> ';
+      html += 'Adres <span style="font-weight:700;color:'+winnerColor+'">'+winner+'</span> scoort op <strong>'+Math.max(scoreA,scoreB)+'</strong> van '+totalCompared+' indicatoren beter dan adres '+(winner==='A'?'B':'A')+'. ';
+      html += 'Dit betekent dat de omgeving van adres '+winner+' op meer punten bovengemiddeld scoort.';
+    } else {
+      html += '<span class="mi mi-sm" style="font-size:12px;color:var(--ai)">balance</span> Beide adressen scoren gelijk op de vergeleken indicatoren.';
+    }
+    html += '</div>';
     html += '</div>';
   }
 
@@ -2643,16 +2936,38 @@ function showBagHoverTooltip(layer, latlng){
   var woonplaats = p.woonplaats_naam || p.woonplaats || '';
   var html = '<div style="font:700 11px DM Sans,sans-serif;color:#39ff14;margin-bottom:3px">' + ((straat+' '+hnr).trim() || 'BAG Object') + '</div>';
   if(p.postcode || woonplaats) html += '<div style="font:400 9px Space Mono,monospace;color:#94a3b8">'+(p.postcode||'')+' '+woonplaats+'</div>';
-  // Adresgegevens
+  // Buurt lookup voor context-vergelijking
+  var buurt = findFeatureAtPoint(_buurtLayer, latlng);
+  var gemeente = findFeatureAtPoint(_gemeenteLayer, latlng);
+  var bp = buurt ? buurt.properties : null;
+
+  // Adresgegevens met kleur-indicators t.o.v. buurt
   var rows = [];
-  if(p.oppervlakte) rows.push('<span class="mi" style="font-size:11px;vertical-align:-2px">straighten</span> '+p.oppervlakte+' m²');
-  if(p.bouwjaar) rows.push('<span class="mi" style="font-size:11px;vertical-align:-2px">calendar_month</span> '+p.bouwjaar);
+  if(p.oppervlakte){
+    var oppStr = '<span class="mi" style="font-size:11px;vertical-align:-2px">straighten</span> '+p.oppervlakte+' m²';
+    // Vergelijk met buurt gem_oppervlakte indien beschikbaar
+    if(bp && bp.gem_oppervlakte && bp.gem_oppervlakte > 0){
+      var oppDiff = Number(p.oppervlakte) - bp.gem_oppervlakte;
+      var oppColor = oppDiff >= 0 ? '#39ff14' : '#ef4444';
+      var oppArrow = oppDiff >= 0 ? '↑' : '↓';
+      oppStr += ' <span style="color:'+oppColor+';font-weight:700">'+oppArrow+'</span>';
+    }
+    rows.push(oppStr);
+  }
+  if(p.bouwjaar){
+    var bjStr = '<span class="mi" style="font-size:11px;vertical-align:-2px">calendar_month</span> '+p.bouwjaar;
+    if(bp && bp.gem_bouwjaar && bp.gem_bouwjaar > 1000){
+      var bjDiff = Number(p.bouwjaar) - bp.gem_bouwjaar;
+      var bjColor = bjDiff >= 0 ? '#39ff14' : '#fbbf24';
+      var bjArrow = bjDiff >= 0 ? '↑ nieuwer' : '↓ ouder';
+      bjStr += ' <span style="color:'+bjColor+';font-size:9px">'+bjArrow+'</span>';
+    }
+    rows.push(bjStr);
+  }
   if(p.gebruiksdoel) rows.push('<span class="mi" style="font-size:11px;vertical-align:-2px">category</span> '+p.gebruiksdoel);
   if(p.status) rows.push('<span class="mi" style="font-size:11px;vertical-align:-2px">info</span> <span style="color:'+bagStatusToColor(p.status)+'">'+p.status+'</span>');
   if(rows.length) html += '<div style="font-size:10px;color:#cbd5e1;margin-top:4px;line-height:1.7">'+rows.join('<br>')+'</div>';
   // Buurt/gemeente context
-  var buurt = findFeatureAtPoint(_buurtLayer, latlng);
-  var gemeente = findFeatureAtPoint(_gemeenteLayer, latlng);
   if(buurt || gemeente){
     html += '<div style="border-top:1px solid rgba(255,255,255,.1);margin-top:5px;padding-top:4px;font-size:9px;color:#64748b">';
     if(buurt) html += '<span class="mi" style="font-size:10px;vertical-align:-1px">grid_on</span> '+buurt.properties.buurtnaam+'<br>';
@@ -2661,7 +2976,7 @@ function showBagHoverTooltip(layer, latlng){
     var gp = gemeente ? gemeente.properties : (buurt ? buurt.properties : null);
     if(gp){
       var extra = [];
-      if(gp.gem_woz_waarde && gp.gem_woz_waarde > 0) extra.push('WOZ €'+Math.round(gp.gem_woz_waarde/1000)+'k');
+      if(gp.gem_woz_waarde && gp.gem_woz_waarde > 0) extra.push('WOZ €'+Math.round(gp.gem_woz_waarde*1000).toLocaleString('nl-NL'));
       if(gp.aantal_inwoners && gp.aantal_inwoners > 0) extra.push(gp.aantal_inwoners.toLocaleString('nl-NL')+' inw.');
       if(extra.length) html += ' · '+extra.join(' · ');
     }
@@ -4290,6 +4605,57 @@ function buildDistSvg(zScore, distType){
   // Waarde marker
   svg += '<line x1="'+mx+'" y1="2" x2="'+mx+'" y2="'+(h-2)+'" stroke="#39ff14" stroke-width="2"/>';
   svg += '<circle cx="'+mx+'" cy="6" r="3" fill="#39ff14"/>';
+  // Sigma labels
+  svg += '<text x="'+pad+'" y="'+(h-1)+'" font-size="8" fill="rgba(226,232,240,0.5)" font-family="Space Mono,monospace">-3\u03c3</text>';
+  svg += '<text x="'+(w-pad-18)+'" y="'+(h-1)+'" font-size="8" fill="rgba(226,232,240,0.5)" font-family="Space Mono,monospace">+3\u03c3</text>';
+  svg += '</svg>';
+  return svg;
+}
+
+// Genereer SVG normaalverdeling curve met TWEE positie-markers (voor adres-vergelijking)
+function buildDualDistSvg(z1, z2, distType){
+  var w=220,h=56,pad=5;
+  var pts=[];
+  var skew = distType==='rechts scheef'?0.6:(distType==='links scheef'?-0.6:0);
+  for(var i=0;i<=40;i++){
+    var x = -3.5 + i*7/40;
+    var xs = x - skew;
+    var y = Math.exp(-0.5*xs*xs)/2.5066;
+    pts.push({x:pad+(i/40)*(w-2*pad), y:h-pad-y*(h-2*pad)*2.8});
+  }
+  var path = 'M'+pts[0].x+','+((h-pad))+' ';
+  pts.forEach(function(p){path+='L'+p.x+','+p.y+' '});
+  path += 'L'+pts[pts.length-1].x+','+(h-pad)+' Z';
+  // Gradient ID uniek
+  var gid = 'gd'+Math.abs(Math.round(z1*100))+'_'+Math.abs(Math.round(z2*100));
+  var svg = '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="display:block;margin:2px 0">';
+  svg += '<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="1" y2="0">';
+  svg += '<stop offset="0%" stop-color="#ef4444" stop-opacity="0.3"/>';
+  svg += '<stop offset="15%" stop-color="#fbbf24" stop-opacity="0.3"/>';
+  svg += '<stop offset="35%" stop-color="#38bdf8" stop-opacity="0.3"/>';
+  svg += '<stop offset="65%" stop-color="#38bdf8" stop-opacity="0.3"/>';
+  svg += '<stop offset="85%" stop-color="#fbbf24" stop-opacity="0.3"/>';
+  svg += '<stop offset="100%" stop-color="#ef4444" stop-opacity="0.3"/>';
+  svg += '</linearGradient></defs>';
+  svg += '<path d="'+path+'" fill="url(#'+gid+')" stroke="rgba(226,232,240,0.3)" stroke-width="1"/>';
+  // Sigma lijnen
+  [-2,-1,0,1,2].forEach(function(s){
+    var sx=pad+((s+3.5)/7)*(w-2*pad);
+    var op=s===0?0.5:0.15;
+    svg+='<line x1="'+sx+'" y1="'+(pad)+'" x2="'+sx+'" y2="'+(h-pad)+'" stroke="rgba(226,232,240,'+op+')" stroke-width="'+(s===0?1.5:0.5)+'" stroke-dasharray="'+(s===0?'':'2,2')+'"/>';
+  });
+  // Marker A (groen)
+  var z1c = Math.max(-3.5,Math.min(3.5,z1));
+  var mx1 = pad+((z1c+3.5)/7)*(w-2*pad);
+  svg += '<line x1="'+mx1+'" y1="2" x2="'+mx1+'" y2="'+(h-2)+'" stroke="#39ff14" stroke-width="2"/>';
+  svg += '<circle cx="'+mx1+'" cy="6" r="3" fill="#39ff14"/>';
+  svg += '<text x="'+(mx1-3)+'" y="'+(h-6)+'" font-size="7" font-weight="700" fill="#39ff14" font-family="Space Mono,monospace">A</text>';
+  // Marker B (blauw)
+  var z2c = Math.max(-3.5,Math.min(3.5,z2));
+  var mx2 = pad+((z2c+3.5)/7)*(w-2*pad);
+  svg += '<line x1="'+mx2+'" y1="2" x2="'+mx2+'" y2="'+(h-2)+'" stroke="#38bdf8" stroke-width="2" stroke-dasharray="3,2"/>';
+  svg += '<circle cx="'+mx2+'" cy="6" r="3" fill="#38bdf8"/>';
+  svg += '<text x="'+(mx2-3)+'" y="'+(h-6)+'" font-size="7" font-weight="700" fill="#38bdf8" font-family="Space Mono,monospace">B</text>';
   // Sigma labels
   svg += '<text x="'+pad+'" y="'+(h-1)+'" font-size="8" fill="rgba(226,232,240,0.5)" font-family="Space Mono,monospace">-3\u03c3</text>';
   svg += '<text x="'+(w-pad-18)+'" y="'+(h-1)+'" font-size="8" fill="rgba(226,232,240,0.5)" font-family="Space Mono,monospace">+3\u03c3</text>';
