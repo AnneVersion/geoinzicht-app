@@ -1225,12 +1225,7 @@ function renderChoropleth(type){
         if(!_infoPinned) document.getElementById('infoPanel').classList.remove('show');
       });
       layer.on('click', function(e){
-        // BAG actief: klik niet doorsturen naar CBS — BAG handler regelt dit
-        if(_layerState.bag || _layerState.panden){
-          console.log('[CBS CLICK] BLOCKED: bag='+_layerState.bag+' panden='+_layerState.panden);
-          return;
-        }
-        console.log('[CBS CLICK] ALLOWED: '+type+' '+feature.properties[cfg.nameField]);
+        if(_layerState.bag || _layerState.panden) return;
         toggleMapSelection(feature.properties, type, layer, newLayer);
         _infoPinned = true;
         showFeatureInfo(feature.properties, cfg, type, true, feature);
@@ -1941,7 +1936,6 @@ function renderBagVectors(){
     },
     onEachFeature: function(feature, layer){
       layer.on('click', function(e){
-        console.log('[BAG GeoJSON CLICK] '+feature.properties.openbare_ruimte+' '+feature.properties.huisnummer);
         L.DomEvent.stopPropagation(e);
         _infoPinned = true;
         showBagFeatureInfo(feature.properties, e.latlng);
@@ -2383,7 +2377,14 @@ function onBagZoomChange(){
 function createBagVectorTileLayer(){
   if(_bagVectorLayer){ _map.removeLayer(_bagVectorLayer); _bagVectorLayer = null; }
 
+  // Eigen pane zodat BAG VT boven CBS choropleth zit (overlayPane = 400)
+  if(!_map.getPane('bagVtPane')){
+    _map.createPane('bagVtPane');
+    _map.getPane('bagVtPane').style.zIndex = 450;
+  }
+
   _bagVectorLayer = L.vectorGrid.protobuf(PDOK_BAG_MVT, {
+    pane: 'bagVtPane',
     rendererFactory: L.canvas.tile,
     maxNativeZoom: 17,
     minNativeZoom: 17,
@@ -2430,7 +2431,6 @@ function createBagVectorTileLayer(){
 
   // Klik-handler voor feature info
   _bagVectorLayer.on('click', function(e){
-    console.log('[BAG VT CLICK] fired, layer:', !!e.layer);
     if(!e.layer || !e.layer.properties) return;
     var p = e.layer.properties;
     var layerName = e.layer._layerName || e.layerName || '';
