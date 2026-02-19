@@ -273,6 +273,8 @@ select option{background:var(--bg);color:var(--tx)}
 .map-tooltip{background:rgba(10,15,26,.92)!important;backdrop-filter:blur(12px);border:1px solid rgba(57,255,20,.25)!important;border-radius:10px!important;padding:0!important;box-shadow:0 8px 32px rgba(0,0,0,.5)!important;color:#e2e8f0!important;font-family:'DM Sans',sans-serif!important;min-width:200px;max-width:320px}
 .map-tooltip .leaflet-tooltip-content{padding:0!important}
 .map-tooltip::before{border-right-color:rgba(10,15,26,.92)!important}
+.bag-hover-tooltip{background:rgba(10,15,26,.94)!important;backdrop-filter:blur(12px);border:1px solid rgba(57,255,20,.3)!important;border-radius:8px!important;padding:8px 11px!important;box-shadow:0 4px 20px rgba(0,0,0,.5)!important;color:#e2e8f0!important;font-family:'DM Sans',sans-serif!important;max-width:260px;pointer-events:none}
+.bag-hover-tooltip::before{border-right-color:rgba(10,15,26,.94)!important}
 .tt-header{padding:8px 12px 6px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:6px}
 .tt-name{font:700 12px 'DM Sans',sans-serif;color:#39ff14;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tt-type{font:400 9px 'Space Mono',monospace;color:#64748b;flex-shrink:0}
@@ -917,6 +919,9 @@ var _wijkData = null, _wijkLayer = null;
 var _bagWmsLayer = null;
 var _bagVectorLayer = null;
 var _bagVtClickHandler = null; // map-level click fallback voor VectorGrid
+var _bagVtMoveHandler = null; // mousemove handler voor hover tooltip
+var _bagHoverTooltip = null; // Leaflet tooltip voor BAG hover
+var _bagHoverLastId = null; // voorkom herhaalde tooltip updates
 var _bagVectorData = null; // raw WFS features cache
 var _bagLoading = false;
 var _bagForceReload = false;
@@ -2373,6 +2378,11 @@ function toggleBagLayer(on){
       _map.getContainer().removeEventListener('click', _bagVtClickHandler, true);
       _bagVtClickHandler=null;
     }
+    if(_bagVtMoveHandler){
+      _map.getContainer().removeEventListener('mousemove', _bagVtMoveHandler, false);
+      _bagVtMoveHandler=null;
+    }
+    closeBagHoverTooltip();
     if(_bagVectorLayer){_map.removeLayer(_bagVectorLayer);_bagVectorLayer=null}
     if(_bagWmsLayer){_map.removeLayer(_bagWmsLayer);_bagWmsLayer=null}
     statusSection.style.display = 'none';
@@ -2436,6 +2446,60 @@ function _handleBagVtClick(layer, rawLatlng, originalEvent){
   }
 }
 
+// BAG hover tooltip: toon adresgegevens + buurt/gemeente context bij mouseover
+function showBagHoverTooltip(layer, latlng){
+  if(!layer || !layer.properties || !latlng) return;
+  var p = layer.properties;
+  var id = p.identificatie || ((p.openbare_ruimte_naam||p.openbare_ruimte||'')+'_'+(p.huisnummer||''));
+  if(id === _bagHoverLastId) return; // zelfde feature, niet updaten
+  _bagHoverLastId = id;
+  closeBagHoverTooltip();
+  var straat = p.openbare_ruimte_naam || p.openbare_ruimte || '';
+  var hnr = (p.huisnummer||'') + (p.huisletter||'') + (p.toevoeging?' '+p.toevoeging:'');
+  var woonplaats = p.woonplaats_naam || p.woonplaats || '';
+  var html = '<div style="font:700 11px DM Sans,sans-serif;color:#39ff14;margin-bottom:3px">' + ((straat+' '+hnr).trim() || 'BAG Object') + '</div>';
+  if(p.postcode || woonplaats) html += '<div style="font:400 9px Space Mono,monospace;color:#94a3b8">'+(p.postcode||'')+' '+woonplaats+'</div>';
+  // Adresgegevens
+  var rows = [];
+  if(p.oppervlakte) rows.push('<span class="mi" style="font-size:11px;vertical-align:-2px">straighten</span> '+p.oppervlakte+' m²');
+  if(p.bouwjaar) rows.push('<span class="mi" style="font-size:11px;vertical-align:-2px">calendar_month</span> '+p.bouwjaar);
+  if(p.gebruiksdoel) rows.push('<span class="mi" style="font-size:11px;vertical-align:-2px">category</span> '+p.gebruiksdoel);
+  if(p.status) rows.push('<span class="mi" style="font-size:11px;vertical-align:-2px">info</span> <span style="color:'+bagStatusToColor(p.status)+'">'+p.status+'</span>');
+  if(rows.length) html += '<div style="font-size:10px;color:#cbd5e1;margin-top:4px;line-height:1.7">'+rows.join('<br>')+'</div>';
+  // Buurt/gemeente context
+  var buurt = findFeatureAtPoint(_buurtLayer, latlng);
+  var gemeente = findFeatureAtPoint(_gemeenteLayer, latlng);
+  if(buurt || gemeente){
+    html += '<div style="border-top:1px solid rgba(255,255,255,.1);margin-top:5px;padding-top:4px;font-size:9px;color:#64748b">';
+    if(buurt) html += '<span class="mi" style="font-size:10px;vertical-align:-1px">grid_on</span> '+buurt.properties.buurtnaam+'<br>';
+    if(gemeente) html += '<span class="mi" style="font-size:10px;vertical-align:-1px">domain</span> '+gemeente.properties.gemeentenaam;
+    // Toon gem. WOZ en inwoners als beschikbaar
+    var gp = gemeente ? gemeente.properties : (buurt ? buurt.properties : null);
+    if(gp){
+      var extra = [];
+      if(gp.gem_woz_waarde && gp.gem_woz_waarde > 0) extra.push('WOZ €'+Math.round(gp.gem_woz_waarde/1000)+'k');
+      if(gp.aantal_inwoners && gp.aantal_inwoners > 0) extra.push(gp.aantal_inwoners.toLocaleString('nl-NL')+' inw.');
+      if(extra.length) html += ' · '+extra.join(' · ');
+    }
+    html += '</div>';
+  }
+  _bagHoverTooltip = L.tooltip({
+    className: 'bag-hover-tooltip',
+    direction: 'right',
+    offset: [12, 0],
+    opacity: 1,
+    permanent: true
+  }).setLatLng(latlng).setContent(html).addTo(_map);
+}
+
+function closeBagHoverTooltip(){
+  if(_bagHoverTooltip){
+    _map.removeLayer(_bagHoverTooltip);
+    _bagHoverTooltip = null;
+  }
+  _bagHoverLastId = null;
+}
+
 // Zoek een BAG VT feature op een klikpositie door alle geladen tiles te doorzoeken
 function _findBagVtFeatureAtEvent(mapEvent){
   if(!_bagVectorLayer || !_map) return null;
@@ -2486,6 +2550,11 @@ function createBagVectorTileLayer(){
     _map.getContainer().removeEventListener('click', _bagVtClickHandler, true);
     _bagVtClickHandler = null;
   }
+  if(_bagVtMoveHandler){
+    _map.getContainer().removeEventListener('mousemove', _bagVtMoveHandler, false);
+    _bagVtMoveHandler = null;
+  }
+  closeBagHoverTooltip();
   if(_bagVectorLayer){ _map.removeLayer(_bagVectorLayer); _bagVectorLayer = null; }
 
   // Eigen pane zodat BAG VT boven CBS choropleth zit (overlayPane = 400)
@@ -2567,6 +2636,23 @@ function createBagVectorTileLayer(){
     }
   };
   mapContainer.addEventListener('click', _bagVtClickHandler, true);
+
+  // Hover: mousemove op map container voor tooltip bij BAG features
+  _bagVtMoveHandler = function(domEvent){
+    if(!_bagVectorLayer || !_map) return;
+    if(_map.getZoom() < 16) return;
+    if(_infoPinned) return; // niet hoveren als info panel vast staat
+    var containerPoint = _map.mouseEventToContainerPoint(domEvent);
+    var layerPoint = _map.containerPointToLayerPoint(containerPoint);
+    var latlng = _map.containerPointToLatLng(containerPoint);
+    var hit = _findBagVtFeatureAtEvent({layerPoint: layerPoint, containerPoint: containerPoint, latlng: latlng});
+    if(hit && hit.layer && hit.layer.properties){
+      showBagHoverTooltip(hit.layer, latlng);
+    } else {
+      closeBagHoverTooltip();
+    }
+  };
+  mapContainer.addEventListener('mousemove', _bagVtMoveHandler, false);
 
   fixLayerOrder();
   toast('BAG Vector Tiles geladen · Zoom in voor meer detail');
