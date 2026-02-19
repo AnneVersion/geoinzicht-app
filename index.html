@@ -2512,12 +2512,13 @@ function _handleBagVtClick(layer, rawLatlng, originalEvent){
 
 // BAG adres selectie: max 2 adressen, met highlight-markers en vergelijking
 function selectBagAdres(p, latlng){
-  var id = p.identificatie || ((p.openbare_ruimte_naam||p.openbare_ruimte||'')+'_'+(p.huisnummer||''));
+  var id = p.identificatie || ((p.openbare_ruimte_naam||p.openbare_ruimte||'')+'_'+(p.huisnummer||'')+(p.huisnummertoevoeging?'-'+p.huisnummertoevoeging:''));
   // Check of dit adres al geselecteerd is → deselecteer
   var existIdx = -1;
   for(var i = 0; i < _selectedAdressen.length; i++){
-    if((_selectedAdressen[i].props.identificatie || '') === (p.identificatie || '') &&
-       _selectedAdressen[i].props.identificatie){ existIdx = i; break; }
+    var ep = _selectedAdressen[i].props;
+    var existId = ep.identificatie || ((ep.openbare_ruimte_naam||ep.openbare_ruimte||'')+'_'+(ep.huisnummer||'')+(ep.huisnummertoevoeging?'-'+ep.huisnummertoevoeging:''));
+    if(existId === id && id){ existIdx = i; break; }
   }
   if(existIdx >= 0){
     if(_selectedAdressen[existIdx].marker) _map.removeLayer(_selectedAdressen[existIdx].marker);
