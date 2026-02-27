@@ -250,8 +250,26 @@ select option{background:var(--bg);color:var(--tx)}
 }
 @media(max-width:600px){.sidebar{width:100%}.stat-row{flex-wrap:wrap}.stat{min-width:calc(50% - 5px)}}
 
+/* ── Indicator Search & Toolbar ── */
+.ind-toolbar{display:flex;gap:6px;align-items:center;margin-bottom:8px}
+.ind-search-wrap{flex:1;position:relative;display:flex;align-items:center}
+.ind-search-icon{position:absolute;left:10px;font-size:16px!important;color:var(--mt);pointer-events:none;z-index:1}
+.ind-search-input{width:100%;padding:8px 32px 8px 32px;border-radius:10px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.03);color:var(--tx);font:500 12px 'DM Sans',sans-serif;outline:none;transition:all .2s}
+.ind-search-input::placeholder{color:var(--mt);opacity:.6}
+.ind-search-input:focus{border-color:rgba(57,255,20,.25);background:rgba(57,255,20,.03);box-shadow:0 0 12px rgba(57,255,20,.06)}
+.ind-search-clear{position:absolute;right:8px;font-size:14px!important;color:var(--mt);cursor:pointer;z-index:1;opacity:.6;transition:opacity .15s}
+.ind-search-clear:hover{opacity:1;color:var(--ac)}
+.ind-toolbar-btns{display:flex;gap:3px;flex-shrink:0}
+.ind-tbtn{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.03);color:var(--mt);cursor:pointer;transition:all .18s}
+.ind-tbtn:hover{background:rgba(57,255,20,.08);color:var(--ac);border-color:rgba(57,255,20,.15)}
+.ind-tbtn .mi{font-size:16px!important}
+.ind-search-info{font:500 10px 'DM Sans',sans-serif;color:var(--mt);padding:4px 10px 6px;display:flex;align-items:center;gap:5px}
+.ind-search-info .mi{font-size:13px!important;color:var(--ac)}
+.ind-search-info b{color:var(--ac);font-weight:700}
+.ind-search-highlight{color:var(--ac);font-weight:700;text-decoration:underline;text-underline-offset:2px}
+
 /* ── Indicator Category Headers ── */
-.ind-cat-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;margin:8px 0 3px;border-radius:12px;cursor:pointer;user-select:none;-webkit-user-select:none;transition:all .25s ease;background:linear-gradient(135deg,color-mix(in srgb,var(--cat-color) 12%,rgba(15,20,35,.9)) 0%,color-mix(in srgb,var(--cat-color) 4%,rgba(15,20,35,.6)) 100%);border:1px solid color-mix(in srgb,var(--cat-color) 20%,transparent);border-left:3px solid var(--cat-color,var(--mt));position:relative;overflow:hidden;flex-shrink:0;backdrop-filter:blur(8px)}
+.ind-cat-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;margin:10px 0 4px;border-radius:12px;cursor:pointer;user-select:none;-webkit-user-select:none;transition:all .25s ease;background:linear-gradient(135deg,color-mix(in srgb,var(--cat-color) 14%,rgba(15,20,35,.9)) 0%,color-mix(in srgb,var(--cat-color) 5%,rgba(15,20,35,.6)) 100%);border:1px solid color-mix(in srgb,var(--cat-color) 20%,transparent);border-left:3px solid var(--cat-color,var(--mt));position:relative;overflow:hidden;flex-shrink:0;backdrop-filter:blur(8px)}
 .ind-cat-header::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--cat-color) 15%,transparent),transparent 70%);opacity:0;transition:opacity .25s}
 .ind-cat-header:hover::before{opacity:1}
 .ind-cat-header:hover{border-color:color-mix(in srgb,var(--cat-color) 35%,transparent);transform:translateX(2px)}
@@ -262,18 +280,18 @@ select option{background:var(--bg);color:var(--tx)}
 .ind-cat-chevron{font-size:16px!important;color:var(--cat-color,var(--mt));opacity:.7;transition:all .2s ease}
 .ind-cat-header:hover .ind-cat-chevron{opacity:1}
 .ind-cat-icon{font-size:18px!important;color:var(--cat-color)!important;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--cat-color) 50%,transparent))}
-.ind-cat-name{font:700 10.5px 'DM Sans',sans-serif;color:var(--tx);letter-spacing:.7px;text-transform:uppercase;position:relative;z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.3)}
-.ind-cat-count{font:700 9px 'Space Mono',monospace;color:color-mix(in srgb,var(--cat-color) 70%,var(--mt));background:color-mix(in srgb,var(--cat-color) 8%,rgba(255,255,255,.04));padding:3px 9px;border-radius:10px;position:relative;z-index:1;min-width:28px;text-align:center;border:1px solid color-mix(in srgb,var(--cat-color) 12%,transparent)}
+.ind-cat-name{font:700 11.5px 'DM Sans',sans-serif;color:var(--tx);letter-spacing:.6px;text-transform:uppercase;position:relative;z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.3)}
+.ind-cat-count{font:700 9.5px 'Space Mono',monospace;color:color-mix(in srgb,var(--cat-color) 70%,var(--mt));background:color-mix(in srgb,var(--cat-color) 8%,rgba(255,255,255,.04));padding:3px 9px;border-radius:10px;position:relative;z-index:1;min-width:28px;text-align:center;border:1px solid color-mix(in srgb,var(--cat-color) 12%,transparent)}
 .ind-cat-count.has-active{color:var(--ac);background:rgba(57,255,20,.15);box-shadow:0 0 10px rgba(57,255,20,.12);border-color:rgba(57,255,20,.2)}
 
 /* ── Indicator List Container ── */
-.indicator-list{display:flex;flex-direction:column;gap:1px;max-height:calc(100vh - 380px);overflow-y:auto;padding:0 4px 0 0;scroll-behavior:smooth}
+.indicator-list{display:flex;flex-direction:column;gap:1px;max-height:calc(100vh - 420px);overflow-y:auto;padding:0 4px 0 0;scroll-behavior:smooth}
 .indicator-list::-webkit-scrollbar{width:3px}
 .indicator-list::-webkit-scrollbar-thumb{background:var(--glass-bd);border-radius:3px}
 .indicator-list::-webkit-scrollbar-thumb:hover{background:rgba(57,255,20,.3)}
 
 /* ── Indicator Items ── */
-.ind-item{display:flex;align-items:center;gap:9px;padding:7px 10px 7px 16px;border-radius:9px;cursor:pointer;transition:all .18s ease;border:none;font-size:12px;user-select:none;-webkit-user-select:none;position:relative;margin-left:6px;border-left:2px solid color-mix(in srgb,var(--cat-color,var(--mt)) 12%,transparent);flex-shrink:0}
+.ind-item{display:flex;align-items:center;gap:10px;padding:8px 10px 8px 16px;border-radius:9px;cursor:pointer;transition:all .18s ease;border:none;font-size:12px;user-select:none;-webkit-user-select:none;position:relative;margin-left:6px;border-left:2px solid color-mix(in srgb,var(--cat-color,var(--mt)) 12%,transparent);flex-shrink:0}
 .ind-item:hover{background:color-mix(in srgb,var(--cat-color,var(--mt)) 6%,rgba(255,255,255,.02));border-left-color:color-mix(in srgb,var(--cat-color,var(--mt)) 50%,transparent)}
 .ind-item.active{background:linear-gradient(90deg,rgba(57,255,20,.07),transparent 80%);border-left-color:var(--ac)}
 .ind-item.primary{background:linear-gradient(90deg,rgba(57,255,20,.14),rgba(57,255,20,.03) 80%);border-left-color:var(--ac);box-shadow:inset 0 0 20px rgba(57,255,20,.04),0 0 12px rgba(57,255,20,.06)}
@@ -284,11 +302,11 @@ select option{background:var(--bg);color:var(--tx)}
 .ind-item .ind-icon .mi{font-size:14px;color:color-mix(in srgb,var(--cat-color,var(--mt)) 80%,var(--mt));transition:color .2s}
 .ind-item:hover .ind-icon .mi{color:var(--cat-color,var(--mt))}
 .ind-item.active .ind-icon .mi,.ind-item.primary .ind-icon .mi{color:var(--ac)}
-.ind-item .ind-name{font:500 11.5px 'DM Sans',sans-serif;color:var(--mt);transition:color .2s;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ind-item .ind-name{font:500 12.5px 'DM Sans',sans-serif;color:var(--mt);transition:color .2s;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ind-item:hover .ind-name{color:var(--tx)}
 .ind-item.active .ind-name{color:var(--tx);font-weight:600}
 .ind-item.primary .ind-name{color:var(--ac);font-weight:700}
-.ind-item .ind-unit{font:500 8px 'Space Mono',monospace;color:color-mix(in srgb,var(--cat-color,var(--mt)) 50%,var(--mt));opacity:.7;flex-shrink:0;min-width:32px;text-align:right}
+.ind-item .ind-unit{font:500 9px 'Space Mono',monospace;color:color-mix(in srgb,var(--cat-color,var(--mt)) 50%,var(--mt));opacity:.7;flex-shrink:0;min-width:36px;text-align:right}
 .ind-item .ind-badge{font:700 7px 'Space Mono',monospace;padding:2px 6px;border-radius:4px;background:rgba(57,255,20,.18);color:var(--ac);display:none;letter-spacing:.8px;flex-shrink:0;text-shadow:0 0 6px rgba(57,255,20,.3)}
 .ind-item.primary .ind-badge{display:block}
 
@@ -567,7 +585,21 @@ select option{background:var(--bg);color:var(--tx)}
         <div id="yearInfo" style="font:400 9px 'Space Mono',monospace;color:var(--mt);margin-top:4px"></div>
       </div>
 
-      <div class="sh"><span class="mi">bar_chart</span> Indicatoren <span style="font:400 9px 'DM Sans',sans-serif;color:var(--mt);text-transform:none;letter-spacing:0">(klik om aan/uit te zetten)</span></div>
+      <div class="sh"><span class="mi">bar_chart</span> Indicatoren <span style="font:400 9px 'DM Sans',sans-serif;color:var(--mt);text-transform:none;letter-spacing:0">(klik = aan/uit, dubbelklik = kaartkleur)</span></div>
+      <!-- Zoekbalk + knoppen -->
+      <div class="ind-toolbar">
+        <div class="ind-search-wrap">
+          <span class="mi ind-search-icon">search</span>
+          <input type="text" id="indSearchInput" class="ind-search-input" placeholder="Zoek indicator..." oninput="filterIndicators(this.value)">
+          <span class="mi ind-search-clear" id="indSearchClear" onclick="clearIndSearch()" style="display:none">close</span>
+        </div>
+        <div class="ind-toolbar-btns">
+          <button class="ind-tbtn" onclick="toggleAllCategories(false)" title="Alles uitklappen"><span class="mi">unfold_more</span></button>
+          <button class="ind-tbtn" onclick="toggleAllCategories(true)" title="Alles inklappen"><span class="mi">unfold_less</span></button>
+          <button class="ind-tbtn" onclick="deselectAllIndicators()" title="Alles deselecteren"><span class="mi">deselect</span></button>
+        </div>
+      </div>
+      <div id="indSearchInfo" class="ind-search-info" style="display:none"></div>
       <div class="indicator-list" id="indicatorList"></div>
 
       <div class="sh"><span class="mi">gradient</span> Legenda</div>
@@ -1020,10 +1052,9 @@ var INDICATORS = [
   {key:'opp_water',             naam:'Oppervlakte water',       eenheid:'ha',        icon:'water',               cat:'oppervlakte'},
 ];
 
-// Welke categorieën zijn ingeklapt (default: meeste dicht, kern-categorieën open)
+// Welke categorieën zijn ingeklapt (default: alles open, minder gebruikte dicht)
 var _collapsedCategories = {
-  herkomst:true, huishoudens:true, opleiding:true, sociale_zekerheid:true,
-  natuur:true, oppervlakte:true
+  oppervlakte:true
 };
 
 // Actieve indicatoren (toggle aan/uit), eerste = primair (kaartkleur)
@@ -4543,11 +4574,15 @@ function updateStats(vals, type){
 // ============================================================
 // UI CONTROLS
 // ============================================================
+var _indSearchTerm = '';
+
 function buildIndicatorList(){
   var el = document.getElementById('indicatorList');
   var html = '';
   var yearInds = _yearIndicators[_activeYear];
   var avSet = yearInds ? new Set(yearInds) : null;
+  var search = _indSearchTerm.toLowerCase().trim();
+  var totalVisible = 0, totalMatch = 0;
 
   // Groepeer indicatoren per categorie
   INDICATOR_CATEGORIES.forEach(function(cat){
@@ -4557,7 +4592,21 @@ function buildIndicatorList(){
     });
     if(catInds.length === 0) return;
 
-    var isCollapsed = _collapsedCategories[cat.id] || false;
+    // Bij zoeken: filter op naam, eenheid of key
+    var filteredInds = catInds;
+    if(search){
+      filteredInds = catInds.filter(function(fm){
+        return fm.naam.toLowerCase().indexOf(search) >= 0 ||
+               fm.key.toLowerCase().indexOf(search) >= 0 ||
+               fm.eenheid.toLowerCase().indexOf(search) >= 0 ||
+               cat.naam.toLowerCase().indexOf(search) >= 0;
+      });
+      if(filteredInds.length === 0) return; // Verberg lege categorieën bij zoeken
+    }
+    totalVisible++;
+    totalMatch += filteredInds.length;
+
+    var isCollapsed = search ? false : (_collapsedCategories[cat.id] || false);
     var activeCount = catInds.filter(function(fm){ return _activeIndicators.indexOf(fm.key) >= 0; }).length;
 
     // Categorie-header met kleurstijl
@@ -4571,15 +4620,20 @@ function buildIndicatorList(){
     html += '</div>';
 
     if(!isCollapsed){
-      catInds.forEach(function(fm){
+      filteredInds.forEach(function(fm){
         var isActive = _activeIndicators.indexOf(fm.key) >= 0;
         var isPrimary = _activeIndicators[0] === fm.key;
         var cls = isPrimary ? 'ind-item primary' : (isActive ? 'ind-item active' : 'ind-item');
-        // Geef categorie-kleur door als CSS custom property
+        var displayName = fm.naam;
+        // Highlight zoekterm in naam
+        if(search && fm.naam.toLowerCase().indexOf(search) >= 0){
+          var idx = fm.naam.toLowerCase().indexOf(search);
+          displayName = fm.naam.substring(0,idx)+'<span class="ind-search-highlight">'+fm.naam.substring(idx,idx+search.length)+'</span>'+fm.naam.substring(idx+search.length);
+        }
         html += '<div class="'+cls+'" data-ind="'+fm.key+'" style="--cat-color:'+cat.color+'" onclick="toggleIndicator(\''+fm.key+'\')" title="Dubbelklik: maak primair (kaartkleur)">';
         html += '<div class="ind-icon"><span class="mi">'+fm.icon+'</span></div>';
         html += '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">';
-        html += '<span class="ind-name">'+fm.naam+'</span>';
+        html += '<span class="ind-name">'+displayName+'</span>';
         html += '<span class="ind-unit">'+fm.eenheid+'</span>';
         html += '</div>';
         html += '<span class="ind-badge">KAART</span>';
@@ -4587,7 +4641,51 @@ function buildIndicatorList(){
       });
     }
   });
+
   el.innerHTML = html;
+
+  // Zoekinfo balk
+  var infoEl = document.getElementById('indSearchInfo');
+  if(search && infoEl){
+    infoEl.style.display = 'flex';
+    infoEl.innerHTML = '<span class="mi">filter_list</span> <b>'+totalMatch+'</b> indicator'+(totalMatch!==1?'en':'')+' in <b>'+totalVisible+'</b> categorie'+(totalVisible!==1?'&euml;n':'');
+  } else if(infoEl){
+    infoEl.style.display = 'none';
+  }
+}
+
+function filterIndicators(val){
+  _indSearchTerm = val || '';
+  var clearBtn = document.getElementById('indSearchClear');
+  if(clearBtn) clearBtn.style.display = _indSearchTerm ? 'block' : 'none';
+  buildIndicatorList();
+}
+
+function clearIndSearch(){
+  _indSearchTerm = '';
+  var input = document.getElementById('indSearchInput');
+  if(input) input.value = '';
+  var clearBtn = document.getElementById('indSearchClear');
+  if(clearBtn) clearBtn.style.display = 'none';
+  buildIndicatorList();
+}
+
+function toggleAllCategories(collapse){
+  INDICATOR_CATEGORIES.forEach(function(cat){
+    _collapsedCategories[cat.id] = collapse;
+  });
+  buildIndicatorList();
+}
+
+function deselectAllIndicators(){
+  // Bewaar altijd minimaal 1 indicator (de primaire)
+  if(_activeIndicators.length <= 1){toast('Minimaal 1 indicator actief');return}
+  var primary = _activeIndicators[0];
+  _activeIndicators = [primary];
+  buildIndicatorList();
+  updateMap();
+  updateActiveStats();
+  toast('Alleen primaire indicator behouden');
 }
 
 function toggleCategory(catId){
