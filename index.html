@@ -250,23 +250,46 @@ select option{background:var(--bg);color:var(--tx)}
 }
 @media(max-width:600px){.sidebar{width:100%}.stat-row{flex-wrap:wrap}.stat{min-width:calc(50% - 5px)}}
 
-/* Indicator list */
-.indicator-list{display:flex;flex-direction:column;gap:3px;max-height:320px;overflow-y:auto;padding-right:4px}
+/* Indicator category headers */
+/* ── Indicator Category Headers ── */
+.ind-cat-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;margin:6px 0 2px;border-radius:10px;cursor:pointer;user-select:none;-webkit-user-select:none;transition:all .2s ease;background:linear-gradient(135deg,rgba(255,255,255,.03) 0%,rgba(255,255,255,.01) 100%);border-left:3px solid var(--cat-color,var(--mt));position:relative;overflow:hidden;flex-shrink:0}
+.ind-cat-header::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--cat-color) 8%,transparent),transparent 60%);opacity:0;transition:opacity .2s}
+.ind-cat-header:hover::before{opacity:1}
+.ind-cat-header:hover{background:linear-gradient(135deg,rgba(255,255,255,.05) 0%,rgba(255,255,255,.02) 100%)}
+.ind-cat-header:first-child{margin-top:0}
+.ind-cat-header.collapsed{opacity:.7}
+.ind-cat-header.collapsed:hover{opacity:1}
+.ind-cat-left{display:flex;align-items:center;gap:7px;position:relative;z-index:1}
+.ind-cat-chevron{font-size:16px!important;color:var(--mt);transition:transform .2s ease}
+.ind-cat-icon{font-size:16px!important;opacity:.9;filter:drop-shadow(0 0 4px color-mix(in srgb,var(--cat-color) 40%,transparent))}
+.ind-cat-name{font:700 10px 'DM Sans',sans-serif;color:var(--tx);letter-spacing:.6px;text-transform:uppercase;position:relative;z-index:1}
+.ind-cat-count{font:600 9px 'Space Mono',monospace;color:var(--mt);background:rgba(255,255,255,.06);padding:2px 8px;border-radius:10px;position:relative;z-index:1;min-width:28px;text-align:center}
+.ind-cat-count.has-active{color:var(--ac);background:rgba(57,255,20,.12);box-shadow:0 0 8px rgba(57,255,20,.1)}
+
+/* ── Indicator List Container ── */
+.indicator-list{display:flex;flex-direction:column;gap:1px;max-height:calc(100vh - 380px);overflow-y:auto;padding:0 2px 0 0;scroll-behavior:smooth}
 .indicator-list::-webkit-scrollbar{width:3px}
 .indicator-list::-webkit-scrollbar-thumb{background:var(--glass-bd);border-radius:3px}
-.ind-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;cursor:pointer;transition:all .2s ease;border:none;font-size:12px;user-select:none;-webkit-user-select:none}
-.ind-item:hover{background:rgba(255,255,255,.04)}
-.ind-item.active{background:rgba(57,255,20,.06)}
-.ind-item.primary{background:rgba(57,255,20,.1);box-shadow:0 0 12px rgba(57,255,20,.08)}
-.ind-item .ind-icon{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;background:var(--glass);border:none;flex-shrink:0;transition:all .2s}
-.ind-item.active .ind-icon{background:rgba(57,255,20,.1);color:var(--ac)}
-.ind-item.primary .ind-icon{background:rgba(57,255,20,.2);color:var(--ac)}
-.ind-item .ind-icon .mi{font-size:15px;color:var(--mt);transition:color .2s}
+.indicator-list::-webkit-scrollbar-thumb:hover{background:rgba(57,255,20,.3)}
+
+/* ── Indicator Items ── */
+.ind-item{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 14px;border-radius:8px;cursor:pointer;transition:all .18s ease;border:none;font-size:12px;user-select:none;-webkit-user-select:none;position:relative;margin-left:4px;border-left:2px solid transparent;flex-shrink:0}
+.ind-item:hover{background:rgba(255,255,255,.04);border-left-color:color-mix(in srgb,var(--cat-color,var(--mt)) 50%,transparent)}
+.ind-item.active{background:linear-gradient(90deg,rgba(57,255,20,.06),transparent 80%);border-left-color:var(--ac)}
+.ind-item.primary{background:linear-gradient(90deg,rgba(57,255,20,.12),rgba(57,255,20,.03) 80%);border-left-color:var(--ac);box-shadow:0 0 16px rgba(57,255,20,.06)}
+.ind-item .ind-icon{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;flex-shrink:0;transition:all .2s;background:color-mix(in srgb,var(--cat-color,var(--mt)) 10%,transparent)}
+.ind-item:hover .ind-icon{background:color-mix(in srgb,var(--cat-color,var(--mt)) 18%,transparent)}
+.ind-item.active .ind-icon{background:rgba(57,255,20,.12)}
+.ind-item.primary .ind-icon{background:rgba(57,255,20,.2);box-shadow:0 0 8px rgba(57,255,20,.15)}
+.ind-item .ind-icon .mi{font-size:14px;color:color-mix(in srgb,var(--cat-color,var(--mt)) 80%,var(--mt));transition:color .2s}
+.ind-item:hover .ind-icon .mi{color:var(--cat-color,var(--mt))}
 .ind-item.active .ind-icon .mi,.ind-item.primary .ind-icon .mi{color:var(--ac)}
-.ind-item .ind-name{font-weight:500;color:var(--mt);transition:color .2s;flex:1}
-.ind-item.active .ind-name,.ind-item.primary .ind-name{color:var(--tx)}
-.ind-item .ind-unit{font:400 9px 'Space Mono',monospace;color:var(--mt);opacity:.6}
-.ind-item .ind-badge{font:700 8px 'Space Mono',monospace;padding:2px 5px;border-radius:4px;background:rgba(57,255,20,.15);color:var(--ac);display:none;letter-spacing:.5px;flex-shrink:0}
+.ind-item .ind-name{font:500 11px 'DM Sans',sans-serif;color:var(--mt);transition:color .2s;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ind-item:hover .ind-name{color:var(--tx)}
+.ind-item.active .ind-name{color:var(--tx);font-weight:600}
+.ind-item.primary .ind-name{color:var(--ac);font-weight:700}
+.ind-item .ind-unit{font:400 8px 'Space Mono',monospace;color:var(--mt);opacity:.5;flex-shrink:0;min-width:32px;text-align:right}
+.ind-item .ind-badge{font:700 7px 'Space Mono',monospace;padding:2px 6px;border-radius:4px;background:rgba(57,255,20,.18);color:var(--ac);display:none;letter-spacing:.8px;flex-shrink:0;text-shadow:0 0 6px rgba(57,255,20,.3)}
 .ind-item.primary .ind-badge{display:block}
 
 /* Kaart hover-tooltip */
@@ -319,10 +342,12 @@ select option{background:var(--bg);color:var(--tx)}
 @keyframes infoPulse{0%{box-shadow:0 0 0 0 rgba(57,255,20,.2)}100%{box-shadow:var(--shadow)}}
 
 /* Indicator list items - micro interaction */
-.ind-item{transition:all .2s cubic-bezier(.4,0,.2,1)}
-.ind-item:hover{transform:translateX(4px)}
-.ind-item.primary{border-left:2px solid var(--ac);animation:glowIn .4s ease-out}
-@keyframes glowIn{from{border-left-color:transparent;box-shadow:none}to{border-left-color:var(--ac);box-shadow:0 0 12px rgba(57,255,20,.08)}}
+.ind-item{transition:all .18s cubic-bezier(.4,0,.2,1)}
+.ind-item:hover{transform:translateX(3px)}
+.ind-item.primary{animation:glowIn .4s ease-out}
+@keyframes glowIn{from{border-left-color:transparent;box-shadow:none}to{border-left-color:var(--ac);box-shadow:0 0 16px rgba(57,255,20,.06)}}
+.ind-cat-header{transition:all .2s cubic-bezier(.4,0,.2,1)}
+.ind-cat-header:hover{transform:translateX(2px)}
 
 /* Sidebar separator lines with gradient fade */
 .sh::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--glass-bd),transparent);margin-left:8px}
@@ -875,37 +900,136 @@ var BASEMAPS = {
   brt:   {url:'https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png', naam:'BRT Topo', icon:'terrain'}
 };
 
-var INDICATORS = [
-  {key:'aantal_inwoners',       naam:'Aantal inwoners',         eenheid:'personen', icon:'groups'},
-  {key:'gem_woz_waarde',        naam:'Gem. WOZ-waarde',         eenheid:'x1000',    icon:'home'},
-  {key:'gem_inkomen_inwoner',   naam:'Gem. inkomen/inwoner',    eenheid:'x1000',    icon:'payments'},
-  {key:'koopwoningen',          naam:'Koopwoningen',            eenheid:'%',        icon:'key'},
-  {key:'65plus',                naam:'65-plussers',             eenheid:'%',        icon:'elderly'},
-  {key:'bevolkingsdichtheid',   naam:'Bevolkingsdichtheid',     eenheid:'/km\u00b2',icon:'density_small'},
-  {key:'gem_aardgas',           naam:'Gem. aardgas',            eenheid:'m\u00b3',  icon:'local_fire_department'},
-  {key:'gem_elektriciteit',     naam:'Gem. elektriciteit',      eenheid:'kWh',      icon:'bolt'},
-  {key:'huishoudens',           naam:'Huishoudens',             eenheid:'aantal',   icon:'family_restroom'},
-  {key:'woningvoorraad',        naam:'Woningvoorraad',          eenheid:'aantal',   icon:'location_city'},
-  {key:'gem_huishouden_grootte',naam:'Gem. huishoudensgrootte', eenheid:'pers.',    icon:'group'},
-  {key:'arbeidsparticipatie',   naam:'Arbeidsparticipatie',     eenheid:'%',        icon:'work'},
-  {key:'bedrijfsvestigingen',   naam:'Bedrijfsvestigingen',     eenheid:'aantal',   icon:'business'},
-  {key:'afstand_huisarts',      naam:'Afstand huisarts',        eenheid:'km',       icon:'local_hospital'},
-  {key:'afstand_supermarkt',    naam:'Afstand supermarkt',      eenheid:'km',       icon:'shopping_cart'},
-  {key:'mannen',                naam:'Mannen',                  eenheid:'personen', icon:'man'},
-  {key:'vrouwen',               naam:'Vrouwen',                 eenheid:'personen', icon:'woman'},
-  {key:'0_15',                  naam:'0-15 jaar',               eenheid:'%',        icon:'child_care'},
-  {key:'15_25',                 naam:'15-25 jaar',              eenheid:'%',        icon:'school'},
-  {key:'25_45',                 naam:'25-45 jaar',              eenheid:'%',        icon:'person'},
-  {key:'45_65',                 naam:'45-65 jaar',              eenheid:'%',        icon:'person_4'},
-  {key:'huurwoningen',          naam:'Huurwoningen',            eenheid:'%',        icon:'real_estate_agent'},
-  {key:'pct_eengezins',         naam:'Eengezinswoningen',       eenheid:'%',        icon:'cottage'},
-  {key:'personenautos',         naam:"Personenauto's",          eenheid:'aantal',   icon:'directions_car'}
+// Indicatorcategorieën voor gegroepeerde weergave
+var INDICATOR_CATEGORIES = [
+  {id:'bevolking',        naam:'Bevolking',                icon:'groups',             color:'#38bdf8'},
+  {id:'leeftijd',         naam:'Leeftijdsopbouw',          icon:'cake',               color:'#a78bfa'},
+  {id:'herkomst',         naam:'Herkomst & Diversiteit',   icon:'public',             color:'#fb923c'},
+  {id:'huishoudens',      naam:'Huishoudens',              icon:'family_restroom',    color:'#f472b6'},
+  {id:'opleiding',        naam:'Opleiding',                icon:'school',             color:'#c084fc'},
+  {id:'inkomen',          naam:'Inkomen & Welvaart',       icon:'payments',           color:'#4ade80'},
+  {id:'wonen',            naam:'Wonen & Woningmarkt',      icon:'home',               color:'#22c55e'},
+  {id:'energie',          naam:'Energie',                  icon:'bolt',               color:'#fbbf24'},
+  {id:'economie',         naam:'Economie & Arbeid',        icon:'work',               color:'#f97316'},
+  {id:'sociale_zekerheid',naam:'Sociale Zekerheid & Zorg', icon:'health_and_safety',  color:'#f43f5e'},
+  {id:'voorzieningen',    naam:'Voorzieningen',            icon:'local_hospital',     color:'#ec4899'},
+  {id:'natuur',           naam:'Natuur & Groen',           icon:'park',               color:'#34d399'},
+  {id:'mobiliteit',       naam:'Mobiliteit',               icon:'directions_car',     color:'#06b6d4'},
+  {id:'oppervlakte',      naam:'Oppervlakte',              icon:'straighten',         color:'#94a3b8'},
 ];
+
+var INDICATORS = [
+  // ── Bevolking ──
+  {key:'aantal_inwoners',       naam:'Aantal inwoners',         eenheid:'personen',  icon:'groups',              cat:'bevolking'},
+  {key:'mannen',                naam:'Mannen',                  eenheid:'personen',  icon:'man',                 cat:'bevolking'},
+  {key:'vrouwen',               naam:'Vrouwen',                 eenheid:'personen',  icon:'woman',               cat:'bevolking'},
+  {key:'bevolkingsdichtheid',   naam:'Bevolkingsdichtheid',     eenheid:'/km\u00b2', icon:'density_small',       cat:'bevolking'},
+  {key:'geboorte_relatief',     naam:'Geboorten per 1000 inw.', eenheid:'\u2030',    icon:'child_friendly',      cat:'bevolking'},
+  {key:'sterfte_relatief',      naam:'Sterfte relatief',        eenheid:'\u2030',    icon:'monitor_heart',       cat:'bevolking'},
+  {key:'stedelijkheid',         naam:'Stedelijkheid (OAD)',     eenheid:'adr/km\u00b2',icon:'location_city',     cat:'bevolking'},
+
+  // ── Leeftijdsopbouw ──
+  {key:'0_15',                  naam:'0-15 jaar',               eenheid:'%',         icon:'child_care',          cat:'leeftijd'},
+  {key:'15_25',                 naam:'15-25 jaar',              eenheid:'%',         icon:'school',              cat:'leeftijd'},
+  {key:'25_45',                 naam:'25-45 jaar',              eenheid:'%',         icon:'person',              cat:'leeftijd'},
+  {key:'45_65',                 naam:'45-65 jaar',              eenheid:'%',         icon:'person_4',            cat:'leeftijd'},
+  {key:'65plus',                naam:'65-plussers',             eenheid:'%',         icon:'elderly',             cat:'leeftijd'},
+
+  // ── Herkomst & Diversiteit ──
+  {key:'pct_herkomst_nl',           naam:'Herkomst Nederland',          eenheid:'%', icon:'flag',                cat:'herkomst'},
+  {key:'pct_herkomst_europa',       naam:'Herkomst Europa (excl. NL)',  eenheid:'%', icon:'public',              cat:'herkomst'},
+  {key:'pct_herkomst_buiten_europa',naam:'Herkomst buiten Europa',      eenheid:'%', icon:'flight',              cat:'herkomst'},
+
+  // ── Huishoudens ──
+  {key:'huishoudens',           naam:'Huishoudens',             eenheid:'aantal',    icon:'family_restroom',     cat:'huishoudens'},
+  {key:'gem_huishouden_grootte',naam:'Gem. huishoudensgrootte', eenheid:'pers.',     icon:'group',               cat:'huishoudens'},
+  {key:'pct_eenpersoonshhd',    naam:'Eenpersoonshuishoudens',  eenheid:'%',         icon:'person',              cat:'huishoudens'},
+  {key:'pct_hhd_met_kind',      naam:'Huishoudens met kinderen',eenheid:'%',         icon:'child_care',          cat:'huishoudens'},
+  {key:'pct_hhd_zonder_kind',   naam:'Huish. zonder kinderen',  eenheid:'%',         icon:'group',               cat:'huishoudens'},
+  {key:'pct_gehuwd',            naam:'Gehuwd',                  eenheid:'%',         icon:'favorite',            cat:'huishoudens'},
+  {key:'pct_ongehuwd',          naam:'Ongehuwd',                eenheid:'%',         icon:'person',              cat:'huishoudens'},
+
+  // ── Opleiding ──
+  {key:'opl_hoog',              naam:'Opleidingsniveau hoog',   eenheid:'%',         icon:'school',              cat:'opleiding'},
+  {key:'opl_midden',            naam:'Opleidingsniveau midden', eenheid:'%',         icon:'menu_book',           cat:'opleiding'},
+  {key:'opl_laag',              naam:'Opleidingsniveau laag',   eenheid:'%',         icon:'auto_stories',        cat:'opleiding'},
+
+  // ── Inkomen & Welvaart ──
+  {key:'gem_inkomen_inwoner',   naam:'Gem. inkomen/inwoner',    eenheid:'x1000',     icon:'payments',            cat:'inkomen'},
+  {key:'gem_inkomen_ontvanger', naam:'Gem. inkomen/ontvanger',  eenheid:'\u20ac',    icon:'account_balance',     cat:'inkomen'},
+  {key:'gem_gestand_inkomen',   naam:'Gem. gestand. inkomen',   eenheid:'x1000',     icon:'savings',             cat:'inkomen'},
+  {key:'mediaan_vermogen',      naam:'Mediaan vermogen huish.', eenheid:'x1000',     icon:'account_balance_wallet',cat:'inkomen'},
+  {key:'pct_hh_hoog_inkomen',   naam:'Hoog inkomen huish.',     eenheid:'%',         icon:'trending_up',         cat:'inkomen'},
+  {key:'pct_hh_laag_inkomen',   naam:'Laag inkomen huish.',     eenheid:'%',         icon:'trending_down',       cat:'inkomen'},
+  {key:'pct_rond_sociaal_min',  naam:'Rond sociaal minimum',   eenheid:'%',         icon:'warning',             cat:'inkomen'},
+
+  // ── Wonen & Woningmarkt ──
+  {key:'gem_woz_waarde',        naam:'Gem. WOZ-waarde',         eenheid:'x1000',     icon:'home',                cat:'wonen'},
+  {key:'woningvoorraad',        naam:'Woningvoorraad',          eenheid:'aantal',    icon:'location_city',       cat:'wonen'},
+  {key:'koopwoningen',          naam:'Koopwoningen',            eenheid:'%',         icon:'key',                 cat:'wonen'},
+  {key:'huurwoningen',          naam:'Huurwoningen',            eenheid:'%',         icon:'real_estate_agent',   cat:'wonen'},
+  {key:'pct_eengezins',         naam:'Eengezinswoningen',       eenheid:'%',         icon:'cottage',             cat:'wonen'},
+  {key:'pct_meergezins',        naam:'Meergezinswoningen',      eenheid:'%',         icon:'apartment',           cat:'wonen'},
+  {key:'pct_bouwjaar_na_2000',  naam:'Bouwjaar na 2000',        eenheid:'%',         icon:'construction',        cat:'wonen'},
+  {key:'pct_leegstand',         naam:'Leegstand woningen',      eenheid:'%',         icon:'door_open',           cat:'wonen'},
+  {key:'pct_stadsverwarming',   naam:'Stadsverwarming',         eenheid:'%',         icon:'water_heater',        cat:'wonen'},
+  {key:'pct_huurcorporatie',    naam:'Huur woningcorporatie',   eenheid:'%',         icon:'corporate_fare',      cat:'wonen'},
+
+  // ── Energie ──
+  {key:'gem_aardgas',           naam:'Gem. aardgas',            eenheid:'m\u00b3',   icon:'local_fire_department',cat:'energie'},
+  {key:'gem_elektriciteit',     naam:'Gem. elektriciteit',      eenheid:'kWh',       icon:'bolt',                cat:'energie'},
+
+  // ── Economie & Arbeid ──
+  {key:'arbeidsparticipatie',   naam:'Arbeidsparticipatie',     eenheid:'%',         icon:'work',                cat:'economie'},
+  {key:'bedrijfsvestigingen',   naam:'Bedrijfsvestigingen',     eenheid:'aantal',    icon:'business',            cat:'economie'},
+  {key:'pct_werknemers',        naam:'Werknemers',              eenheid:'%',         icon:'badge',               cat:'economie'},
+  {key:'pct_zelfstandigen',     naam:'Zelfstandigen',           eenheid:'%',         icon:'storefront',          cat:'economie'},
+
+  // ── Sociale Zekerheid & Zorg ──
+  {key:'wmo_per_1000',          naam:'WMO-cli\u00ebnten/1000 inw.',eenheid:'\u2030', icon:'accessible',          cat:'sociale_zekerheid'},
+  {key:'pct_jeugdzorg',         naam:'Jongeren met jeugdzorg',  eenheid:'%',         icon:'child_care',          cat:'sociale_zekerheid'},
+
+  // ── Voorzieningen ──
+  {key:'afstand_huisarts',      naam:'Afstand huisarts',        eenheid:'km',        icon:'local_hospital',      cat:'voorzieningen'},
+  {key:'afstand_supermarkt',    naam:'Afstand supermarkt',      eenheid:'km',        icon:'shopping_cart',       cat:'voorzieningen'},
+  {key:'afstand_treinstation',  naam:'Afstand treinstation',    eenheid:'km',        icon:'train',               cat:'voorzieningen'},
+  {key:'afstand_apotheek',      naam:'Afstand apotheek',        eenheid:'km',        icon:'local_pharmacy',      cat:'voorzieningen'},
+  {key:'afstand_basisonderwijs',naam:'Afstand basisschool',     eenheid:'km',        icon:'school',              cat:'voorzieningen'},
+  {key:'afstand_kdv',           naam:'Afstand kinderdagverblijf',eenheid:'km',       icon:'child_friendly',      cat:'voorzieningen'},
+  {key:'afstand_ziekenhuis',    naam:'Afstand ziekenhuis',      eenheid:'km',        icon:'emergency',           cat:'voorzieningen'},
+  {key:'afstand_bibliotheek',   naam:'Afstand bibliotheek',     eenheid:'km',        icon:'local_library',       cat:'voorzieningen'},
+  {key:'afstand_restaurant',    naam:'Afstand restaurant',      eenheid:'km',        icon:'restaurant',          cat:'voorzieningen'},
+  {key:'afstand_cafe',          naam:'Afstand caf\u00e9',       eenheid:'km',        icon:'local_bar',           cat:'voorzieningen'},
+
+  // ── Natuur & Groen ──
+  {key:'afstand_park',          naam:'Afstand park/plantsoen',  eenheid:'km',        icon:'park',                cat:'natuur'},
+  {key:'afstand_bos',           naam:'Afstand bos',             eenheid:'km',        icon:'forest',              cat:'natuur'},
+  {key:'afstand_openbaar_groen',naam:'Afstand openbaar groen',  eenheid:'km',        icon:'grass',               cat:'natuur'},
+  {key:'afstand_natuur',        naam:'Afstand natuurterrein',   eenheid:'km',        icon:'landscape',           cat:'natuur'},
+  {key:'afstand_sportterrein',  naam:'Afstand sportterrein',    eenheid:'km',        icon:'sports_soccer',       cat:'natuur'},
+
+  // ── Mobiliteit ──
+  {key:'personenautos',         naam:"Personenauto's",          eenheid:'aantal',    icon:'directions_car',      cat:'mobiliteit'},
+  {key:'auto_per_huishouden',   naam:"Auto's per huishouden",   eenheid:'aantal',    icon:'garage',              cat:'mobiliteit'},
+  {key:'auto_per_km2',          naam:"Auto's per km\u00b2",     eenheid:'aantal',    icon:'traffic',             cat:'mobiliteit'},
+  {key:'motorfietsen',          naam:'Motorfietsen',            eenheid:'aantal',    icon:'two_wheeler',         cat:'mobiliteit'},
+  {key:'afstand_oprit',         naam:'Afstand oprit snelweg',   eenheid:'km',        icon:'edit_road',           cat:'mobiliteit'},
+
+  // ── Oppervlakte ──
+  {key:'opp_land',              naam:'Oppervlakte land',        eenheid:'ha',        icon:'terrain',             cat:'oppervlakte'},
+  {key:'opp_water',             naam:'Oppervlakte water',       eenheid:'ha',        icon:'water',               cat:'oppervlakte'},
+];
+
+// Welke categorieën zijn ingeklapt (default: meeste dicht, kern-categorieën open)
+var _collapsedCategories = {
+  herkomst:true, huishoudens:true, opleiding:true, sociale_zekerheid:true,
+  natuur:true, oppervlakte:true
+};
 
 // Actieve indicatoren (toggle aan/uit), eerste = primair (kaartkleur)
 var _activeIndicators = ['gem_woz_waarde','aantal_inwoners','gem_inkomen_inwoner'];
 
-var REVERSE_KEYS = ['afstand_huisarts','afstand_supermarkt'];
+var REVERSE_KEYS = ['afstand_huisarts','afstand_supermarkt','afstand_treinstation','afstand_apotheek','afstand_basisonderwijs','afstand_kdv','afstand_ziekenhuis','afstand_bibliotheek','afstand_restaurant','afstand_cafe','afstand_park','afstand_bos','afstand_openbaar_groen','afstand_natuur','afstand_sportterrein','afstand_oprit','pct_leegstand','pct_rond_sociaal_min','pct_hh_laag_inkomen','opl_laag'];
 var COLORS = ['#1a2332','#1e3a5f','#1d6fa5','#22a7d3','#5ec69b','#a3d65c','#f5c842'];
 var COLORS_REVERSE = COLORS.slice().reverse();
 
@@ -4324,33 +4448,27 @@ function showFeatureInfo(p, cfg, type, isClick, geoFeature){
   var findings = [];
 
   // Groepeer indicatoren per categorie
-  var categories = [
-    {label:'Bevolking', icon:'groups', color:'var(--ac)', keys:['aantal_inwoners','mannen','vrouwen','0_15','15_25','25_45','45_65','65plus','bevolkingsdichtheid','huishoudens','gem_huishouden_grootte']},
-    {label:'Woningen', icon:'home', color:'var(--wn)', keys:['woningvoorraad','gem_woz_waarde','koopwoningen','huurwoningen','pct_eengezins']},
-    {label:'Energie', icon:'bolt', color:'var(--cyan)', keys:['gem_aardgas','gem_elektriciteit']},
-    {label:'Economie', icon:'payments', color:'var(--ai)', keys:['gem_inkomen_inwoner','arbeidsparticipatie','bedrijfsvestigingen','personenautos']},
-    {label:'Voorzieningen', icon:'local_hospital', color:'#f59e0b', keys:['afstand_huisarts','afstand_supermarkt']}
-  ];
-
+  // Gebruik centrale INDICATOR_CATEGORIES voor tooltip categorisering
   if(isClick){
     // UITGEBREID: alle indicatoren per categorie
-    categories.forEach(function(cat){
+    INDICATOR_CATEGORIES.forEach(function(cat){
+      var catInds = INDICATORS.filter(function(fm){ return fm.cat === cat.id; });
       var catHtml = '';
       var catCount = 0;
-      cat.keys.forEach(function(k){
-        var v = p[k];
+      catInds.forEach(function(fm){
+        var v = p[fm.key];
         if(v !== undefined && v !== null){
-          catHtml += buildCompareHtml(k, v);
+          catHtml += buildCompareHtml(fm.key, v);
           catCount++;
-          var ns = _nationalStats[k];
+          var ns = _nationalStats[fm.key];
           if(ns && ns.stddev > 0){
-            findings.push({level:typeLabel, naam:name, key:k, val:v, z:(v-ns.avg)/ns.stddev, avg:ns.avg, stddev:ns.stddev});
+            findings.push({level:typeLabel, naam:name, key:fm.key, val:v, z:(v-ns.avg)/ns.stddev, avg:ns.avg, stddev:ns.stddev});
           }
         }
       });
       if(catCount > 0){
         html += '<div style="padding-top:6px;border-top:1px solid var(--glass-bd);margin-top:4px">';
-        html += '<div style="font:600 10px DM Sans,sans-serif;color:'+cat.color+';margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">'+cat.icon+'</span> '+cat.label+' <span style="font-weight:400;color:var(--mt)">('+catCount+')</span></div>';
+        html += '<div style="font:600 10px DM Sans,sans-serif;color:'+cat.color+';margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">'+cat.icon+'</span> '+cat.naam+' <span style="font-weight:400;color:var(--mt)">('+catCount+')</span></div>';
         html += catHtml + '</div>';
       }
     });
@@ -4430,20 +4548,51 @@ function buildIndicatorList(){
   var html = '';
   var yearInds = _yearIndicators[_activeYear];
   var avSet = yearInds ? new Set(yearInds) : null;
-  INDICATORS.forEach(function(fm){
-    var hasData = !avSet || avSet.has(fm.key);
-    if(!hasData) return; // Verberg indicatoren zonder data voor dit jaar
-    var isActive = _activeIndicators.indexOf(fm.key) >= 0;
-    var isPrimary = _activeIndicators[0] === fm.key;
-    var cls = isPrimary ? 'ind-item primary' : (isActive ? 'ind-item active' : 'ind-item');
-    html += '<div class="'+cls+'" data-ind="'+fm.key+'" onclick="toggleIndicator(\''+fm.key+'\')">';
-    html += '<div class="ind-icon"><span class="mi">'+fm.icon+'</span></div>';
-    html += '<span class="ind-name">'+fm.naam+'</span>';
-    html += '<span class="ind-unit">'+fm.eenheid+'</span>';
-    html += '<span class="ind-badge">KAART</span>';
+
+  // Groepeer indicatoren per categorie
+  INDICATOR_CATEGORIES.forEach(function(cat){
+    var catInds = INDICATORS.filter(function(fm){
+      if(fm.cat !== cat.id) return false;
+      return !avSet || avSet.has(fm.key);
+    });
+    if(catInds.length === 0) return;
+
+    var isCollapsed = _collapsedCategories[cat.id] || false;
+    var activeCount = catInds.filter(function(fm){ return _activeIndicators.indexOf(fm.key) >= 0; }).length;
+
+    // Categorie-header met kleurstijl
+    html += '<div class="ind-cat-header'+(isCollapsed?' collapsed':'')+'" onclick="toggleCategory(\''+cat.id+'\')" style="--cat-color:'+cat.color+'">';
+    html += '<div class="ind-cat-left">';
+    html += '<span class="mi ind-cat-chevron">'+(isCollapsed?'chevron_right':'expand_more')+'</span>';
+    html += '<span class="mi ind-cat-icon" style="color:'+cat.color+'">'+cat.icon+'</span>';
+    html += '<span class="ind-cat-name">'+cat.naam+'</span>';
     html += '</div>';
+    html += '<span class="ind-cat-count'+(activeCount>0?' has-active':'')+'">'+activeCount+'/'+catInds.length+'</span>';
+    html += '</div>';
+
+    if(!isCollapsed){
+      catInds.forEach(function(fm){
+        var isActive = _activeIndicators.indexOf(fm.key) >= 0;
+        var isPrimary = _activeIndicators[0] === fm.key;
+        var cls = isPrimary ? 'ind-item primary' : (isActive ? 'ind-item active' : 'ind-item');
+        // Geef categorie-kleur door als CSS custom property
+        html += '<div class="'+cls+'" data-ind="'+fm.key+'" style="--cat-color:'+cat.color+'" onclick="toggleIndicator(\''+fm.key+'\')" title="Dubbelklik: maak primair (kaartkleur)">';
+        html += '<div class="ind-icon"><span class="mi">'+fm.icon+'</span></div>';
+        html += '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">';
+        html += '<span class="ind-name">'+fm.naam+'</span>';
+        html += '<span class="ind-unit">'+fm.eenheid+'</span>';
+        html += '</div>';
+        html += '<span class="ind-badge">KAART</span>';
+        html += '</div>';
+      });
+    }
   });
   el.innerHTML = html;
+}
+
+function toggleCategory(catId){
+  _collapsedCategories[catId] = !_collapsedCategories[catId];
+  buildIndicatorList();
 }
 
 function toggleIndicator(key){
@@ -5360,30 +5509,92 @@ function toggleSidebar(){
 
 // Uitleg per indicator
 var INDICATOR_UITLEG = {
+  // Bevolking
   'aantal_inwoners': 'Totaal aantal geregistreerde inwoners in het gebied. Gebaseerd op de BRP (Basisregistratie Personen).',
   'mannen': 'Aantal mannelijke inwoners geregistreerd in het gebied.',
   'vrouwen': 'Aantal vrouwelijke inwoners geregistreerd in het gebied.',
+  'bevolkingsdichtheid': 'Inwoners per vierkante kilometer. Stedelijke gebieden: >2500, landelijk: <500.',
+  'geboorte_relatief': 'Aantal levendgeborenen per 1000 inwoners. Landelijk gemiddeld circa 10.',
+  'sterfte_relatief': 'Aantal sterfgevallen per 1000 inwoners. Hoger in vergrijsde gebieden.',
+  'stedelijkheid': 'Omgevingsadressendichtheid (OAD): adressen per km\u00b2. CBS stedelijkheidsklasse.',
+  // Leeftijd
   '0_15': 'Percentage van de bevolking jonger dan 15 jaar. Indicator voor gezinnen met jonge kinderen.',
   '15_25': 'Percentage 15-24 jarigen. Hoog percentage kan wijzen op studentenpopulatie.',
   '25_45': 'Percentage 25-44 jarigen. De werkende en gezinsvormende leeftijdsgroep.',
   '45_65': 'Percentage 45-64 jarigen. Vaak gevestigde bewoners met stabiel inkomen.',
   '65plus': 'Percentage 65-plussers. Hoog percentage duidt op vergrijzing en hogere zorgbehoefte.',
-  'bevolkingsdichtheid': 'Inwoners per vierkante kilometer. Stedelijke gebieden: >2500, landelijk: <500.',
+  // Herkomst
+  'pct_herkomst_nl': 'Percentage inwoners met herkomstland Nederland. CBS definitie op basis van geboorteland (ouders).',
+  'pct_herkomst_europa': 'Percentage inwoners met herkomstland in Europa (exclusief Nederland).',
+  'pct_herkomst_buiten_europa': 'Percentage inwoners met herkomstland buiten Europa.',
+  // Huishoudens
   'huishoudens': 'Totaal aantal huishoudens (alleenstaand, samenwonend, gezin) in het gebied.',
   'gem_huishouden_grootte': 'Gemiddeld aantal personen per huishouden. Landelijk circa 2,1. Lager = meer alleenstaanden.',
+  'pct_eenpersoonshhd': 'Percentage eenpersoonshuishoudens. In grote steden vaak >50%.',
+  'pct_hhd_met_kind': 'Percentage huishoudens met thuiswonende kinderen. Indicator voor gezinswijken.',
+  'pct_hhd_zonder_kind': 'Percentage meerpersoonshuishoudens zonder thuiswonende kinderen.',
+  'pct_gehuwd': 'Percentage gehuwde personen van de bevolking van 15 jaar en ouder.',
+  'pct_ongehuwd': 'Percentage ongehuwde personen van de bevolking van 15 jaar en ouder.',
+  // Opleiding
+  'opl_hoog': 'Percentage bevolking (15-75 jr) met hbo of wo diploma. Indicator voor kenniseconomie.',
+  'opl_midden': 'Percentage bevolking (15-75 jr) met mbo 2-4, havo of vwo diploma.',
+  'opl_laag': 'Percentage bevolking (15-75 jr) met maximaal vmbo of vergelijkbaar. Aandachtspunt voor participatie.',
+  // Inkomen
+  'gem_inkomen_inwoner': 'Gemiddeld besteedbaar inkomen per inwoner. Inclusief lonen, uitkeringen en pensioenen.',
+  'gem_inkomen_ontvanger': 'Gemiddeld besteedbaar inkomen per inkomensontvanger. Hoger dan per inwoner (kinderen tellen niet mee).',
+  'gem_gestand_inkomen': 'Gemiddeld gestandaardiseerd inkomen van huishoudens. Gecorrigeerd voor huishoudensgrootte.',
+  'mediaan_vermogen': 'Mediaan vermogen van particuliere huishoudens. 50e percentiel, inclusief woningwaarde.',
+  'pct_hh_hoog_inkomen': 'Percentage huishoudens met hoog inkomen (boven 200% modaal).',
+  'pct_hh_laag_inkomen': 'Percentage huishoudens met laag inkomen (onder 40% van mediaan). Indicator voor armoede.',
+  'pct_rond_sociaal_min': 'Percentage huishoudens onder of rond het sociaal minimum. Armoede-indicator.',
+  // Wonen
   'woningvoorraad': 'Totaal aantal woningen in het gebied, ongeacht of ze bewoond zijn.',
   'gem_woz_waarde': 'Gemiddelde WOZ-waarde (Wet Waardering Onroerende Zaken) van woningen. Bepalend voor OZB belasting.',
   'koopwoningen': 'Percentage woningen in eigendom. Hoger = meer vermogensopbouw bij bewoners.',
   'huurwoningen': 'Percentage huurwoningen (sociaal + vrije sector). Hoger = meer doorstroom.',
   'pct_eengezins': 'Percentage eengezinswoningen (rijtjes, twee-onder-een-kap, vrijstaand). Typisch voor suburbaan.',
+  'pct_meergezins': 'Percentage meergezinswoningen (appartementen, flats). Typisch voor stedelijk.',
+  'pct_bouwjaar_na_2000': 'Percentage woningen gebouwd na 2000. Indicator voor nieuwbouw en energiezuinigheid.',
+  'pct_leegstand': 'Percentage leegstaande woningen. Hoog = aandachtspunt voor woningmarkt.',
+  'pct_stadsverwarming': 'Percentage woningen aangesloten op stadsverwarming (warmtenet).',
+  'pct_huurcorporatie': 'Percentage huurwoningen in bezit van woningcorporaties. Sociale huursector.',
+  // Energie
   'gem_aardgas': 'Gemiddeld jaarlijks aardgasverbruik per woning in m\u00b3. Hoger = mogelijk slecht ge\u00efsoleerd.',
   'gem_elektriciteit': 'Gemiddeld jaarlijks elektriciteitsverbruik per woning in kWh. Inclusief warmtepompen.',
-  'gem_inkomen_inwoner': 'Gemiddeld besteedbaar inkomen per inwoner. Inclusief lonen, uitkeringen en pensioenen.',
+  // Economie
   'arbeidsparticipatie': 'Netto arbeidsparticipatie: percentage 15-74 jarigen dat minimaal 12 uur per week werkt.',
   'bedrijfsvestigingen': 'Aantal geregistreerde bedrijfsvestigingen (KvK). Indicator voor lokale economische activiteit.',
-  'personenautos': 'Totaal aantal geregistreerde personenauto\'s. Indicator voor mobiliteit en autobezit.',
+  'pct_werknemers': 'Percentage werknemers van de 15-74 jarige bevolking.',
+  'pct_zelfstandigen': 'Percentage zelfstandigen (zzp, freelance) van de 15-74 jarige bevolking.',
+  // Sociale zekerheid
+  'wmo_per_1000': 'Aantal WMO-cli\u00ebnten per 1000 inwoners. Wet maatschappelijke ondersteuning (hulp bij huishouden, dagbesteding).',
+  'pct_jeugdzorg': 'Percentage jongeren (0-23 jaar) dat jeugdzorg in natura ontvangt.',
+  // Voorzieningen
   'afstand_huisarts': 'Gemiddelde afstand tot dichtstbijzijnde huisartsenpraktijk in km. >2 km = aandachtspunt.',
-  'afstand_supermarkt': 'Gemiddelde afstand tot dichtstbijzijnde grote supermarkt in km. >3 km = voedselwoestijn.'
+  'afstand_supermarkt': 'Gemiddelde afstand tot dichtstbijzijnde grote supermarkt in km. >3 km = voedselwoestijn.',
+  'afstand_treinstation': 'Gemiddelde afstand tot dichtstbijzijnde treinstation in km.',
+  'afstand_apotheek': 'Gemiddelde afstand tot dichtstbijzijnde apotheek in km.',
+  'afstand_basisonderwijs': 'Gemiddelde afstand tot dichtstbijzijnde basisschool in km.',
+  'afstand_kdv': 'Gemiddelde afstand tot dichtstbijzijnde kinderdagverblijf in km.',
+  'afstand_ziekenhuis': 'Gemiddelde afstand tot dichtstbijzijnde ziekenhuis (excl. buitenpoli) in km.',
+  'afstand_bibliotheek': 'Gemiddelde afstand tot dichtstbijzijnde bibliotheek in km.',
+  'afstand_restaurant': 'Gemiddelde afstand tot dichtstbijzijnde restaurant in km.',
+  'afstand_cafe': 'Gemiddelde afstand tot dichtstbijzijnde caf\u00e9 in km.',
+  // Natuur
+  'afstand_park': 'Gemiddelde afstand tot dichtstbijzijnde park of plantsoen in km.',
+  'afstand_bos': 'Gemiddelde afstand tot dichtstbijzijnde bos in km.',
+  'afstand_openbaar_groen': 'Gemiddelde afstand tot dichtstbijzijnde openbaar groen in km.',
+  'afstand_natuur': 'Gemiddelde afstand tot dichtstbijzijnde open natuurterrein in km.',
+  'afstand_sportterrein': 'Gemiddelde afstand tot dichtstbijzijnde sportterrein in km.',
+  // Mobiliteit
+  'personenautos': 'Totaal aantal geregistreerde personenauto\'s. Indicator voor mobiliteit en autobezit.',
+  'auto_per_huishouden': 'Gemiddeld aantal personenauto\'s per huishouden.',
+  'auto_per_km2': 'Aantal personenauto\'s per vierkante kilometer.',
+  'motorfietsen': 'Totaal aantal geregistreerde motorfietsen en scooters.',
+  'afstand_oprit': 'Gemiddelde afstand tot dichtstbijzijnde oprit van een hoofdverkeersweg in km.',
+  // Oppervlakte
+  'opp_land': 'Oppervlakte land in hectaren (exclusief water).',
+  'opp_water': 'Oppervlakte binnenwater in hectaren.'
 };
 
 function renderIndicatorDefs(){
@@ -5396,23 +5607,15 @@ function renderIndicatorDefs(){
   // Zorg dat nationalStats berekend is
   if(!_nationalStats || Object.keys(_nationalStats).length === 0) computeNationalStats();
 
-  // Groepeer per categorie
-  var categories = [
-    {label:'Bevolking', icon:'groups', color:'var(--ac)', keys:['aantal_inwoners','mannen','vrouwen','0_15','15_25','25_45','45_65','65plus','bevolkingsdichtheid','huishoudens','gem_huishouden_grootte']},
-    {label:'Woningen & Vastgoed', icon:'home', color:'var(--wn)', keys:['woningvoorraad','gem_woz_waarde','koopwoningen','huurwoningen','pct_eengezins']},
-    {label:'Energie', icon:'bolt', color:'var(--cyan)', keys:['gem_aardgas','gem_elektriciteit']},
-    {label:'Economie', icon:'payments', color:'var(--ai)', keys:['gem_inkomen_inwoner','arbeidsparticipatie','bedrijfsvestigingen','personenautos']},
-    {label:'Voorzieningen', icon:'local_hospital', color:'#f59e0b', keys:['afstand_huisarts','afstand_supermarkt']}
-  ];
-
+  // Gebruik centrale INDICATOR_CATEGORIES
   var html = '<div style="font:500 10px \'Space Mono\',monospace;color:var(--ac);margin-bottom:8px">'+available.length+'/'+INDICATORS.length+' indicatoren beschikbaar voor '+_activeYear+'</div>';
 
-  categories.forEach(function(cat){
-    var catInds = available.filter(function(fm){ return cat.keys.indexOf(fm.key) > -1; });
+  INDICATOR_CATEGORIES.forEach(function(cat){
+    var catInds = available.filter(function(fm){ return fm.cat === cat.id; });
     if(catInds.length === 0) return;
 
     html += '<div style="margin-top:8px;margin-bottom:4px;font:700 10px \'DM Sans\',sans-serif;color:'+cat.color+';display:flex;align-items:center;gap:4px;text-transform:uppercase;letter-spacing:.5px">';
-    html += '<span class="mi mi-sm" style="color:'+cat.color+'">'+cat.icon+'</span> '+cat.label+' ('+catInds.length+')</div>';
+    html += '<span class="mi mi-sm" style="color:'+cat.color+'">'+cat.icon+'</span> '+cat.naam+' ('+catInds.length+')</div>';
 
     catInds.forEach(function(fm){
       var ns = _nationalStats[fm.key];

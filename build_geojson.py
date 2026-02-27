@@ -43,30 +43,106 @@ AVAILABLE_YEARS = [2012, 2017, 2018, 2019, 2022, 2023, 2024]
 # Mapping: app field key -> list of possible PDOK property names (ordered by preference)
 # Sommige velden veranderen van naam tussen jaren
 PDOK_FIELDS = {
+    # ── Bevolking ──
     "aantal_inwoners":        ["aantalInwoners"],
     "mannen":                 ["mannen"],
     "vrouwen":                ["vrouwen"],
+    "bevolkingsdichtheid":    ["bevolkingsdichtheidInwonersPerKm2"],
+    "geboorte_relatief":      ["geboortesPer1000Inwoners"],
+    "sterfte_relatief":       ["sterfteRelatief"],
+    "stedelijkheid":          ["stedelijkheidAdressenPerKm2"],
+    "omgevingsadressendichtheid": ["omgevingsadressendichtheid"],
+
+    # ── Leeftijdsopbouw ──
     "0_15":                   ["percentagePersonen0Tot15Jaar"],
     "15_25":                  ["percentagePersonen15Tot25Jaar"],
     "25_45":                  ["percentagePersonen25Tot45Jaar"],
     "45_65":                  ["percentagePersonen45Tot65Jaar"],
     "65plus":                 ["percentagePersonen65JaarEnOuder"],
+
+    # ── Herkomst & Diversiteit ──
+    "pct_herkomst_nl":              ["percentageMetHerkomstlandNederland", "percentageGebInNlMetHerkomstlandNederland"],
+    "pct_herkomst_europa":          ["percentageMetHerkomstlandUitEuropaExclNl"],
+    "pct_herkomst_buiten_europa":   ["percentageMetHerkomstlandBuitenEuropa"],
+
+    # ── Huishoudens ──
     "huishoudens":            ["aantalHuishoudens"],
     "gem_huishouden_grootte": ["gemiddeldeHuishoudsgrootte"],
-    "bevolkingsdichtheid":    ["bevolkingsdichtheidInwonersPerKm2"],
+    "pct_eenpersoonshhd":     ["percentageEenpersoonshuishoudens"],
+    "pct_hhd_met_kind":       ["percentageHuishoudensMetKinderen"],
+    "pct_hhd_zonder_kind":    ["percentageHuishoudensZonderKinderen"],
+    "pct_gehuwd":             ["percentageGehuwd"],
+    "pct_ongehuwd":           ["percentageOngehuwd"],
+
+    # ── Opleiding ──
+    "opl_hoog":               ["opleidingsniveauHoog"],
+    "opl_midden":             ["opleidingsniveauMiddelbaar"],
+    "opl_laag":               ["opleidingsniveauLaag"],
+
+    # ── Inkomen & Welvaart ──
+    "gem_inkomen_inwoner":    ["gemiddeldInkomenPerInwoner"],
+    "gem_inkomen_ontvanger":  ["gemiddeldInkomenPerInkomensontvanger"],
+    "gem_gestand_inkomen":    ["gemiddeldGestandaardiseerdInkomenVanHuishoudens"],
+    "mediaan_vermogen":       ["mediaanVermogenVanParticuliereHuish"],
+    "pct_hh_hoog_inkomen":    ["percentageHuishoudensMetHoogInkomen"],
+    "pct_hh_laag_inkomen":    ["percentageHuishoudensMetLaagInkomen"],
+    "pct_rond_sociaal_min":   ["percentageHuishoudensOnderOfRondSociaalMinimum"],
+
+    # ── Wonen & Woningmarkt ──
     "woningvoorraad":         ["woningvoorraad"],
     "gem_woz_waarde":         ["gemiddeldeWoningwaarde"],
     "koopwoningen":           ["percentageKoopwoningen"],
     "huurwoningen":           ["percentageHuurwoningen"],
     "pct_eengezins":          ["percentageEengezinswoning"],
+    "pct_meergezins":         ["percentageMeergezinswoning"],
+    "pct_bouwjaar_na_2000":   ["percentageBouwjaarklasseVanaf2000"],
+    "pct_leegstand":          ["percentageLeegstandWoningen"],
+    "pct_stadsverwarming":    ["percentageWoningenMetStadsverwarming"],
+    "pct_huurcorporatie":     ["percHuurwoningenInBezitWoningcorporaties"],
+
+    # ── Energie ──
     "gem_aardgas":            ["gemiddeldGasverbruikTotaal"],
     "gem_elektriciteit":      ["gemiddeldElektriciteitsverbruikTotaal"],
-    "gem_inkomen_inwoner":    ["gemiddeldInkomenPerInwoner", "gemiddeldInkomenPerInkomensontvanger"],
+
+    # ── Economie & Arbeid ──
     "arbeidsparticipatie":    ["nettoArbeidsparticipatie"],
     "bedrijfsvestigingen":    ["aantalBedrijfsvestigingen"],
+    "pct_werknemers":         ["percentageWerknemers"],
+    "pct_zelfstandigen":      ["percentageZelfstandigen"],
+
+    # ── Sociale Zekerheid & Zorg ──
+    "wmo_per_1000":           ["aantalWmoClientenPer1000Inwoners"],
+    "pct_jeugdzorg":          ["percentageJongerenMetJeugdzorgInNatura"],
+
+    # ── Voorzieningen (afstand in km) ──
     "afstand_huisarts":       ["huisartsenpraktijkGemiddeldeAfstandInKm"],
     "afstand_supermarkt":     ["groteSupermarktGemiddeldeAfstandInKm"],
+    "afstand_treinstation":   ["treinstationGemiddeldeAfstandInKm"],
+    "afstand_apotheek":       ["apotheekGemiddeldeAfstandInKm"],
+    "afstand_basisonderwijs": ["basisonderwijsGemiddeldeAfstandInKm"],
+    "afstand_kdv":            ["kinderdagverblijfGemiddeldeAfstandInKm"],
+    "afstand_ziekenhuis":     ["ziekenhuisExclBuitenpolikliniekGemAfstInKm"],
+    "afstand_bibliotheek":    ["bibliotheekGemiddeldeAfstandInKm"],
+    "afstand_restaurant":     ["restaurantGemiddeldeAfstandInKm"],
+    "afstand_cafe":           ["cafeGemiddeldeAfstandInKm"],
+
+    # ── Natuur & Groen (afstand in km) ──
+    "afstand_park":           ["afstandTotParkOfPlantsoen"],
+    "afstand_bos":            ["afstandTotBos"],
+    "afstand_openbaar_groen": ["afstandTotOpenbaarGroenTotaal"],
+    "afstand_natuur":         ["afstandTotOpenNatuurTerreinTotaal"],
+    "afstand_sportterrein":   ["afstandTotSportterrein"],
+
+    # ── Mobiliteit ──
     "personenautos":          ["personenautosTotaal"],
+    "auto_per_huishouden":    ["personenautosPerHuishouden"],
+    "auto_per_km2":           ["personenautosPerKm2"],
+    "motorfietsen":           ["motortweewielersTotaal"],
+    "afstand_oprit":          ["opritHoofdverkeerswegGemiddeldeAfstandInKm"],
+
+    # ── Oppervlakte ──
+    "opp_land":               ["oppervlakteLandInHa"],
+    "opp_water":              ["oppervlakteWaterInHa"],
 }
 
 # Admin-velden per type
@@ -167,9 +243,10 @@ def download_features(base_url, type_name, prop_names, expected_total=-1):
             "srsName": "EPSG:4326", "count": PAGE_SIZE, "startIndex": start,
             "propertyName": prop_str,
         }
+
         pct = f" ({len(all_features)}/{expected_total})" if expected_total > 0 else f" ({len(all_features)})"
         log.info(f"  PDOK page startIndex={start}{pct}...")
-        resp = requests.get(base_url, params=params, timeout=120)
+        resp = requests.get(base_url, params=params, timeout=600)
         resp.raise_for_status()
         data = resp.json()
         features = data.get("features", [])
