@@ -585,11 +585,11 @@ select option{background:var(--bg);color:var(--tx)}
       <div class="sh"><span class="mi">science</span> Extra Domeinen</div>
       <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
         <div class="ms-box domain-toggle" id="domToggleBodem" onclick="toggleDomain('bodemgebruik')" style="padding:6px 10px">
-          <span style="display:flex;align-items:center;gap:6px"><span class="mi mi-sm" style="color:#a3e635;font-size:15px">landscape</span><span style="font-size:11px">Bodemgebruik</span></span>
+          <span style="display:flex;align-items:center;gap:6px"><span class="mi mi-sm" style="color:#a3e635;font-size:15px">landscape</span><span style="font-size:11px">Bodemgebruik</span><span id="bbgPeiljaarBadge" style="font:500 8px Space Mono,monospace;color:var(--mt);opacity:.6"></span></span>
           <span class="mi mi-sm dom-toggle-icon" style="font-size:18px;color:var(--mt)">toggle_off</span>
         </div>
         <div class="ms-box domain-toggle" id="domToggleFlora" onclick="toggleDomain('flora_fauna')" style="padding:6px 10px">
-          <span style="display:flex;align-items:center;gap:6px"><span class="mi mi-sm" style="color:#84cc16;font-size:15px">pets</span><span style="font-size:11px">Flora & Fauna</span></span>
+          <span style="display:flex;align-items:center;gap:6px"><span class="mi mi-sm" style="color:#84cc16;font-size:15px">pets</span><span style="font-size:11px">Flora & Fauna</span><span style="font:500 8px Space Mono,monospace;color:var(--mt);opacity:.6">geen data</span></span>
           <span class="mi mi-sm dom-toggle-icon" style="font-size:18px;color:var(--mt)">toggle_off</span>
         </div>
         <div class="ms-box domain-toggle" id="domToggleLandbouw" onclick="toggleDomain('landbouw')" style="padding:6px 10px">
@@ -1186,6 +1186,7 @@ function buildBasemapButtons(){
 // JAAR SELECTIE
 // ============================================================
 var _yearIndicators = {}; // Cache: {2022: ['aantal_inwoners','gem_woz_waarde',...]}
+var _bbgPeiljaar = null;  // Bodemgebruik peiljaar uit metadata (bv. 2017)
 
 function buildYearButtons(){
   var el = document.getElementById('yearBtns');
@@ -1240,6 +1241,7 @@ function switchYear(year){
     var meta = d.metadata || {};
     var availableIndicators = meta.indicators || [];
     _yearIndicators[year] = availableIndicators;
+    _bbgPeiljaar = meta.bbg_peiljaar || null;
     updateYearInfo(year, meta);
     filterIndicatorsByYear(availableIndicators);
 
@@ -3647,6 +3649,12 @@ function loadBagForSelection(){
 
   if(targets.length === 0) return Promise.resolve(0);
 
+  // Bereken verwacht totaal uit prefetch index
+  var expectedTotal = 0;
+  targets.forEach(function(gem){
+    if(_bagIndex && _bagIndex[gem.code]) expectedTotal += (_bagIndex[gem.code].count || 0);
+  });
+
   // UI
   var progEl = document.getElementById('bagBgProgress');
   progEl.style.display = 'block';
@@ -3657,6 +3665,7 @@ function loadBagForSelection(){
   bgText.textContent = 'BAG adressen laden...';
   bgPct.textContent = '0%';
   bgBar.style.width = '0%';
+  if(expectedTotal > 0) bgDetail.textContent = 'Verwacht: '+expectedTotal.toLocaleString('nl-NL')+' adressen in '+targets.length+' gemeenten';
 
   var totalLoaded = 0;
   var completed = 0;
@@ -3671,7 +3680,7 @@ function loadBagForSelection(){
         var pct = Math.round(completed / targets.length * 100);
         bgPct.textContent = pct + '%';
         bgBar.style.width = pct + '%';
-        bgDetail.textContent = completed+'/'+targets.length+' gemeenten \u00b7 '+totalLoaded.toLocaleString('nl-NL')+' adressen';
+        bgDetail.textContent = completed+'/'+targets.length+' gemeenten \u00b7 '+totalLoaded.toLocaleString('nl-NL')+(expectedTotal > 0 ? ' / '+expectedTotal.toLocaleString('nl-NL') : '')+' adressen';
       }).catch(function(e){
         console.warn('BAG pre-built niet beschikbaar voor '+gem.naam+': '+e.message);
         completed++;
@@ -3684,13 +3693,13 @@ function loadBagForSelection(){
     bgText.textContent = 'Klaar!';
     bgPct.textContent = '100%';
     bgBar.style.width = '100%';
-    bgDetail.textContent = totalLoaded.toLocaleString('nl-NL')+' adressen geladen voor '+targets.length+' gemeenten';
+    bgDetail.textContent = totalLoaded.toLocaleString('nl-NL')+(expectedTotal > 0 ? ' / '+expectedTotal.toLocaleString('nl-NL') : '')+' adressen geladen voor '+targets.length+' gemeenten';
     updateBagCacheUI();
     // Render op kaart
     _bagVectorData = getCachedBagFeatures();
     renderBagVectors();
     updateBagStatusCountsFromData();
-    toast(totalLoaded.toLocaleString('nl-NL')+' BAG adressen geladen \u2714');
+    toast(totalLoaded.toLocaleString('nl-NL')+(expectedTotal > 0 ? ' / '+expectedTotal.toLocaleString('nl-NL') : '')+' BAG adressen geladen \u2714');
     setTimeout(function(){ progEl.style.display = 'none'; }, 5000);
     return totalLoaded;
   });
@@ -4653,6 +4662,10 @@ function buildIndicatorList(){
     html += '<span class="mi ind-cat-chevron">'+(isCollapsed?'chevron_right':'expand_more')+'</span>';
     html += '<span class="mi ind-cat-icon" style="color:'+cat.color+'">'+cat.icon+'</span>';
     html += '<span class="ind-cat-name">'+cat.naam+'</span>';
+    // Peiljaar badge voor bodemgebruik
+    if(cat.id === 'bodemgebruik' && _bbgPeiljaar){
+      html += '<span style="font:500 8px Space Mono,monospace;color:var(--mt);opacity:.7;margin-left:4px">('+_bbgPeiljaar+')</span>';
+    }
     html += '</div>';
     html += '<span class="ind-cat-count'+(activeCount>0?' has-active':'')+'">'+activeCount+'/'+catInds.length+'</span>';
     html += '</div>';
@@ -4776,6 +4789,9 @@ function updateDomainToggles(){
       if(icon) icon.textContent = 'toggle_off';
     }
   });
+  // Bodemgebruik peiljaar badge
+  var pjBadge = document.getElementById('bbgPeiljaarBadge');
+  if(pjBadge) pjBadge.textContent = _bbgPeiljaar ? '(peiljaar '+_bbgPeiljaar+')' : '';
 }
 
 function toggleCategory(catId){
