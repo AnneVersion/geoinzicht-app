@@ -4606,9 +4606,23 @@ function formatVal(v){
 function updateLegend(breaks, colors){
   var el = document.getElementById('legend');
   var html = '';
-  var labels = ['< '+formatVal(breaks[0])];
-  for(var i=0;i<breaks.length-1;i++) labels.push(formatVal(breaks[i])+' \u2013 '+formatVal(breaks[i+1]));
-  labels.push('> '+formatVal(breaks[breaks.length-1]));
+  // Toon actieve indicator naam + eenheid
+  var primaryKey = _activeIndicators.length > 0 ? _activeIndicators[0] : '';
+  var primaryInd = INDICATORS.filter(function(fm){ return fm.key === primaryKey; })[0];
+  var primaryCat = primaryInd ? INDICATOR_CATEGORIES.filter(function(c){ return c.id === primaryInd.cat; })[0] : null;
+  if(primaryInd){
+    var catColor = primaryCat ? primaryCat.color : 'var(--ac)';
+    var catIcon = primaryCat ? primaryCat.icon : 'bar_chart';
+    html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--glass-bd)">';
+    html += '<span class="mi" style="font-size:16px;color:'+catColor+'">'+catIcon+'</span>';
+    html += '<span style="font:600 11px DM Sans,sans-serif;color:var(--tx)">'+primaryInd.naam+'</span>';
+    html += '<span style="font:500 9px Space Mono,monospace;color:var(--mt);margin-left:auto">'+primaryInd.eenheid+'</span>';
+    html += '</div>';
+  }
+  var unit = primaryInd ? primaryInd.eenheid : '';
+  var labels = ['< '+formatVal(breaks[0])+(unit?' '+unit:'')];
+  for(var i=0;i<breaks.length-1;i++) labels.push(formatVal(breaks[i])+' \u2013 '+formatVal(breaks[i+1])+(unit?' '+unit:''));
+  labels.push('> '+formatVal(breaks[breaks.length-1])+(unit?' '+unit:''));
   for(var i=0;i<colors.length;i++)
     html += '<div class="legend-row"><div class="legend-color" style="background:'+colors[i]+'"></div><span>'+(labels[i]||'')+'</span></div>';
   el.innerHTML = html;
@@ -4761,10 +4775,19 @@ function toggleDomain(catId){
       if(idx >= 0 && _activeIndicators.length > 1) _activeIndicators.splice(idx,1);
     });
   } else {
-    // Alles aan + uitklappen
+    // Alles aan + uitklappen + eerste wordt primair (kaartkleur + legenda)
     catInds.forEach(function(fm){
       if(_activeIndicators.indexOf(fm.key) < 0) _activeIndicators.push(fm.key);
     });
+    // Maak eerste indicator van dit domein primair
+    if(catInds.length > 0){
+      var firstKey = catInds[0].key;
+      var fIdx = _activeIndicators.indexOf(firstKey);
+      if(fIdx > 0){
+        _activeIndicators.splice(fIdx, 1);
+        _activeIndicators.unshift(firstKey);
+      }
+    }
     _collapsedCategories[catId] = false;
   }
   buildIndicatorList();
@@ -4807,7 +4830,8 @@ function toggleIndicator(key){
     _activeIndicators.splice(idx, 1);
     logEvent('indicator_uit', key);
   } else {
-    _activeIndicators.push(key);
+    // Nieuwe indicator wordt meteen primair (kaartkleur + legenda)
+    _activeIndicators.unshift(key);
     logEvent('indicator_aan', key);
   }
   buildIndicatorList();
