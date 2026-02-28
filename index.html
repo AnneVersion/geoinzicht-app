@@ -143,6 +143,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);overf
 .ms-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;background:rgba(57,255,20,.1);color:var(--ac);font:600 10px 'DM Sans',sans-serif;border-radius:12px;cursor:pointer;transition:background .15s}
 .ms-chip:hover{background:rgba(57,255,20,.2)}
 .ms-chip .mi{font-size:12px}
+.domain-toggle{cursor:pointer;transition:all .2s}
+.domain-toggle:hover{border-color:rgba(57,255,20,.2)}
+.domain-toggle.active{background:rgba(57,255,20,.08);border-color:rgba(57,255,20,.2)}
+.domain-toggle.active .dom-toggle-icon{color:var(--ac)!important}
 .ms-loadbtn{width:100%;margin-top:8px;padding:9px 12px;background:linear-gradient(135deg,rgba(57,255,20,.15),rgba(6,182,212,.1));color:var(--ac);border:1px solid rgba(57,255,20,.2);border-radius:8px;font:600 12px 'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s}
 .ms-loadbtn:hover{background:linear-gradient(135deg,rgba(57,255,20,.25),rgba(6,182,212,.15));transform:translateY(-1px)}
 /* Tabs */
@@ -268,46 +272,43 @@ select option{background:var(--bg);color:var(--tx)}
 .ind-search-info b{color:var(--ac);font-weight:700}
 .ind-search-highlight{color:var(--ac);font-weight:700;text-decoration:underline;text-underline-offset:2px}
 
-/* ── Indicator Category Headers ── */
-.ind-cat-header{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;margin:6px 0 2px;border-radius:10px;cursor:pointer;user-select:none;-webkit-user-select:none;transition:all .25s ease;background:linear-gradient(135deg,color-mix(in srgb,var(--cat-color) 14%,rgba(15,20,35,.9)) 0%,color-mix(in srgb,var(--cat-color) 5%,rgba(15,20,35,.6)) 100%);border:1px solid color-mix(in srgb,var(--cat-color) 20%,transparent);border-left:3px solid var(--cat-color,var(--mt));position:relative;overflow:hidden;flex-shrink:0;backdrop-filter:blur(8px)}
-.ind-cat-header::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--cat-color) 15%,transparent),transparent 70%);opacity:0;transition:opacity .25s}
-.ind-cat-header:hover::before{opacity:1}
-.ind-cat-header:hover{border-color:color-mix(in srgb,var(--cat-color) 35%,transparent);transform:translateX(2px)}
+/* ── Indicator Category Headers (ms-box stijl) ── */
+.ind-cat-header{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;margin:2px 0 0;border-radius:8px;cursor:pointer;user-select:none;-webkit-user-select:none;transition:all .2s;background:var(--glass);border:1px solid transparent;flex-shrink:0;font-size:12px;color:var(--tx)}
+.ind-cat-header:hover{border-color:rgba(57,255,20,.2)}
 .ind-cat-header:first-child{margin-top:0}
-.ind-cat-header.collapsed{opacity:.6;background:linear-gradient(135deg,rgba(255,255,255,.02),rgba(255,255,255,.005) 100%);border-color:rgba(255,255,255,.04)}
-.ind-cat-header.collapsed:hover{opacity:.9;background:linear-gradient(135deg,color-mix(in srgb,var(--cat-color) 8%,rgba(15,20,35,.7)),rgba(15,20,35,.4) 100%);border-color:color-mix(in srgb,var(--cat-color) 15%,transparent)}
-.ind-cat-left{display:flex;align-items:center;gap:8px;position:relative;z-index:1}
-.ind-cat-chevron{font-size:16px!important;color:var(--cat-color,var(--mt));opacity:.7;transition:all .2s ease}
-.ind-cat-header:hover .ind-cat-chevron{opacity:1}
-.ind-cat-icon{font-size:18px!important;color:var(--cat-color)!important;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--cat-color) 50%,transparent))}
-.ind-cat-name{font:700 11.5px 'DM Sans',sans-serif;color:var(--tx);letter-spacing:.6px;text-transform:uppercase;position:relative;z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.3)}
-.ind-cat-count{font:700 9.5px 'Space Mono',monospace;color:color-mix(in srgb,var(--cat-color) 70%,var(--mt));background:color-mix(in srgb,var(--cat-color) 8%,rgba(255,255,255,.04));padding:3px 9px;border-radius:10px;position:relative;z-index:1;min-width:28px;text-align:center;border:1px solid color-mix(in srgb,var(--cat-color) 12%,transparent)}
-.ind-cat-count.has-active{color:var(--ac);background:rgba(57,255,20,.15);box-shadow:0 0 10px rgba(57,255,20,.12);border-color:rgba(57,255,20,.2)}
+.ind-cat-header.collapsed{opacity:.7}
+.ind-cat-header.collapsed:hover{opacity:1}
+.ind-cat-left{display:flex;align-items:center;gap:6px}
+.ind-cat-chevron{font-size:14px!important;color:var(--mt);opacity:.7;transition:all .2s ease}
+.ind-cat-header:hover .ind-cat-chevron{opacity:1;color:var(--cat-color,var(--mt))}
+.ind-cat-icon{font-size:15px!important;color:var(--cat-color)!important}
+.ind-cat-name{font:600 11px 'DM Sans',sans-serif;color:var(--tx);letter-spacing:.3px}
+.ind-cat-count{font:700 9px 'Space Mono',monospace;color:var(--mt);background:rgba(255,255,255,.04);padding:2px 7px;border-radius:8px;min-width:24px;text-align:center}
+.ind-cat-count.has-active{color:var(--ac);background:rgba(57,255,20,.1)}
 
 /* ── Indicator List Container ── */
-.indicator-list{display:flex;flex-direction:column;gap:1px;max-height:clamp(180px,calc(100vh - 380px),600px);overflow-y:auto;padding:0 4px 0 0;scroll-behavior:smooth}
+.indicator-list{display:flex;flex-direction:column;gap:0;max-height:clamp(180px,calc(100vh - 380px),600px);overflow-y:auto;padding:0;scroll-behavior:smooth}
 .indicator-list::-webkit-scrollbar{width:3px}
 .indicator-list::-webkit-scrollbar-thumb{background:var(--glass-bd);border-radius:3px}
 .indicator-list::-webkit-scrollbar-thumb:hover{background:rgba(57,255,20,.3)}
 
-/* ── Indicator Items ── */
-.ind-item{display:flex;align-items:center;gap:7px;padding:4px 8px 4px 14px;border-radius:7px;cursor:pointer;transition:all .18s ease;border:none;font-size:12px;user-select:none;-webkit-user-select:none;position:relative;margin-left:6px;border-left:2px solid color-mix(in srgb,var(--cat-color,var(--mt)) 12%,transparent);flex-shrink:0}
-.ind-item:hover{background:color-mix(in srgb,var(--cat-color,var(--mt)) 6%,rgba(255,255,255,.02));border-left-color:color-mix(in srgb,var(--cat-color,var(--mt)) 50%,transparent)}
-.ind-item.active{background:linear-gradient(90deg,rgba(57,255,20,.07),transparent 80%);border-left-color:var(--ac)}
-.ind-item.primary{background:linear-gradient(90deg,rgba(57,255,20,.14),rgba(57,255,20,.03) 80%);border-left-color:var(--ac);box-shadow:inset 0 0 20px rgba(57,255,20,.04),0 0 12px rgba(57,255,20,.06)}
-.ind-item .ind-icon{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex-shrink:0;transition:all .2s;background:color-mix(in srgb,var(--cat-color,var(--mt)) 12%,transparent);border:1px solid color-mix(in srgb,var(--cat-color,var(--mt)) 8%,transparent)}
-.ind-item:hover .ind-icon{background:color-mix(in srgb,var(--cat-color,var(--mt)) 20%,transparent);border-color:color-mix(in srgb,var(--cat-color,var(--mt)) 18%,transparent)}
-.ind-item.active .ind-icon{background:rgba(57,255,20,.14);border-color:rgba(57,255,20,.15)}
-.ind-item.primary .ind-icon{background:rgba(57,255,20,.22);box-shadow:0 0 10px rgba(57,255,20,.18);border-color:rgba(57,255,20,.25)}
-.ind-item .ind-icon .mi{font-size:12px;color:color-mix(in srgb,var(--cat-color,var(--mt)) 80%,var(--mt));transition:color .2s}
-.ind-item:hover .ind-icon .mi{color:var(--cat-color,var(--mt))}
-.ind-item.active .ind-icon .mi,.ind-item.primary .ind-icon .mi{color:var(--ac)}
-.ind-item .ind-name{font:500 11.5px 'DM Sans',sans-serif;color:var(--mt);transition:color .2s;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ── Indicator Items (ms-opt stijl) ── */
+.ind-item{display:flex;align-items:center;gap:5px;padding:3px 10px;cursor:pointer;transition:all .15s;font-size:11px;line-height:1.1;color:var(--tx);user-select:none;-webkit-user-select:none;flex-shrink:0}
+.ind-item:hover{background:rgba(57,255,20,.06)}
+.ind-item.active{background:rgba(57,255,20,.1);color:var(--ac)}
+.ind-item.primary{background:rgba(57,255,20,.15);color:var(--ac)}
+.ind-item .ind-icon{width:13px;height:13px;border:1.5px solid var(--mt);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;transition:all .15s}
+.ind-item .ind-icon .mi{font-size:9px;color:transparent;transition:color .15s}
+.ind-item.active .ind-icon{border-color:var(--ac);background:var(--ac)}
+.ind-item.active .ind-icon .mi{color:var(--bg)}
+.ind-item.primary .ind-icon{border-color:var(--ac);background:var(--ac);box-shadow:0 0 6px rgba(57,255,20,.3)}
+.ind-item.primary .ind-icon .mi{color:var(--bg)}
+.ind-item .ind-name{font:500 11px 'DM Sans',sans-serif;color:var(--mt);transition:color .15s;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ind-item:hover .ind-name{color:var(--tx)}
-.ind-item.active .ind-name{color:var(--tx);font-weight:600}
-.ind-item.primary .ind-name{color:var(--ac);font-weight:700}
-.ind-item .ind-unit{font:500 9px 'Space Mono',monospace;color:color-mix(in srgb,var(--cat-color,var(--mt)) 50%,var(--mt));opacity:.7;flex-shrink:0;min-width:36px;text-align:right}
-.ind-item .ind-badge{font:700 7px 'Space Mono',monospace;padding:2px 6px;border-radius:4px;background:rgba(57,255,20,.18);color:var(--ac);display:none;letter-spacing:.8px;flex-shrink:0;text-shadow:0 0 6px rgba(57,255,20,.3)}
+.ind-item.active .ind-name{color:var(--ac);font-weight:500}
+.ind-item.primary .ind-name{color:var(--ac);font-weight:600}
+.ind-item .ind-unit{font:500 9px 'Space Mono',monospace;color:var(--mt);opacity:.6;flex-shrink:0;min-width:28px;text-align:right}
+.ind-item .ind-badge{font:700 7px 'Space Mono',monospace;padding:2px 5px;border-radius:3px;background:rgba(57,255,20,.18);color:var(--ac);display:none;letter-spacing:.8px;flex-shrink:0}
 .ind-item.primary .ind-badge{display:block}
 
 /* Kaart hover-tooltip */
@@ -360,12 +361,8 @@ select option{background:var(--bg);color:var(--tx)}
 @keyframes infoPulse{0%{box-shadow:0 0 0 0 rgba(57,255,20,.2)}100%{box-shadow:var(--shadow)}}
 
 /* Indicator list items - micro interaction */
-.ind-item{transition:all .18s cubic-bezier(.4,0,.2,1)}
-.ind-item:hover{transform:translateX(3px)}
-.ind-item.primary{animation:glowIn .4s ease-out}
-@keyframes glowIn{from{border-left-color:transparent;box-shadow:none}to{border-left-color:var(--ac);box-shadow:0 0 16px rgba(57,255,20,.06)}}
-.ind-cat-header{transition:all .2s cubic-bezier(.4,0,.2,1)}
-.ind-cat-header:hover{transform:translateX(2px)}
+.ind-item{transition:background .15s}
+.ind-item.primary{animation:none}
 
 /* Sidebar separator lines with gradient fade */
 .sh::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--glass-bd),transparent);margin-left:8px}
@@ -529,7 +526,7 @@ select option{background:var(--bg);color:var(--tx)}
         <div class="ms-chips" id="msGemChips"></div>
       </div>
       <!-- Multi-select Wijk -->
-      <div class="ms-wrap" id="msWijk" style="margin-top:6px">
+      <div class="ms-wrap" id="msWijk" style="margin-top:2px">
         <div class="ms-box" onclick="toggleMsDropdown('msWijk')">
           <span class="ms-label" id="msWijkLabel">Alle wijken</span>
           <span class="mi mi-sm" style="color:var(--mt)">expand_more</span>
@@ -541,7 +538,7 @@ select option{background:var(--bg);color:var(--tx)}
         <div class="ms-chips" id="msWijkChips"></div>
       </div>
       <!-- Multi-select Buurt -->
-      <div class="ms-wrap" id="msBuurt" style="margin-top:6px">
+      <div class="ms-wrap" id="msBuurt" style="margin-top:2px">
         <div class="ms-box" onclick="toggleMsDropdown('msBuurt')">
           <span class="ms-label" id="msBuurtLabel">Alle buurten</span>
           <span class="mi mi-sm" style="color:var(--mt)">expand_more</span>
@@ -583,6 +580,22 @@ select option{background:var(--bg);color:var(--tx)}
       <div class="card" style="padding:8px 10px;margin-bottom:6px">
         <div style="display:flex;gap:4px;flex-wrap:wrap" id="yearBtns"></div>
         <div id="yearInfo" style="font:400 9px 'Space Mono',monospace;color:var(--mt);margin-top:4px"></div>
+      </div>
+
+      <div class="sh"><span class="mi">science</span> Extra Domeinen</div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
+        <div class="ms-box domain-toggle" id="domToggleBodem" onclick="toggleDomain('bodemgebruik')" style="padding:6px 10px">
+          <span style="display:flex;align-items:center;gap:6px"><span class="mi mi-sm" style="color:#a3e635;font-size:15px">landscape</span><span style="font-size:11px">Bodemgebruik</span></span>
+          <span class="mi mi-sm dom-toggle-icon" style="font-size:18px;color:var(--mt)">toggle_off</span>
+        </div>
+        <div class="ms-box domain-toggle" id="domToggleFlora" onclick="toggleDomain('flora_fauna')" style="padding:6px 10px">
+          <span style="display:flex;align-items:center;gap:6px"><span class="mi mi-sm" style="color:#84cc16;font-size:15px">pets</span><span style="font-size:11px">Flora & Fauna</span></span>
+          <span class="mi mi-sm dom-toggle-icon" style="font-size:18px;color:var(--mt)">toggle_off</span>
+        </div>
+        <div class="ms-box domain-toggle" id="domToggleLandbouw" onclick="toggleDomain('landbouw')" style="padding:6px 10px">
+          <span style="display:flex;align-items:center;gap:6px"><span class="mi mi-sm" style="color:#ca8a04;font-size:15px">agriculture</span><span style="font-size:11px">Landbouw</span></span>
+          <span class="mi mi-sm dom-toggle-icon" style="font-size:18px;color:var(--mt)">toggle_off</span>
+        </div>
       </div>
 
       <div class="sh"><span class="mi">bar_chart</span> Indicatoren <span style="font:400 9px 'DM Sans',sans-serif;color:var(--mt);text-transform:none;letter-spacing:0">(klik = aan/uit, dubbelklik = kaartkleur)</span></div>
@@ -948,6 +961,9 @@ var INDICATOR_CATEGORIES = [
   {id:'natuur',           naam:'Natuur & Groen',           icon:'park',               color:'#34d399'},
   {id:'mobiliteit',       naam:'Mobiliteit',               icon:'directions_car',     color:'#06b6d4'},
   {id:'oppervlakte',      naam:'Oppervlakte',              icon:'straighten',         color:'#94a3b8'},
+  {id:'bodemgebruik',    naam:'Bodemgebruik',             icon:'landscape',          color:'#a3e635'},
+  {id:'flora_fauna',     naam:'Flora & Fauna',            icon:'pets',               color:'#84cc16'},
+  {id:'landbouw',        naam:'Landbouw',                 icon:'agriculture',        color:'#ca8a04'},
 ];
 
 var INDICATORS = [
@@ -1050,11 +1066,33 @@ var INDICATORS = [
   // ── Oppervlakte ──
   {key:'opp_land',              naam:'Oppervlakte land',        eenheid:'ha',        icon:'terrain',             cat:'oppervlakte'},
   {key:'opp_water',             naam:'Oppervlakte water',       eenheid:'ha',        icon:'water',               cat:'oppervlakte'},
+
+  // ── Bodemgebruik ──
+  {key:'pct_bebouwd',            naam:'Bebouwd terrein',         eenheid:'%',         icon:'domain',              cat:'bodemgebruik'},
+  {key:'pct_agrarisch',          naam:'Agrarisch terrein',       eenheid:'%',         icon:'agriculture',         cat:'bodemgebruik'},
+  {key:'pct_natuur',             naam:'Natuurterrein',           eenheid:'%',         icon:'forest',              cat:'bodemgebruik'},
+  {key:'pct_recreatie',          naam:'Recreatieterrein',        eenheid:'%',         icon:'attractions',         cat:'bodemgebruik'},
+  {key:'opp_woonterrein_ha',     naam:'Woonterrein',             eenheid:'ha',        icon:'home',                cat:'bodemgebruik'},
+  {key:'opp_bedrijventerrein_ha',naam:'Bedrijventerrein',        eenheid:'ha',        icon:'factory',             cat:'bodemgebruik'},
+
+  // ── Flora & Fauna ──
+  {key:'ff_totaal_soorten',      naam:'Totaal soorten',          eenheid:'soorten',   icon:'pets',                cat:'flora_fauna'},
+  {key:'ff_totaal_waarnemingen', naam:'Totaal waarnemingen',     eenheid:'aantal',    icon:'visibility',          cat:'flora_fauna'},
+  {key:'ff_soorten_vogels',      naam:'Vogelsoorten',            eenheid:'soorten',   icon:'flutter_dash',        cat:'flora_fauna'},
+  {key:'ff_soorten_zoogdieren',  naam:'Zoogdiersoorten',         eenheid:'soorten',   icon:'cruelty_free',        cat:'flora_fauna'},
+  {key:'ff_soorten_planten',     naam:'Plantensoorten',          eenheid:'soorten',   icon:'local_florist',       cat:'flora_fauna'},
+
+  // ── Landbouw ──
+  {key:'lbt_totaal_cultuurgrond_ha',naam:'Cultuurgrond',         eenheid:'ha',        icon:'agriculture',         cat:'landbouw'},
+  {key:'lbt_totaal_rundvee',     naam:'Rundvee',                 eenheid:'dieren',    icon:'pets',                cat:'landbouw'},
+  {key:'lbt_totaal_varkens',     naam:'Varkens',                 eenheid:'dieren',    icon:'cruelty_free',        cat:'landbouw'},
+  {key:'lbt_totaal_kippen',      naam:'Kippen',                  eenheid:'dieren',    icon:'egg',                 cat:'landbouw'},
+  {key:'lbt_aantal_bedrijven',   naam:'Landbouwbedrijven',       eenheid:'bedrijven', icon:'storefront',          cat:'landbouw'},
 ];
 
 // Welke categorieën zijn ingeklapt (default: alles open, minder gebruikte dicht)
 var _collapsedCategories = {
-  oppervlakte:true
+  oppervlakte:true, bodemgebruik:true, flora_fauna:true, landbouw:true
 };
 
 // Actieve indicatoren (toggle aan/uit), eerste = primair (kaartkleur)
@@ -4631,11 +4669,9 @@ function buildIndicatorList(){
           displayName = fm.naam.substring(0,idx)+'<span class="ind-search-highlight">'+fm.naam.substring(idx,idx+search.length)+'</span>'+fm.naam.substring(idx+search.length);
         }
         html += '<div class="'+cls+'" data-ind="'+fm.key+'" style="--cat-color:'+cat.color+'" onclick="toggleIndicator(\''+fm.key+'\')" title="Dubbelklik: maak primair (kaartkleur)">';
-        html += '<div class="ind-icon"><span class="mi">'+fm.icon+'</span></div>';
-        html += '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">';
+        html += '<div class="ind-icon"><span class="mi">check</span></div>';
         html += '<span class="ind-name">'+displayName+'</span>';
         html += '<span class="ind-unit">'+fm.eenheid+'</span>';
-        html += '</div>';
         html += '<span class="ind-badge">KAART</span>';
         html += '</div>';
       });
@@ -4652,6 +4688,9 @@ function buildIndicatorList(){
   } else if(infoEl){
     infoEl.style.display = 'none';
   }
+
+  // Update domein-toggles
+  if(typeof updateDomainToggles === 'function') updateDomainToggles();
 }
 
 function filterIndicators(val){
@@ -4686,6 +4725,57 @@ function deselectAllIndicators(){
   updateMap();
   updateActiveStats();
   toast('Alleen primaire indicator behouden');
+}
+
+// Domein aan/uit toggles
+var DOMAIN_CATS = ['bodemgebruik','flora_fauna','landbouw'];
+var DOMAIN_TOGGLE_MAP = {bodemgebruik:'domToggleBodem',flora_fauna:'domToggleFlora',landbouw:'domToggleLandbouw'};
+
+function toggleDomain(catId){
+  var yearInds = _yearIndicators[_activeYear];
+  var avSet = yearInds ? new Set(yearInds) : null;
+  var catInds = INDICATORS.filter(function(fm){
+    if(fm.cat !== catId) return false;
+    return !avSet || avSet.has(fm.key);
+  });
+  if(catInds.length === 0){ toast('Geen data beschikbaar voor dit domein in '+_activeYear); return; }
+
+  var anyActive = catInds.some(function(fm){ return _activeIndicators.indexOf(fm.key) >= 0; });
+  if(anyActive){
+    // Alles uit
+    catInds.forEach(function(fm){
+      var idx = _activeIndicators.indexOf(fm.key);
+      if(idx >= 0 && _activeIndicators.length > 1) _activeIndicators.splice(idx,1);
+    });
+  } else {
+    // Alles aan + uitklappen
+    catInds.forEach(function(fm){
+      if(_activeIndicators.indexOf(fm.key) < 0) _activeIndicators.push(fm.key);
+    });
+    _collapsedCategories[catId] = false;
+  }
+  buildIndicatorList();
+  updateDomainToggles();
+  updateMap();
+  updateActiveStats();
+}
+
+function updateDomainToggles(){
+  DOMAIN_CATS.forEach(function(catId){
+    var elId = DOMAIN_TOGGLE_MAP[catId];
+    var el = document.getElementById(elId);
+    if(!el) return;
+    var catInds = INDICATORS.filter(function(fm){ return fm.cat === catId; });
+    var anyActive = catInds.some(function(fm){ return _activeIndicators.indexOf(fm.key) >= 0; });
+    var icon = el.querySelector('.dom-toggle-icon');
+    if(anyActive){
+      el.classList.add('active');
+      if(icon) icon.textContent = 'toggle_on';
+    } else {
+      el.classList.remove('active');
+      if(icon) icon.textContent = 'toggle_off';
+    }
+  });
 }
 
 function toggleCategory(catId){
