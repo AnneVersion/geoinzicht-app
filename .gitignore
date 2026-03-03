@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# BAG bulk data (te groot voor git, lokaal genereren via download_bag_bulk.py)
+bag/bag_GM*.geojson
+
+# Temp files
+%TEMP%*
+NUL
+*.tmp

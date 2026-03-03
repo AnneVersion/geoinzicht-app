@@ -1,8 +1,118 @@
 {
-  "GM1942": {
-    "naam": "Gooise Meren",
-    "count": 50787,
-    "size_mb": 18.8,
-    "generated": "2026-02-17T21:28:09"
+  "generated_at": "2026-03-03T20:34:16",
+  "total_gemeenten": 22,
+  "total_adressen": 575898,
+  "total_size_mb": 192.9,
+  "gemeenten": {
+    "GM0034": {
+      "naam": "Almere",
+      "count": 51000,
+      "size_mb": 16.7
+    },
+    "GM0050": {
+      "naam": "Zeewolde",
+      "count": 50351,
+      "size_mb": 16.63
+    },
+    "GM0060": {
+      "naam": "Ameland",
+      "count": 4534,
+      "size_mb": 1.5
+    },
+    "GM0072": {
+      "naam": "Harlingen",
+      "count": 16142,
+      "size_mb": 5.37
+    },
+    "GM0088": {
+      "naam": "Schiermonnikoog",
+      "count": 1564,
+      "size_mb": 0.53
+    },
+    "GM0093": {
+      "naam": "Terschelling",
+      "count": 6022,
+      "size_mb": 2.03
+    },
+    "GM0096": {
+      "naam": "Vlieland",
+      "count": 1481,
+      "size_mb": 0.49
+    },
+    "GM0166": {
+      "naam": "Kampen",
+      "count": 31345,
+      "size_mb": 10.38
+    },
+    "GM0171": {
+      "naam": "Noordoostpolder",
+      "count": 46070,
+      "size_mb": 15.25
+    },
+    "GM0184": {
+      "naam": "Urk",
+      "count": 9054,
+      "size_mb": 2.94
+    },
+    "GM0230": {
+      "naam": "Elburg",
+      "count": 27482,
+      "size_mb": 9.15
+    },
+    "GM0233": {
+      "naam": "Ermelo",
+      "count": 33429,
+      "size_mb": 11.09
+    },
+    "GM0243": {
+      "naam": "Harderwijk",
+      "count": 32908,
+      "size_mb": 10.99
+    },
+    "GM0267": {
+      "naam": "Nijkerk",
+      "count": 69685,
+      "size_mb": 23.12
+    },
+    "GM0269": {
+      "naam": "Oldebroek",
+      "count": 21658,
+      "size_mb": 7.19
+    },
+    "GM0273": {
+      "naam": "Putten",
+      "count": 26798,
+      "size_mb": 8.89
+    },
+    "GM0302": {
+      "naam": "Nunspeet",
+      "count": 17688,
+      "size_mb": 5.9
+    },
+    "GM0303": {
+      "naam": "Dronten",
+      "count": 45439,
+      "size_mb": 15.06
+    },
+    "GM0313": {
+      "naam": "Bunschoten",
+      "count": 12674,
+      "size_mb": 4.33
+    },
+    "GM0317": {
+      "naam": "Eemnes",
+      "count": 16005,
+      "size_mb": 5.26
+    },
+    "GM0998": {
+      "naam": "Buitenland",
+      "count": 3782,
+      "size_mb": 1.29
+    },
+    "GM1942": {
+      "naam": "",
+      "count": 50787,
+      "size_mb": 18.83
+    }
   }
 }
