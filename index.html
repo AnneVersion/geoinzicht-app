@@ -1719,15 +1719,16 @@ function updatePandWmsOpacity(){
 }
 
 // ============================================================
-// BAG CACHE — IndexedDB (onbeperkt) + in-memory Map (snel)
+// BAG CACHE — IndexedDB per gemeente (betrouwbaar) + in-memory (snel)
 // ============================================================
 var BAG_IDB_NAME = 'geoinzicht_bag';
-var BAG_IDB_VERSION = 1;
-var BAG_IDB_STORE = 'adressen';
-var _bagIdb = null;        // IndexedDB database handle
+var BAG_IDB_VERSION = 2;
+var BAG_IDB_STORE = 'gemeenten'; // 1 record per gemeente (compact)
+var _bagIdb = null;
 var _bagMem = {};          // In-memory: identificatie -> feature (snelle lookup)
 var _bagMemCount = 0;      // Aantal unieke adressen in memory
-var _bagCacheReady = false; // Is IDB klaar?
+var _bagCacheReady = false;
+var _bagCachedGems = {};   // Welke gemeenten zijn in IDB cache: {GM0363: count}
 
 // Open IndexedDB
 function openBagIDB(){
@@ -1736,10 +1737,11 @@ function openBagIDB(){
     var req = indexedDB.open(BAG_IDB_NAME, BAG_IDB_VERSION);
     req.onupgradeneeded = function(e){
       var db = e.target.result;
+      // Verwijder oude store met individuele adressen (v1)
+      if(db.objectStoreNames.contains('adressen')) db.deleteObjectStore('adressen');
+      // Nieuwe store: 1 record per gemeente met features array
       if(!db.objectStoreNames.contains(BAG_IDB_STORE)){
-        var store = db.createObjectStore(BAG_IDB_STORE, {keyPath:'id'});
-        store.createIndex('lat','lat',{unique:false});
-        store.createIndex('lng','lng',{unique:false});
+        db.createObjectStore(BAG_IDB_STORE, {keyPath:'code'});
       }
     };
     req.onsuccess = function(e){ _bagIdb = e.target.result; resolve(_bagIdb); };
@@ -1747,7 +1749,7 @@ function openBagIDB(){
   });
 }
 
-// Laad ALLE adressen uit IndexedDB naar in-memory cache
+// Laad ALLE gemeenten uit IndexedDB naar in-memory cache
 function loadBagFromIDB(){
   return openBagIDB().then(function(db){
     return new Promise(function(resolve){
@@ -1758,56 +1760,60 @@ function loadBagFromIDB(){
         var items = req.result || [];
         _bagMem = {};
         _bagMemCount = 0;
+        _bagCachedGems = {};
         items.forEach(function(item){
-          _bagMem[item.id] = item.feature;
-          _bagMemCount++;
+          _bagCachedGems[item.code] = item.count || 0;
+          (item.features || []).forEach(function(f){
+            var id = f.properties && (f.properties.identificatie || f.properties.id);
+            if(id && !_bagMem[id]){
+              _bagMem[id] = f;
+              _bagMemCount++;
+            }
+          });
         });
         _bagCacheReady = true;
-        console.log('BAG cache geladen uit IndexedDB:', _bagMemCount, 'adressen');
+        console.log('BAG cache hersteld:', _bagMemCount, 'adressen uit', items.length, 'gemeenten');
         updateBagCacheUI();
         resolve(_bagMemCount);
       };
       req.onerror = function(){ _bagCacheReady = true; resolve(0); };
     });
-  }).catch(function(){ _bagCacheReady = true; return 0; });
+  }).catch(function(e){ console.warn('BAG IDB load error:', e); _bagCacheReady = true; return 0; });
 }
 
-// Sla features op in IndexedDB (batch put)
-function saveBagToIDB(features){
+// Sla gemeente features op in IndexedDB (1 record per gemeente)
+function saveBagGemeenteToIDB(code, features){
   if(!features || !features.length) return Promise.resolve();
-  // Eerst in-memory opslaan
-  var newItems = [];
+  // In-memory opslaan
   features.forEach(function(f){
-    var id = f.properties.identificatie || f.properties.id;
-    if(!id) return;
-    if(!_bagMem[id]){
+    var id = f.properties && (f.properties.identificatie || f.properties.id);
+    if(id && !_bagMem[id]){
       _bagMem[id] = f;
       _bagMemCount++;
-      var c = f.geometry.coordinates;
-      newItems.push({id:id, lat:c[1], lng:c[0], feature:f});
     }
   });
+  _bagCachedGems[code] = features.length;
   updateBagCacheUI();
-  if(newItems.length === 0) return Promise.resolve();
-
-  // Schrijf naar IndexedDB in batches van 5000
+  // Schrijf naar IndexedDB: 1 record per gemeente
   return openBagIDB().then(function(db){
     return new Promise(function(resolve){
-      var batchSize = 5000;
-      var idx = 0;
-      function writeBatch(){
-        if(idx >= newItems.length){ resolve(); return; }
-        var batch = newItems.slice(idx, idx + batchSize);
-        idx += batchSize;
-        var tx = db.transaction(BAG_IDB_STORE, 'readwrite');
-        var store = tx.objectStore(BAG_IDB_STORE);
-        batch.forEach(function(item){ store.put(item); });
-        tx.oncomplete = writeBatch;
-        tx.onerror = function(e){ console.warn('IDB write error:',e); writeBatch(); };
-      }
-      writeBatch();
+      var tx = db.transaction(BAG_IDB_STORE, 'readwrite');
+      tx.objectStore(BAG_IDB_STORE).put({code: code, count: features.length, features: features});
+      tx.oncomplete = function(){ resolve(); };
+      tx.onerror = function(e){ console.warn('IDB write error:', code, e); resolve(); };
     });
-  }).catch(function(e){ console.warn('IDB save error:',e); });
+  }).catch(function(e){ console.warn('IDB save error:', code, e); });
+}
+
+// Compat wrapper: saveBagToIDB wordt nog door andere code aangeroepen
+function saveBagToIDB(features){
+  if(!features || !features.length) return Promise.resolve();
+  features.forEach(function(f){
+    var id = f.properties && (f.properties.identificatie || f.properties.id);
+    if(id && !_bagMem[id]){ _bagMem[id] = f; _bagMemCount++; }
+  });
+  updateBagCacheUI();
+  return Promise.resolve();
 }
 
 // Haal alle gecachte features in de huidige viewport uit memory
@@ -1830,14 +1836,14 @@ function getCachedBagFeatures(){
 function clearBagCache(){
   _bagMem = {};
   _bagMemCount = 0;
-  _bagBgLoaded = {};  // Reset geladen gemeenten tracker
+  _bagBgLoaded = {};
+  _bagCachedGems = {};
   openBagIDB().then(function(db){
     var tx = db.transaction(BAG_IDB_STORE, 'readwrite');
     tx.objectStore(BAG_IDB_STORE).clear();
   }).catch(function(){});
   updateBagCacheUI();
-  // Oude localStorage cache ook opruimen
-  try{localStorage.removeItem('geoinzicht_bag_cache');localStorage.removeItem('geoinzicht_bag_meta')}catch(e){}
+  try{localStorage.removeItem('geoinzicht_bag_cache');localStorage.removeItem('geoinzicht_bag_meta');localStorage.removeItem('bag_loaded_gems')}catch(e){}
 }
 
 function updateBagCacheUI(){
@@ -3741,14 +3747,19 @@ function prefetchBagSubareaCounts(){
 
 // Laad BAG adressen voor een specifieke gemeente uit pre-built bestand
 function loadBagForGemeente(code){
+  // Check of gemeente al in IDB cache zit
+  if(_bagCachedGems[code] && _bagCachedGems[code] > 0){
+    return Promise.resolve(0); // Al gecacht, features al in _bagMem
+  }
   var url = 'bag/bag_'+code+'.geojson'+_cacheBust;
   return fetch(url).then(function(r){
     if(!r.ok) throw new Error('BAG '+code+' niet beschikbaar ('+r.status+')');
     return r.json();
   }).then(function(d){
     var features = d.features || [];
-    saveBagToIDB(features);
-    return features.length;
+    return saveBagGemeenteToIDB(code, features).then(function(){
+      return features.length;
+    });
   });
 }
 
@@ -3845,13 +3856,22 @@ var _bagLocalMode = false; // true = renderen vanuit lokale data (geen WMS/VT)
 
 function autoPreloadBagLocal(){
   if(!_bagIndex || !_gemeenteData) return;
-  var available = Object.keys(_bagIndex).filter(function(code){
+  var allAvailable = Object.keys(_bagIndex).filter(function(code){
     var info = _bagIndex[code];
     return info && info.count > 0 && info.size_mb > 0;
   });
-  if(available.length === 0){
+  if(allAvailable.length === 0){
     console.log('BAG auto-preload: geen lokale bestanden beschikbaar');
     return;
+  }
+
+  // Filter: skip gemeenten die al in IndexedDB cache zitten
+  var available = allAvailable.filter(function(code){
+    return !_bagCachedGems[code] || _bagCachedGems[code] === 0;
+  });
+  var alreadyCached = allAvailable.length - available.length;
+  if(alreadyCached > 0){
+    console.log('BAG auto-preload: '+alreadyCached+' gemeenten al in IDB cache ('+_bagMemCount+' adr), '+available.length+' nog te laden');
   }
 
   // Sorteer: kleinste gemeenten eerst (snelle feedback)
@@ -3868,6 +3888,32 @@ function autoPreloadBagLocal(){
   // WMS op lage opacity als subtiele achtergrond
   if(_bagWmsLayer) _bagWmsLayer.setOpacity(0.15);
 
+  // Als er niets te laden is (alles al gecacht), skip fetch-fase
+  if(available.length === 0 && alreadyCached > 0){
+    console.log('BAG auto-preload: alle '+allAvailable.length+' gemeenten al in cache');
+    _bagBgRunning = false;
+    // Check of server meer bestanden heeft
+    var gemTotaal = _gemeenteData ? _gemeenteData.features.length : 343;
+    if(allAvailable.length < gemTotaal - 5){
+      toast(_bagMemCount.toLocaleString('nl-NL')+' BAG adressen uit cache · '+allAvailable.length+'/'+gemTotaal+' gem. beschikbaar', 'info');
+      // Start poll voor nieuwe bestanden
+      _bagPollTimer = setInterval(function(){
+        loadBagIndex().then(function(){
+          var newAvail = Object.keys(_bagIndex).filter(function(c){ return _bagIndex[c] && _bagIndex[c].count > 0 && _bagIndex[c].size_mb > 0; });
+          if(newAvail.length > allAvailable.length){
+            clearInterval(_bagPollTimer);
+            toast(newAvail.length+'/'+gemTotaal+' gemeenten beschikbaar — laadt nieuwe...', 'info');
+            setTimeout(function(){ autoPreloadBagLocal(); }, 1000);
+          }
+        });
+      }, 60000);
+    } else {
+      toast(_bagMemCount.toLocaleString('nl-NL')+' BAG adressen uit cache · heel NL ✅', 'success');
+    }
+    updateBagCacheUI();
+    return;
+  }
+
   _bagBgRunning = true;
   var progEl = document.getElementById('bagBgProgress');
   progEl.style.display = 'block';
@@ -3876,7 +3922,11 @@ function autoPreloadBagLocal(){
   var bgBar = document.getElementById('bagBgBar');
   var bgDetail = document.getElementById('bagBgDetail');
   var totalExpected = available.reduce(function(s,c){ return s + (_bagIndex[c].count||0); }, 0);
-  bgText.textContent = 'BAG lokaal laden...';
+  if(alreadyCached > 0){
+    bgText.textContent = alreadyCached+' gemeenten uit cache · '+available.length+' nieuwe laden...';
+  } else {
+    bgText.textContent = 'BAG lokaal laden...';
+  }
   bgPct.textContent = '0%';
   bgBar.style.width = '0%';
   bgDetail.textContent = available.length + ' gemeenten · ' + totalExpected.toLocaleString('nl-NL') + ' adressen verwacht';
@@ -9524,24 +9574,40 @@ async function init(){
     // Start achtergrond laden van buurten en wijken na 1.5s
     setTimeout(function(){ loadBackgroundCbsData(); }, 1500);
 
-    // BAG: als lokale bestanden beschikbaar, automatisch laden
-    // Anders: aantallen prefetchen voor dropdown
+    // BAG: eerst cache herstellen uit IndexedDB, dan evt. ontbrekende laden
     setTimeout(function(){
-      loadBagIndex().then(function(){
-        var localCount = _bagIndex ? Object.keys(_bagIndex).filter(function(c){
-          return _bagIndex[c] && _bagIndex[c].size_mb > 0;
-        }).length : 0;
-        if(localCount >= 10){
-          // Genoeg lokale bestanden: activeer BAG layer en start preload
-          console.log('BAG auto-preload: '+localCount+' lokale bestanden beschikbaar');
-          if(!_layerState.bag) toggleLayer('bag');
-          setTimeout(function(){ autoPreloadBagLocal(); }, 500);
-        } else {
-          // Niet genoeg lokale bestanden: prefetch aantallen via WFS
-          prefetchBagCounts();
+      // Stap 1: IndexedDB cache herstellen (snel, geen server-fetch)
+      loadBagFromIDB().then(function(cachedCount){
+        console.log('BAG cache hersteld:', cachedCount, 'adressen uit', Object.keys(_bagCachedGems).length, 'gemeenten');
+        // Herstel _bagBgLoaded tracker vanuit IDB cache
+        for(var gc in _bagCachedGems){
+          var naam = (_bagIndex && _bagIndex[gc]) ? _bagIndex[gc].naam : gc;
+          _bagBgLoaded[naam || gc] = true;
         }
+        if(cachedCount > 0){
+          // We hebben gecachete BAG data — activeer BAG layer + render
+          _bagLocalMode = true;
+          if(!_layerState.bag) toggleLayer('bag');
+          _bagVectorData = getCachedBagFeatures();
+          renderBagVectors();
+          updateBagCacheUI();
+          toast(cachedCount.toLocaleString('nl-NL')+' BAG adressen hersteld uit cache', 'success');
+        }
+        // Stap 2: Check of er nieuwe/ontbrekende bestanden op de server zijn
+        return loadBagIndex().then(function(){
+          var localCount = _bagIndex ? Object.keys(_bagIndex).filter(function(c){
+            return _bagIndex[c] && _bagIndex[c].size_mb > 0;
+          }).length : 0;
+          if(localCount >= 10){
+            console.log('BAG auto-preload: '+localCount+' lokale bestanden beschikbaar');
+            if(!_layerState.bag) toggleLayer('bag');
+            setTimeout(function(){ autoPreloadBagLocal(); }, 500);
+          } else if(cachedCount === 0){
+            prefetchBagCounts();
+          }
+        });
       });
-    }, 3000);
+    }, 2000);
 
     // Start feedback timer (30 min)
     initFeedbackTimer();
