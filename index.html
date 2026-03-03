@@ -992,6 +992,7 @@ var INDICATOR_CATEGORIES = [
   {id:'landbouw',        naam:'Landbouw',                 icon:'agriculture',        color:'#ca8a04', bron:'CBS (tabel 80781ned)', jaar:'cbsjaar'},
   {id:'zorgkosten',      naam:'Zorgkosten',               icon:'local_pharmacy',     color:'#ef4444', bron:'Vektis Open Data', jaar:'cbsjaar'},
   {id:'criminaliteit',   naam:'Criminaliteit',            icon:'gavel',              color:'#dc2626', bron:'data.politie.nl', jaar:'cbsjaar'},
+  {id:'bag_adressen',    naam:'BAG Adressen',             icon:'home',               color:'#39ff14', bron:'Kadaster BAG (PDOK)', jaar:'cbsjaar'},
 ];
 
 var INDICATORS = [
@@ -1140,6 +1141,15 @@ var INDICATORS = [
   {key:'cr_cybercrime',         naam:'Cybercrime',               eenheid:'aantal',    icon:'computer',            cat:'criminaliteit'},
   {key:'cr_fraude',             naam:'Horizontale fraude',       eenheid:'aantal',    icon:'report',              cat:'criminaliteit'},
   {key:'cr_inbraak_bedrijven',  naam:'Inbraak bedrijven',        eenheid:'aantal',    icon:'business',            cat:'criminaliteit'},
+  // BAG Adressen
+  {key:'bag_adressen_totaal',   naam:'Totaal adressen',          eenheid:'aantal',    icon:'home',                cat:'bag_adressen'},
+  {key:'bag_adressen_woon',     naam:'Woningen',                 eenheid:'aantal',    icon:'house',               cat:'bag_adressen'},
+  {key:'bag_adressen_kantoor',  naam:'Kantoren',                 eenheid:'aantal',    icon:'business',            cat:'bag_adressen'},
+  {key:'bag_adressen_winkel',   naam:'Winkels',                  eenheid:'aantal',    icon:'storefront',          cat:'bag_adressen'},
+  {key:'bag_adressen_industrie',naam:'Industrie',                eenheid:'aantal',    icon:'factory',             cat:'bag_adressen'},
+  {key:'bag_adressen_overig',   naam:'Overig',                   eenheid:'aantal',    icon:'domain',              cat:'bag_adressen'},
+  {key:'bag_gem_oppervlakte',   naam:'Gem. oppervlakte',         eenheid:'m²',        icon:'straighten',          cat:'bag_adressen'},
+  {key:'bag_med_bouwjaar',      naam:'Mediaan bouwjaar',         eenheid:'jaar',      icon:'calendar_today',      cat:'bag_adressen'},
 ];
 
 // Welke categorieën zijn ingeklapt (default: alles dicht)
@@ -1149,7 +1159,7 @@ var _collapsedCategories = {
   economie:true, sociale_zekerheid:true, voorzieningen:true,
   natuur:true, mobiliteit:true, oppervlakte:true,
   bodemgebruik:true, flora_fauna:true, landbouw:true,
-  zorgkosten:true, criminaliteit:true
+  zorgkosten:true, criminaliteit:true, bag_adressen:true
 };
 
 // Actieve indicatoren (toggle aan/uit), eerste = primair (kaartkleur)
@@ -1837,18 +1847,30 @@ function updateBagCacheUI(){
   var totalAdressen = 0;
   var gemGeteld = 0;
   var gemTotaal = _gemeenteData ? _gemeenteData.features.length : 342;
+  var localGemeenten = 0; // Gemeenten met lokale bestanden
   if(_bagIndex && Object.keys(_bagIndex).length > 0){
     for(var k in _bagIndex){
       totalAdressen += (_bagIndex[k].count || 0);
       gemGeteld++;
+      if(_bagIndex[k].size_mb > 0) localGemeenten++;
     }
   }
   var wijkGeteld = Object.keys(_bagWijkIndex).length;
   var buurtGeteld = Object.keys(_bagBuurtIndex).length;
-  // Cache info tekst
+  // Cache info tekst — toon ook in-memory geladen adressen
   if(el){
-    if(gemGeteld > 0){
-      var parts = [];
+    var parts = [];
+    if(_bagLocalMode && _bagMemCount > 0){
+      // Lokale mode: toon geladen adressen prominent
+      parts.push('✅ '+_bagMemCount.toLocaleString('nl-NL')+' adressen geladen');
+      var gemLoaded = Object.keys(_bagBgLoaded).length;
+      if(gemLoaded > 0){
+        parts.push(gemLoaded+'/'+gemTotaal+' gemeenten');
+      }
+      if(totalAdressen > _bagMemCount){
+        parts.push('('+totalAdressen.toLocaleString('nl-NL')+' beschikbaar)');
+      }
+    } else if(gemGeteld > 0){
       parts.push(totalAdressen.toLocaleString('nl-NL')+' adressen totaal');
       if(gemGeteld < gemTotaal){
         parts.push(gemGeteld+'/'+gemTotaal+' gemeenten geteld');
@@ -1857,18 +1879,17 @@ function updateBagCacheUI(){
       }
       if(wijkGeteld > 0) parts.push(wijkGeteld+' wijken');
       if(buurtGeteld > 0) parts.push(buurtGeteld+' buurten');
-      if(_bagPrefetching) parts.push('⏳ telt...');
-      if(_bagSubPrefetching) parts.push('⏳ sub-areas...');
-      el.textContent = parts.join(' · ');
-    } else if(_bagPrefetching){
-      el.textContent = 'Adressen tellen per gemeente...';
-    } else {
-      el.textContent = 'Totaal: tellen...';
     }
+    if(_bagBgRunning) parts.push('⏳ laden...');
+    if(_bagPrefetching) parts.push('⏳ telt...');
+    if(_bagSubPrefetching) parts.push('⏳ sub-areas...');
+    el.textContent = parts.length > 0 ? parts.join(' · ') : 'Totaal: tellen...';
   }
   // Update badge op BAG knop: totaal adressen
   if(btnEl){
-    if(totalAdressen > 0){
+    if(_bagLocalMode && _bagMemCount > 0){
+      btnEl.textContent = '('+_bagMemCount.toLocaleString('nl-NL')+' geladen)';
+    } else if(totalAdressen > 0){
       var suffix = (gemGeteld < gemTotaal) ? '+' : '';
       btnEl.textContent = '('+totalAdressen.toLocaleString('nl-NL')+suffix+')';
     } else if(_bagPrefetching){
