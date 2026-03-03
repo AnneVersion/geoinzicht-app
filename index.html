@@ -973,26 +973,26 @@ var BASEMAPS = {
 
 // Indicatorcategorieën voor gegroepeerde weergave
 var INDICATOR_CATEGORIES = [
-  {id:'bevolking',        naam:'Bevolking',                icon:'groups',             color:'#38bdf8', bron:'CBS', jaar:'cbsjaar'},
-  {id:'leeftijd',         naam:'Leeftijdsopbouw',          icon:'cake',               color:'#a78bfa', bron:'CBS', jaar:'cbsjaar'},
-  {id:'herkomst',         naam:'Herkomst & Diversiteit',   icon:'public',             color:'#fb923c', bron:'CBS', jaar:'cbsjaar'},
-  {id:'huishoudens',      naam:'Huishoudens',              icon:'family_restroom',    color:'#f472b6', bron:'CBS', jaar:'cbsjaar'},
-  {id:'opleiding',        naam:'Opleiding',                icon:'school',             color:'#c084fc', bron:'CBS', jaar:'cbsjaar'},
-  {id:'inkomen',          naam:'Inkomen & Welvaart',       icon:'payments',           color:'#4ade80', bron:'CBS', jaar:'cbsjaar'},
-  {id:'wonen',            naam:'Wonen & Woningmarkt',      icon:'home',               color:'#22c55e', bron:'CBS', jaar:'cbsjaar'},
-  {id:'energie',          naam:'Energie',                  icon:'bolt',               color:'#fbbf24', bron:'CBS', jaar:'cbsjaar'},
-  {id:'economie',         naam:'Economie & Arbeid',        icon:'work',               color:'#f97316', bron:'CBS', jaar:'cbsjaar'},
-  {id:'sociale_zekerheid',naam:'Sociale Zekerheid & Zorg', icon:'health_and_safety',  color:'#f43f5e', bron:'CBS', jaar:'cbsjaar'},
-  {id:'voorzieningen',    naam:'Voorzieningen',            icon:'local_hospital',     color:'#ec4899', bron:'CBS', jaar:'cbsjaar'},
-  {id:'natuur',           naam:'Natuur & Groen',           icon:'park',               color:'#34d399', bron:'CBS', jaar:'cbsjaar'},
-  {id:'mobiliteit',       naam:'Mobiliteit',               icon:'directions_car',     color:'#06b6d4', bron:'CBS', jaar:'cbsjaar'},
-  {id:'oppervlakte',      naam:'Oppervlakte',              icon:'straighten',         color:'#94a3b8', bron:'CBS', jaar:'cbsjaar'},
-  {id:'bodemgebruik',    naam:'Bodemgebruik',             icon:'landscape',          color:'#a3e635', bron:'CBS (tabel 70262ned)', jaar:'bbg'},
-  {id:'flora_fauna',     naam:'Flora & Fauna',            icon:'pets',               color:'#84cc16', bron:'GBIF', jaar:'cumulatief'},
-  {id:'landbouw',        naam:'Landbouw',                 icon:'agriculture',        color:'#ca8a04', bron:'CBS (tabel 80781ned)', jaar:'cbsjaar'},
-  {id:'zorgkosten',      naam:'Zorgkosten',               icon:'local_pharmacy',     color:'#ef4444', bron:'Vektis Open Data', jaar:'cbsjaar'},
-  {id:'criminaliteit',   naam:'Criminaliteit',            icon:'gavel',              color:'#dc2626', bron:'data.politie.nl', jaar:'cbsjaar'},
-  {id:'bag_adressen',    naam:'BAG Adressen',             icon:'home',               color:'#39ff14', bron:'Kadaster BAG (PDOK)', jaar:'cbsjaar'},
+  {id:'bevolking',        naam:'Bevolking',                icon:'groups',             color:'#38bdf8', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'leeftijd',         naam:'Leeftijdsopbouw',          icon:'cake',               color:'#a78bfa', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'herkomst',         naam:'Herkomst & Diversiteit',   icon:'public',             color:'#fb923c', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'huishoudens',      naam:'Huishoudens',              icon:'family_restroom',    color:'#f472b6', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'opleiding',        naam:'Opleiding',                icon:'school',             color:'#c084fc', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'inkomen',          naam:'Inkomen & Welvaart',       icon:'payments',           color:'#4ade80', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'wonen',            naam:'Wonen & Woningmarkt',      icon:'home',               color:'#22c55e', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'energie',          naam:'Energie',                  icon:'bolt',               color:'#fbbf24', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'economie',         naam:'Economie & Arbeid',        icon:'work',               color:'#f97316', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'sociale_zekerheid',naam:'Sociale Zekerheid & Zorg', icon:'health_and_safety',  color:'#f43f5e', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'voorzieningen',    naam:'Voorzieningen',            icon:'local_hospital',     color:'#ec4899', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'natuur',           naam:'Natuur & Groen',           icon:'park',               color:'#34d399', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'mobiliteit',       naam:'Mobiliteit',               icon:'directions_car',     color:'#06b6d4', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'oppervlakte',      naam:'Oppervlakte',              icon:'straighten',         color:'#94a3b8', bron:'CBS Kerncijfers Wijken en Buurten', jaar:'cbsjaar'},
+  {id:'bodemgebruik',    naam:'Bodemgebruik',             icon:'landscape',          color:'#a3e635', bron:'CBS Bodemgebruik (tabel 70262ned)', jaar:'bbg'},
+  {id:'flora_fauna',     naam:'Flora & Fauna',            icon:'pets',               color:'#84cc16', bron:'GBIF (Global Biodiversity Information Facility)', jaar:'gbif'},
+  {id:'landbouw',        naam:'Landbouw',                 icon:'agriculture',        color:'#ca8a04', bron:'CBS Landbouwtelling (tabel 80781ned)', jaar:'cbsjaar'},
+  {id:'zorgkosten',      naam:'Zorgkosten',               icon:'local_pharmacy',     color:'#ef4444', bron:'Vektis Open Data (zorgverzekeraars)', jaar:'zk'},
+  {id:'criminaliteit',   naam:'Criminaliteit',            icon:'gavel',              color:'#dc2626', bron:'Politie (data.politie.nl)', jaar:'cr'},
+  {id:'bag_adressen',    naam:'BAG Adressen',             icon:'home',               color:'#39ff14', bron:'Kadaster BAG via PDOK', jaar:'bag'},
 ];
 
 var INDICATORS = [
@@ -4703,10 +4703,32 @@ function showFeatureInfo(p, cfg, type, isClick, geoFeature){
   html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
   html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:var(--ac);vertical-align:-2px">label</span> Type</span>';
   html += '<span style="font:700 11px Space Mono,monospace;color:var(--ac)">'+typeLabel+'</span></div>';
-  // Data peildatum
+  // Data peildatum + bronnen overzicht
+  var _fMeta = ((_gemeenteData||{}).metadata||{});
   html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
   html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:var(--wn);vertical-align:-2px">calendar_today</span> CBS data</span>';
-  html += '<span style="font:700 11px Space Mono,monospace;color:var(--wn)">peildatum 1 jan '+_activeYear+'</span></div>';
+  html += '<span style="font:700 11px Space Mono,monospace;color:var(--wn)">peiljaar '+_activeYear+'</span></div>';
+  // Extra bronnen als ze er zijn
+  if(_fMeta.zk_jaar){
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
+    html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:#ef4444;vertical-align:-2px">local_pharmacy</span> Zorgkosten</span>';
+    html += '<span style="font:700 11px Space Mono,monospace;color:#ef4444">peiljaar '+_fMeta.zk_jaar+'</span></div>';
+  }
+  if(_fMeta.cr_jaar){
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
+    html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:#dc2626;vertical-align:-2px">gavel</span> Criminaliteit</span>';
+    html += '<span style="font:700 11px Space Mono,monospace;color:#dc2626">peiljaar '+_fMeta.cr_jaar+'</span></div>';
+  }
+  if(_fMeta.bbg_peiljaar){
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
+    html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:#a3e635;vertical-align:-2px">landscape</span> Bodemgebruik</span>';
+    html += '<span style="font:700 11px Space Mono,monospace;color:#a3e635">peiljaar '+_fMeta.bbg_peiljaar+'</span></div>';
+  }
+  if(_fMeta.enriched_at){
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
+    html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:#39ff14;vertical-align:-2px">sync</span> Verrijkt</span>';
+    html += '<span style="font:700 11px Space Mono,monospace;color:#39ff14">'+_fMeta.enriched_at.substring(0,10)+'</span></div>';
+  }
   if(isClick) {
     html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
     html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:var(--ai);vertical-align:-2px">tag</span> Code</span>';
@@ -4785,9 +4807,16 @@ function showFeatureInfo(p, cfg, type, isClick, geoFeature){
       });
       if(catCount > 0){
         html += '<div style="padding-top:6px;border-top:1px solid var(--glass-bd);margin-top:4px">';
-        var _pjLabel='';if(cat.jaar==='cbsjaar')_pjLabel='CBS '+_activeYear;else if(cat.jaar==='bbg'){var _bj=((_gemeenteData||{}).metadata||{}).bbg_peiljaar||2017;_pjLabel='peiljaar '+_bj;}else if(cat.jaar==='cumulatief')_pjLabel='cumulatief';
-        html += '<div style="font:600 10px DM Sans,sans-serif;color:'+cat.color+';margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi mi-sm" style="font-size:13px">'+cat.icon+'</span> '+cat.naam+' <span style="font-weight:400;color:var(--mt)">('+catCount+')</span>';
-        if(_pjLabel) html += ' <span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.7">'+_pjLabel+'</span>';
+        var _pjMeta = ((_gemeenteData||{}).metadata||{});
+        var _pjLabel='';
+        if(cat.jaar==='cbsjaar') _pjLabel='peiljaar '+_activeYear;
+        else if(cat.jaar==='bbg'){var _bj=_pjMeta.bbg_peiljaar||2017;_pjLabel='peiljaar '+_bj;}
+        else if(cat.jaar==='gbif') _pjLabel='cumulatief';
+        else if(cat.jaar==='zk'){var _zj=_pjMeta.zk_jaar||'?';_pjLabel='peiljaar '+_zj;}
+        else if(cat.jaar==='cr'){var _cj=_pjMeta.cr_jaar||'?';_pjLabel='peiljaar '+_cj;}
+        else if(cat.jaar==='bag'){var _bd=_pjMeta.enriched_at||'';_pjLabel=_bd?'bijgewerkt '+_bd.substring(0,10):'actueel';}
+        html += '<div style="font:600 10px DM Sans,sans-serif;color:'+cat.color+';margin-bottom:4px;display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span class="mi mi-sm" style="font-size:13px">'+cat.icon+'</span> '+cat.naam+' <span style="font-weight:400;color:var(--mt)">('+catCount+')</span>';
+        if(_pjLabel) html += ' <span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.7"><span class="mi" style="font-size:9px">update</span> '+_pjLabel+'</span>';
         html += '</div>';
         html += catHtml + '</div>';
       }
@@ -4918,10 +4947,16 @@ function buildIndicatorList(){
     html += '<span class="mi ind-cat-chevron">'+(isCollapsed?'chevron_right':'expand_more')+'</span>';
     html += '<span class="mi ind-cat-icon" style="color:'+cat.color+'">'+cat.icon+'</span>';
     html += '<span class="ind-cat-name">'+cat.naam+'</span>';
-    // Peiljaar badge voor bodemgebruik
-    if(cat.id === 'bodemgebruik' && _bbgPeiljaar){
-      html += '<span style="font:500 8px Space Mono,monospace;color:var(--mt);opacity:.7;margin-left:4px">('+_bbgPeiljaar+')</span>';
-    }
+    // Peiljaar badge per categorie
+    var _ilMeta = ((_gemeenteData||{}).metadata||{});
+    var _ilJaar = '';
+    if(cat.jaar==='cbsjaar') _ilJaar = _activeYear;
+    else if(cat.jaar==='bbg') _ilJaar = _ilMeta.bbg_peiljaar||_bbgPeiljaar||2017;
+    else if(cat.jaar==='gbif') _ilJaar = 'cum.';
+    else if(cat.jaar==='zk') _ilJaar = _ilMeta.zk_jaar||'?';
+    else if(cat.jaar==='cr') _ilJaar = _ilMeta.cr_jaar||'?';
+    else if(cat.jaar==='bag'){var _bd2=_ilMeta.enriched_at||'';_ilJaar=_bd2?_bd2.substring(0,10):'actueel';}
+    if(_ilJaar) html += '<span style="font:500 8px Space Mono,monospace;color:var(--mt);opacity:.7;margin-left:4px" title="'+cat.bron+'">'+_ilJaar+'</span>';
     html += '</div>';
     html += '<span class="ind-cat-count'+(activeCount>0?' has-active':'')+'">'+activeCount+'/'+catInds.length+'</span>';
     html += '</div>';
@@ -6091,13 +6126,22 @@ function renderIndicatorDefs(){
 
     html += '<div style="margin-top:8px;margin-bottom:4px;font:700 10px \'DM Sans\',sans-serif;color:'+cat.color+';display:flex;align-items:center;gap:4px;text-transform:uppercase;letter-spacing:.5px">';
     html += '<span class="mi mi-sm" style="color:'+cat.color+'">'+cat.icon+'</span> '+cat.naam+' ('+catInds.length+')';
-    // Bron & peiljaar badge
-    var _catJaarLabel = '';
-    if(cat.jaar === 'cbsjaar') _catJaarLabel = 'CBS '+_activeYear;
-    else if(cat.jaar === 'bbg'){var _bbgJr=((_gemeenteData||{}).metadata||{}).bbg_peiljaar||2017;_catJaarLabel='CBS peiljaar '+_bbgJr;}
-    else if(cat.jaar === 'cumulatief') _catJaarLabel = 'GBIF \u2014 cumulatief (alle jaren)';
-    if(_catJaarLabel) html += ' <span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);background:var(--glass);padding:1px 5px;border-radius:3px;text-transform:none;letter-spacing:0;vertical-align:1px">'+_catJaarLabel+'</span>';
     html += '</div>';
+    // Bron & bijgewerkt-tot badge
+    var _meta = ((_gemeenteData||{}).metadata||{});
+    var _catJaarLabel = '', _catBijgewerkt = '';
+    if(cat.jaar === 'cbsjaar'){ _catJaarLabel = cat.bron; _catBijgewerkt = 'peiljaar '+_activeYear; }
+    else if(cat.jaar === 'bbg'){ var _bbgJr=_meta.bbg_peiljaar||2017; _catJaarLabel = cat.bron; _catBijgewerkt = 'peiljaar '+_bbgJr; }
+    else if(cat.jaar === 'gbif'){ _catJaarLabel = cat.bron; _catBijgewerkt = 'cumulatief (alle jaren)'; }
+    else if(cat.jaar === 'zk'){ var _zkJr=_meta.zk_jaar||'?'; _catJaarLabel = cat.bron; _catBijgewerkt = 'peiljaar '+_zkJr; }
+    else if(cat.jaar === 'cr'){ var _crJr=_meta.cr_jaar||'?'; _catJaarLabel = cat.bron; _catBijgewerkt = 'peiljaar '+_crJr; }
+    else if(cat.jaar === 'bag'){ _catJaarLabel = cat.bron; var _bagDt=_meta.enriched_at||''; _catBijgewerkt = _bagDt ? 'bijgewerkt '+_bagDt.substring(0,10) : 'actueel'; }
+    if(_catJaarLabel){
+      html += '<div style="display:flex;align-items:center;gap:4px;margin-top:1px;margin-bottom:2px;flex-wrap:wrap">';
+      html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);background:var(--glass);padding:1px 5px;border-radius:3px;letter-spacing:0" title="Databron">'+_catJaarLabel+'</span>';
+      html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--ac);background:rgba(57,255,20,.08);padding:1px 5px;border-radius:3px;letter-spacing:0" title="Bijgewerkt tot"><span class="mi" style="font-size:9px;vertical-align:-1px">update</span> '+_catBijgewerkt+'</span>';
+      html += '</div>';
+    }
 
     catInds.forEach(function(fm){
       var ns = _nationalStats[fm.key];

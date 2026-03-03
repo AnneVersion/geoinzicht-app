@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-03-03T20:34:16",
-  "total_gemeenten": 22,
-  "total_adressen": 575898,
-  "total_size_mb": 192.9,
+  "generated_at": "2026-03-03T21:08:23",
+  "total_gemeenten": 46,
+  "total_adressen": 2668571,
+  "total_size_mb": 894.2,
   "gemeenten": {
     "GM0034": {
       "naam": "Almere",
@@ -103,6 +103,126 @@
       "naam": "Eemnes",
       "count": 16005,
       "size_mb": 5.26
+    },
+    "GM0363": {
+      "naam": "Amsterdam",
+      "count": 688531,
+      "size_mb": 233.13
+    },
+    "GM0373": {
+      "naam": "Bergen (NH.)",
+      "count": 73402,
+      "size_mb": 24.4
+    },
+    "GM0375": {
+      "naam": "Beverwijk",
+      "count": 49074,
+      "size_mb": 16.34
+    },
+    "GM0376": {
+      "naam": "Blaricum",
+      "count": 32378,
+      "size_mb": 10.6
+    },
+    "GM0377": {
+      "naam": "Bloemendaal",
+      "count": 55830,
+      "size_mb": 18.69
+    },
+    "GM0383": {
+      "naam": "Castricum",
+      "count": 27511,
+      "size_mb": 9.1
+    },
+    "GM0384": {
+      "naam": "Diemen",
+      "count": 63434,
+      "size_mb": 21.06
+    },
+    "GM0385": {
+      "naam": "Edam-Volendam",
+      "count": 54739,
+      "size_mb": 18.14
+    },
+    "GM0388": {
+      "naam": "Enkhuizen",
+      "count": 21642,
+      "size_mb": 7.19
+    },
+    "GM0396": {
+      "naam": "Heemskerk",
+      "count": 44428,
+      "size_mb": 14.76
+    },
+    "GM0400": {
+      "naam": "Den Helder",
+      "count": 38211,
+      "size_mb": 12.79
+    },
+    "GM0405": {
+      "naam": "Hoorn",
+      "count": 43349,
+      "size_mb": 14.11
+    },
+    "GM0406": {
+      "naam": "Huizen",
+      "count": 31094,
+      "size_mb": 10.19
+    },
+    "GM0420": {
+      "naam": "Medemblik",
+      "count": 55345,
+      "size_mb": 18.3
+    },
+    "GM0441": {
+      "naam": "Schagen",
+      "count": 49807,
+      "size_mb": 16.6
+    },
+    "GM0448": {
+      "naam": "Texel",
+      "count": 19067,
+      "size_mb": 6.35
+    },
+    "GM0453": {
+      "naam": "Velsen",
+      "count": 63281,
+      "size_mb": 21.11
+    },
+    "GM0473": {
+      "naam": "Zandvoort",
+      "count": 15436,
+      "size_mb": 5.24
+    },
+    "GM0498": {
+      "naam": "Drechterland",
+      "count": 27735,
+      "size_mb": 9.18
+    },
+    "GM0505": {
+      "naam": "Dordrecht",
+      "count": 96060,
+      "size_mb": 31.95
+    },
+    "GM0518": {
+      "naam": "'s-Gravenhage",
+      "count": 425121,
+      "size_mb": 143.16
+    },
+    "GM0532": {
+      "naam": "Stede Broec",
+      "count": 12025,
+      "size_mb": 4.0
+    },
+    "GM0537": {
+      "naam": "Katwijk",
+      "count": 43266,
+      "size_mb": 14.32
+    },
+    "GM0575": {
+      "naam": "Noordwijk",
+      "count": 61907,
+      "size_mb": 20.6
     },
     "GM0998": {
       "naam": "Buitenland",
