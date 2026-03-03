@@ -1862,13 +1862,16 @@ function updateBagCacheUI(){
     var parts = [];
     if(_bagLocalMode && _bagMemCount > 0){
       // Lokale mode: toon geladen adressen prominent
-      parts.push('✅ '+_bagMemCount.toLocaleString('nl-NL')+' adressen geladen');
       var gemLoaded = Object.keys(_bagBgLoaded).length;
-      if(gemLoaded > 0){
+      var alleGem = gemLoaded >= gemTotaal - 5;
+      if(alleGem){
+        parts.push('✅ '+_bagMemCount.toLocaleString('nl-NL')+' adressen · heel NL geladen');
+      } else {
+        parts.push('⏳ '+_bagMemCount.toLocaleString('nl-NL')+' adressen');
         parts.push(gemLoaded+'/'+gemTotaal+' gemeenten');
-      }
-      if(totalAdressen > _bagMemCount){
-        parts.push('('+totalAdressen.toLocaleString('nl-NL')+' beschikbaar)');
+        if(localGemeenten < gemTotaal && !_bagBgRunning){
+          parts.push('server download loopt nog');
+        }
       }
     } else if(gemGeteld > 0){
       parts.push(totalAdressen.toLocaleString('nl-NL')+' adressen totaal');
@@ -1888,7 +1891,9 @@ function updateBagCacheUI(){
   // Update badge op BAG knop: totaal adressen
   if(btnEl){
     if(_bagLocalMode && _bagMemCount > 0){
-      btnEl.textContent = '('+_bagMemCount.toLocaleString('nl-NL')+' geladen)';
+      var gemL = Object.keys(_bagBgLoaded).length;
+      var alleG = gemL >= gemTotaal - 5;
+      btnEl.textContent = alleG ? '('+_bagMemCount.toLocaleString('nl-NL')+' ✅)' : '('+_bagMemCount.toLocaleString('nl-NL')+' · '+gemL+'/'+gemTotaal+')';
     } else if(totalAdressen > 0){
       var suffix = (gemGeteld < gemTotaal) ? '+' : '';
       btnEl.textContent = '('+totalAdressen.toLocaleString('nl-NL')+suffix+')';
@@ -3923,22 +3928,54 @@ function autoPreloadBagLocal(){
     if(queue.length === 0 && running === 0){
       _bagBgRunning = false;
       var elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      bgText.textContent = 'Klaar!';
-      bgPct.textContent = '100%';
-      bgBar.style.width = '100%';
-      bgDetail.textContent = totalLoaded.toLocaleString('nl-NL')+' adressen geladen in '+elapsed+'s · '+completed+' gemeenten';
+      var gemTotaal = _gemeenteData ? _gemeenteData.features.length : 343;
+      var gemBeschikbaar = available.length;
+      var alleGemeenten = gemBeschikbaar >= gemTotaal - 5; // ~alle (minus evt. geen adressen)
+
+      if(alleGemeenten){
+        bgText.textContent = '✅ Volledig geladen';
+        bgPct.textContent = '100%';
+        bgBar.style.width = '100%';
+        bgDetail.textContent = totalLoaded.toLocaleString('nl-NL')+' adressen · '+completed+' gemeenten · '+elapsed+'s';
+        // Verwijder WMS achtergrond nu lokale data volledig is
+        if(_bagWmsLayer){ _bagWmsLayer.setOpacity(0); }
+        toast(totalLoaded.toLocaleString('nl-NL')+' BAG adressen geladen ✔ (heel NL)', 'success');
+        setTimeout(function(){ if(!_bagBgRunning) progEl.style.display = 'none'; }, 8000);
+      } else {
+        // Niet alle gemeenten beschikbaar — server download nog bezig
+        var ontbreekt = gemTotaal - gemBeschikbaar;
+        bgText.textContent = '⏳ '+gemBeschikbaar+'/'+gemTotaal+' gemeenten beschikbaar';
+        bgPct.textContent = Math.round(gemBeschikbaar/gemTotaal*100)+'%';
+        bgBar.style.width = Math.round(gemBeschikbaar/gemTotaal*100)+'%';
+        bgDetail.textContent = totalLoaded.toLocaleString('nl-NL')+' adressen geladen · '+ontbreekt+' gemeenten worden nog gedownload op server';
+        // Periodiek opnieuw checken of er meer bestanden zijn
+        _bagPollTimer = setInterval(function(){
+          loadBagIndex().then(function(){
+            var newAvail = Object.keys(_bagIndex).filter(function(c){ return _bagIndex[c] && _bagIndex[c].count > 0 && _bagIndex[c].size_mb > 0; });
+            if(newAvail.length > gemBeschikbaar){
+              // Nieuwe bestanden! Herlaad
+              clearInterval(_bagPollTimer);
+              toast(newAvail.length+'/'+gemTotaal+' gemeenten beschikbaar — herlaadt...', 'info');
+              setTimeout(function(){ autoPreloadBagLocal(); }, 1000);
+            } else {
+              // Update status
+              bgDetail.textContent = totalLoaded.toLocaleString('nl-NL')+' geladen · '+newAvail.length+'/'+gemTotaal+' gemeenten beschikbaar · checkt elke 60s...';
+            }
+          });
+        }, 60000); // Check elke 60 seconden
+        // WMS op lage opacity houden als dekking voor ontbrekende gebieden
+        if(_bagWmsLayer){ _bagWmsLayer.setOpacity(0.1); }
+        toast(totalLoaded.toLocaleString('nl-NL')+' adressen geladen ('+gemBeschikbaar+'/'+gemTotaal+' gem.) — download loopt nog', 'info');
+      }
       updateBagCacheUI();
       _bagVectorData = getCachedBagFeatures();
       renderBagVectors();
       updateBagStatusCountsFromData();
-      // Verwijder WMS achtergrond nu lokale data volledig is
-      if(_bagWmsLayer){ _bagWmsLayer.setOpacity(0); }
-      toast(totalLoaded.toLocaleString('nl-NL')+' BAG adressen geladen ✔', 'success');
-      setTimeout(function(){ if(!_bagBgRunning) progEl.style.display = 'none'; }, 5000);
     }
   }
   processNext();
 }
+var _bagPollTimer = null;
 
 function startBagBackgroundLoad(){
   if(_bagBgRunning){ toast('Achtergrond laden is al bezig'); return; }
