@@ -1,238 +1,2060 @@
 {
-  "generated_at": "2026-03-03T21:08:23",
-  "total_gemeenten": 46,
-  "total_adressen": 2668571,
-  "total_size_mb": 894.2,
-  "gemeenten": {
-    "GM0034": {
-      "naam": "Almere",
-      "count": 51000,
-      "size_mb": 16.7
-    },
-    "GM0050": {
-      "naam": "Zeewolde",
-      "count": 50351,
-      "size_mb": 16.63
-    },
-    "GM0060": {
-      "naam": "Ameland",
-      "count": 4534,
-      "size_mb": 1.5
-    },
-    "GM0072": {
-      "naam": "Harlingen",
-      "count": 16142,
-      "size_mb": 5.37
-    },
-    "GM0088": {
-      "naam": "Schiermonnikoog",
-      "count": 1564,
-      "size_mb": 0.53
-    },
-    "GM0093": {
-      "naam": "Terschelling",
-      "count": 6022,
-      "size_mb": 2.03
-    },
-    "GM0096": {
-      "naam": "Vlieland",
-      "count": 1481,
-      "size_mb": 0.49
-    },
-    "GM0166": {
-      "naam": "Kampen",
-      "count": 31345,
-      "size_mb": 10.38
-    },
-    "GM0171": {
-      "naam": "Noordoostpolder",
-      "count": 46070,
-      "size_mb": 15.25
-    },
-    "GM0184": {
-      "naam": "Urk",
-      "count": 9054,
-      "size_mb": 2.94
-    },
-    "GM0230": {
-      "naam": "Elburg",
-      "count": 27482,
-      "size_mb": 9.15
-    },
-    "GM0233": {
-      "naam": "Ermelo",
-      "count": 33429,
-      "size_mb": 11.09
-    },
-    "GM0243": {
-      "naam": "Harderwijk",
-      "count": 32908,
-      "size_mb": 10.99
-    },
-    "GM0267": {
-      "naam": "Nijkerk",
-      "count": 69685,
-      "size_mb": 23.12
-    },
-    "GM0269": {
-      "naam": "Oldebroek",
-      "count": 21658,
-      "size_mb": 7.19
-    },
-    "GM0273": {
-      "naam": "Putten",
-      "count": 26798,
-      "size_mb": 8.89
-    },
-    "GM0302": {
-      "naam": "Nunspeet",
-      "count": 17688,
-      "size_mb": 5.9
-    },
-    "GM0303": {
-      "naam": "Dronten",
-      "count": 45439,
-      "size_mb": 15.06
-    },
-    "GM0313": {
-      "naam": "Bunschoten",
-      "count": 12674,
-      "size_mb": 4.33
-    },
-    "GM0317": {
-      "naam": "Eemnes",
-      "count": 16005,
-      "size_mb": 5.26
-    },
-    "GM0363": {
-      "naam": "Amsterdam",
-      "count": 688531,
-      "size_mb": 233.13
-    },
-    "GM0373": {
-      "naam": "Bergen (NH.)",
-      "count": 73402,
-      "size_mb": 24.4
-    },
-    "GM0375": {
-      "naam": "Beverwijk",
-      "count": 49074,
-      "size_mb": 16.34
-    },
-    "GM0376": {
-      "naam": "Blaricum",
-      "count": 32378,
-      "size_mb": 10.6
-    },
-    "GM0377": {
-      "naam": "Bloemendaal",
-      "count": 55830,
-      "size_mb": 18.69
-    },
-    "GM0383": {
-      "naam": "Castricum",
-      "count": 27511,
-      "size_mb": 9.1
-    },
-    "GM0384": {
-      "naam": "Diemen",
-      "count": 63434,
-      "size_mb": 21.06
-    },
-    "GM0385": {
-      "naam": "Edam-Volendam",
-      "count": 54739,
-      "size_mb": 18.14
-    },
-    "GM0388": {
-      "naam": "Enkhuizen",
-      "count": 21642,
-      "size_mb": 7.19
-    },
-    "GM0396": {
-      "naam": "Heemskerk",
-      "count": 44428,
-      "size_mb": 14.76
-    },
-    "GM0400": {
-      "naam": "Den Helder",
-      "count": 38211,
-      "size_mb": 12.79
-    },
-    "GM0405": {
-      "naam": "Hoorn",
-      "count": 43349,
-      "size_mb": 14.11
-    },
-    "GM0406": {
-      "naam": "Huizen",
-      "count": 31094,
-      "size_mb": 10.19
-    },
-    "GM0420": {
-      "naam": "Medemblik",
-      "count": 55345,
-      "size_mb": 18.3
-    },
-    "GM0441": {
-      "naam": "Schagen",
-      "count": 49807,
-      "size_mb": 16.6
-    },
-    "GM0448": {
-      "naam": "Texel",
-      "count": 19067,
-      "size_mb": 6.35
-    },
-    "GM0453": {
-      "naam": "Velsen",
-      "count": 63281,
-      "size_mb": 21.11
-    },
-    "GM0473": {
-      "naam": "Zandvoort",
-      "count": 15436,
-      "size_mb": 5.24
-    },
-    "GM0498": {
-      "naam": "Drechterland",
-      "count": 27735,
-      "size_mb": 9.18
-    },
-    "GM0505": {
-      "naam": "Dordrecht",
-      "count": 96060,
-      "size_mb": 31.95
-    },
-    "GM0518": {
-      "naam": "'s-Gravenhage",
-      "count": 425121,
-      "size_mb": 143.16
-    },
-    "GM0532": {
-      "naam": "Stede Broec",
-      "count": 12025,
-      "size_mb": 4.0
-    },
-    "GM0537": {
-      "naam": "Katwijk",
-      "count": 43266,
-      "size_mb": 14.32
-    },
-    "GM0575": {
-      "naam": "Noordwijk",
-      "count": 61907,
-      "size_mb": 20.6
-    },
-    "GM0998": {
-      "naam": "Buitenland",
-      "count": 3782,
-      "size_mb": 1.29
-    },
-    "GM1942": {
-      "naam": "",
-      "count": 50787,
-      "size_mb": 18.83
-    }
+  "GM0014": {
+    "naam": "GM0014",
+    "count": 178228,
+    "size_mb": 59.5,
+    "generated": "2026-03-06T17:53:06"
+  },
+  "GM0034": {
+    "naam": "GM0034",
+    "count": 51000,
+    "size_mb": 16.7,
+    "generated": "2026-03-06T17:53:07"
+  },
+  "GM0037": {
+    "naam": "GM0037",
+    "count": 23141,
+    "size_mb": 7.7,
+    "generated": "2026-03-06T17:53:07"
+  },
+  "GM0047": {
+    "naam": "GM0047",
+    "count": 18003,
+    "size_mb": 6.0,
+    "generated": "2026-03-06T17:53:07"
+  },
+  "GM0050": {
+    "naam": "GM0050",
+    "count": 50351,
+    "size_mb": 16.6,
+    "generated": "2026-03-06T17:53:07"
+  },
+  "GM0059": {
+    "naam": "GM0059",
+    "count": 22445,
+    "size_mb": 7.5,
+    "generated": "2026-03-06T17:53:08"
+  },
+  "GM0060": {
+    "naam": "GM0060",
+    "count": 4534,
+    "size_mb": 1.5,
+    "generated": "2026-03-06T17:53:08"
+  },
+  "GM0072": {
+    "naam": "GM0072",
+    "count": 16142,
+    "size_mb": 5.4,
+    "generated": "2026-03-06T17:53:08"
+  },
+  "GM0074": {
+    "naam": "GM0074",
+    "count": 52347,
+    "size_mb": 17.4,
+    "generated": "2026-03-06T17:53:08"
+  },
+  "GM0080": {
+    "naam": "GM0080",
+    "count": 103948,
+    "size_mb": 34.6,
+    "generated": "2026-03-06T17:53:09"
+  },
+  "GM0085": {
+    "naam": "GM0085",
+    "count": 21381,
+    "size_mb": 7.1,
+    "generated": "2026-03-06T17:53:09"
+  },
+  "GM0086": {
+    "naam": "GM0086",
+    "count": 58527,
+    "size_mb": 19.4,
+    "generated": "2026-03-06T17:53:10"
+  },
+  "GM0088": {
+    "naam": "GM0088",
+    "count": 1564,
+    "size_mb": 0.5,
+    "generated": "2026-03-06T17:53:10"
+  },
+  "GM0090": {
+    "naam": "GM0090",
+    "count": 36001,
+    "size_mb": 11.9,
+    "generated": "2026-03-06T17:53:10"
+  },
+  "GM0093": {
+    "naam": "GM0093",
+    "count": 6022,
+    "size_mb": 2.0,
+    "generated": "2026-03-06T17:53:10"
+  },
+  "GM0096": {
+    "naam": "GM0096",
+    "count": 1481,
+    "size_mb": 0.5,
+    "generated": "2026-03-06T17:53:10"
+  },
+  "GM0098": {
+    "naam": "GM0098",
+    "count": 27837,
+    "size_mb": 9.2,
+    "generated": "2026-03-06T17:53:10"
+  },
+  "GM0106": {
+    "naam": "GM0106",
+    "count": 40717,
+    "size_mb": 13.3,
+    "generated": "2026-03-06T17:53:10"
+  },
+  "GM0109": {
+    "naam": "GM0109",
+    "count": 32111,
+    "size_mb": 10.7,
+    "generated": "2026-03-06T17:53:11"
+  },
+  "GM0114": {
+    "naam": "GM0114",
+    "count": 64245,
+    "size_mb": 21.2,
+    "generated": "2026-03-06T17:53:11"
+  },
+  "GM0118": {
+    "naam": "GM0118",
+    "count": 36534,
+    "size_mb": 12.2,
+    "generated": "2026-03-06T17:53:12"
+  },
+  "GM0119": {
+    "naam": "GM0119",
+    "count": 24479,
+    "size_mb": 8.1,
+    "generated": "2026-03-06T17:53:12"
+  },
+  "GM0141": {
+    "naam": "GM0141",
+    "count": 45407,
+    "size_mb": 15.0,
+    "generated": "2026-03-06T17:53:12"
+  },
+  "GM0147": {
+    "naam": "GM0147",
+    "count": 14471,
+    "size_mb": 4.7,
+    "generated": "2026-03-06T17:53:12"
+  },
+  "GM0148": {
+    "naam": "GM0148",
+    "count": 21739,
+    "size_mb": 7.2,
+    "generated": "2026-03-06T17:53:12"
+  },
+  "GM0150": {
+    "naam": "GM0150",
+    "count": 63842,
+    "size_mb": 21.2,
+    "generated": "2026-03-06T17:53:13"
+  },
+  "GM0153": {
+    "naam": "GM0153",
+    "count": 131244,
+    "size_mb": 43.6,
+    "generated": "2026-03-06T17:53:14"
+  },
+  "GM0158": {
+    "naam": "GM0158",
+    "count": 32046,
+    "size_mb": 10.7,
+    "generated": "2026-03-06T17:53:14"
+  },
+  "GM0160": {
+    "naam": "GM0160",
+    "count": 59024,
+    "size_mb": 19.7,
+    "generated": "2026-03-06T17:53:14"
+  },
+  "GM0163": {
+    "naam": "GM0163",
+    "count": 34004,
+    "size_mb": 11.3,
+    "generated": "2026-03-06T17:53:15"
+  },
+  "GM0164": {
+    "naam": "GM0164",
+    "count": 71929,
+    "size_mb": 23.8,
+    "generated": "2026-03-06T17:53:15"
+  },
+  "GM0166": {
+    "naam": "GM0166",
+    "count": 31345,
+    "size_mb": 10.4,
+    "generated": "2026-03-06T17:53:15"
+  },
+  "GM0168": {
+    "naam": "GM0168",
+    "count": 17994,
+    "size_mb": 6.0,
+    "generated": "2026-03-06T17:53:16"
+  },
+  "GM0171": {
+    "naam": "GM0171",
+    "count": 46070,
+    "size_mb": 15.2,
+    "generated": "2026-03-06T17:53:16"
+  },
+  "GM0173": {
+    "naam": "GM0173",
+    "count": 17858,
+    "size_mb": 6.0,
+    "generated": "2026-03-06T17:53:16"
+  },
+  "GM0175": {
+    "naam": "GM0175",
+    "count": 27492,
+    "size_mb": 9.1,
+    "generated": "2026-03-06T17:53:16"
+  },
+  "GM0177": {
+    "naam": "GM0177",
+    "count": 26126,
+    "size_mb": 8.6,
+    "generated": "2026-03-06T17:53:16"
+  },
+  "GM0180": {
+    "naam": "GM0180",
+    "count": 20784,
+    "size_mb": 6.9,
+    "generated": "2026-03-06T17:53:17"
+  },
+  "GM0183": {
+    "naam": "GM0183",
+    "count": 26639,
+    "size_mb": 8.8,
+    "generated": "2026-03-06T17:53:17"
+  },
+  "GM0184": {
+    "naam": "GM0184",
+    "count": 9054,
+    "size_mb": 2.9,
+    "generated": "2026-03-06T17:53:17"
+  },
+  "GM0189": {
+    "naam": "GM0189",
+    "count": 42268,
+    "size_mb": 14.0,
+    "generated": "2026-03-06T17:53:17"
+  },
+  "GM0193": {
+    "naam": "GM0193",
+    "count": 83605,
+    "size_mb": 27.6,
+    "generated": "2026-03-06T17:53:18"
+  },
+  "GM0197": {
+    "naam": "GM0197",
+    "count": 15860,
+    "size_mb": 5.3,
+    "generated": "2026-03-06T17:53:18"
+  },
+  "GM0200": {
+    "naam": "GM0200",
+    "count": 105553,
+    "size_mb": 35.1,
+    "generated": "2026-03-06T17:53:19"
+  },
+  "GM0202": {
+    "naam": "GM0202",
+    "count": 127724,
+    "size_mb": 42.3,
+    "generated": "2026-03-06T17:53:20"
+  },
+  "GM0203": {
+    "naam": "GM0203",
+    "count": 54913,
+    "size_mb": 18.4,
+    "generated": "2026-03-06T17:53:20"
+  },
+  "GM0209": {
+    "naam": "GM0209",
+    "count": 23113,
+    "size_mb": 7.7,
+    "generated": "2026-03-06T17:53:20"
+  },
+  "GM0213": {
+    "naam": "GM0213",
+    "count": 37352,
+    "size_mb": 12.4,
+    "generated": "2026-03-06T17:53:21"
+  },
+  "GM0214": {
+    "naam": "GM0214",
+    "count": 73930,
+    "size_mb": 24.6,
+    "generated": "2026-03-06T17:53:21"
+  },
+  "GM0216": {
+    "naam": "GM0216",
+    "count": 16344,
+    "size_mb": 5.4,
+    "generated": "2026-03-06T17:53:21"
+  },
+  "GM0221": {
+    "naam": "GM0221",
+    "count": 7118,
+    "size_mb": 2.3,
+    "generated": "2026-03-06T17:53:21"
+  },
+  "GM0222": {
+    "naam": "GM0222",
+    "count": 37118,
+    "size_mb": 12.4,
+    "generated": "2026-03-06T17:53:22"
+  },
+  "GM0225": {
+    "naam": "GM0225",
+    "count": 13161,
+    "size_mb": 4.4,
+    "generated": "2026-03-06T17:53:22"
+  },
+  "GM0226": {
+    "naam": "GM0226",
+    "count": 26451,
+    "size_mb": 8.7,
+    "generated": "2026-03-06T17:53:22"
+  },
+  "GM0228": {
+    "naam": "Ede",
+    "count": 48484,
+    "size_mb": 18.0,
+    "generated": "2026-03-06T17:36:01"
+  },
+  "GM0230": {
+    "naam": "GM0230",
+    "count": 27482,
+    "size_mb": 9.1,
+    "generated": "2026-03-06T17:53:22"
+  },
+  "GM0232": {
+    "naam": "GM0232",
+    "count": 25807,
+    "size_mb": 8.5,
+    "generated": "2026-03-06T17:53:23"
+  },
+  "GM0233": {
+    "naam": "GM0233",
+    "count": 33429,
+    "size_mb": 11.1,
+    "generated": "2026-03-06T17:53:23"
+  },
+  "GM0243": {
+    "naam": "GM0243",
+    "count": 32908,
+    "size_mb": 11.0,
+    "generated": "2026-03-06T17:53:23"
+  },
+  "GM0244": {
+    "naam": "GM0244",
+    "count": 21189,
+    "size_mb": 7.0,
+    "generated": "2026-03-06T17:53:23"
+  },
+  "GM0246": {
+    "naam": "GM0246",
+    "count": 13519,
+    "size_mb": 4.5,
+    "generated": "2026-03-06T17:53:23"
+  },
+  "GM0252": {
+    "naam": "GM0252",
+    "count": 31969,
+    "size_mb": 10.5,
+    "generated": "2026-03-06T17:53:24"
+  },
+  "GM0262": {
+    "naam": "GM0262",
+    "count": 57448,
+    "size_mb": 19.0,
+    "generated": "2026-03-06T17:53:24"
+  },
+  "GM0263": {
+    "naam": "GM0263",
+    "count": 34554,
+    "size_mb": 11.5,
+    "generated": "2026-03-06T17:53:24"
+  },
+  "GM0267": {
+    "naam": "GM0267",
+    "count": 69685,
+    "size_mb": 23.1,
+    "generated": "2026-03-06T17:53:25"
+  },
+  "GM0268": {
+    "naam": "Nijmegen",
+    "count": 50836,
+    "size_mb": 19.0,
+    "generated": "2026-03-06T17:37:57"
+  },
+  "GM0269": {
+    "naam": "GM0269",
+    "count": 21658,
+    "size_mb": 7.2,
+    "generated": "2026-03-06T17:53:25"
+  },
+  "GM0273": {
+    "naam": "GM0273",
+    "count": 26798,
+    "size_mb": 8.9,
+    "generated": "2026-03-06T17:53:25"
+  },
+  "GM0274": {
+    "naam": "GM0274",
+    "count": 25517,
+    "size_mb": 8.4,
+    "generated": "2026-03-06T17:53:26"
+  },
+  "GM0275": {
+    "naam": "GM0275",
+    "count": 39225,
+    "size_mb": 12.9,
+    "generated": "2026-03-06T17:53:26"
+  },
+  "GM0277": {
+    "naam": "GM0277",
+    "count": 5668,
+    "size_mb": 1.9,
+    "generated": "2026-03-06T17:53:26"
+  },
+  "GM0279": {
+    "naam": "GM0279",
+    "count": 6601,
+    "size_mb": 2.2,
+    "generated": "2026-03-06T17:53:26"
+  },
+  "GM0281": {
+    "naam": "GM0281",
+    "count": 27215,
+    "size_mb": 8.9,
+    "generated": "2026-03-06T17:53:26"
+  },
+  "GM0285": {
+    "naam": "GM0285",
+    "count": 55589,
+    "size_mb": 18.5,
+    "generated": "2026-03-06T17:53:27"
+  },
+  "GM0289": {
+    "naam": "GM0289",
+    "count": 26607,
+    "size_mb": 8.9,
+    "generated": "2026-03-06T17:53:27"
+  },
+  "GM0293": {
+    "naam": "GM0293",
+    "count": 12482,
+    "size_mb": 4.1,
+    "generated": "2026-03-06T17:53:27"
+  },
+  "GM0294": {
+    "naam": "GM0294",
+    "count": 17172,
+    "size_mb": 5.8,
+    "generated": "2026-03-06T17:53:27"
+  },
+  "GM0296": {
+    "naam": "GM0296",
+    "count": 48761,
+    "size_mb": 16.1,
+    "generated": "2026-03-06T17:53:27"
+  },
+  "GM0297": {
+    "naam": "GM0297",
+    "count": 34694,
+    "size_mb": 11.5,
+    "generated": "2026-03-06T17:53:28"
+  },
+  "GM0299": {
+    "naam": "GM0299",
+    "count": 59722,
+    "size_mb": 19.7,
+    "generated": "2026-03-06T17:53:28"
+  },
+  "GM0301": {
+    "naam": "GM0301",
+    "count": 37666,
+    "size_mb": 12.5,
+    "generated": "2026-03-06T17:53:28"
+  },
+  "GM0302": {
+    "naam": "GM0302",
+    "count": 17688,
+    "size_mb": 5.9,
+    "generated": "2026-03-06T17:53:28"
+  },
+  "GM0303": {
+    "naam": "GM0303",
+    "count": 45439,
+    "size_mb": 15.1,
+    "generated": "2026-03-06T17:53:29"
+  },
+  "GM0307": {
+    "naam": "GM0307",
+    "count": 115637,
+    "size_mb": 38.4,
+    "generated": "2026-03-06T17:53:29"
+  },
+  "GM0308": {
+    "naam": "GM0308",
+    "count": 33192,
+    "size_mb": 10.9,
+    "generated": "2026-03-06T17:53:30"
+  },
+  "GM0310": {
+    "naam": "GM0310",
+    "count": 116661,
+    "size_mb": 38.9,
+    "generated": "2026-03-06T17:53:31"
+  },
+  "GM0312": {
+    "naam": "GM0312",
+    "count": 40260,
+    "size_mb": 13.3,
+    "generated": "2026-03-06T17:53:31"
+  },
+  "GM0313": {
+    "naam": "GM0313",
+    "count": 12674,
+    "size_mb": 4.3,
+    "generated": "2026-03-06T17:53:31"
+  },
+  "GM0317": {
+    "naam": "GM0317",
+    "count": 16005,
+    "size_mb": 5.3,
+    "generated": "2026-03-06T17:53:31"
+  },
+  "GM0321": {
+    "naam": "GM0321",
+    "count": 34621,
+    "size_mb": 11.4,
+    "generated": "2026-03-06T17:53:31"
+  },
+  "GM0327": {
+    "naam": "GM0327",
+    "count": 53171,
+    "size_mb": 17.7,
+    "generated": "2026-03-06T17:53:32"
+  },
+  "GM0331": {
+    "naam": "GM0331",
+    "count": 33134,
+    "size_mb": 11.0,
+    "generated": "2026-03-06T17:53:32"
+  },
+  "GM0335": {
+    "naam": "GM0335",
+    "count": 14100,
+    "size_mb": 4.7,
+    "generated": "2026-03-06T17:53:32"
+  },
+  "GM0339": {
+    "naam": "GM0339",
+    "count": 5163,
+    "size_mb": 1.7,
+    "generated": "2026-03-06T17:53:32"
+  },
+  "GM0340": {
+    "naam": "GM0340",
+    "count": 22171,
+    "size_mb": 7.3,
+    "generated": "2026-03-06T17:53:32"
+  },
+  "GM0342": {
+    "naam": "GM0342",
+    "count": 33073,
+    "size_mb": 11.0,
+    "generated": "2026-03-06T17:53:32"
+  },
+  "GM0344": {
+    "naam": "GM0344",
+    "count": 274776,
+    "size_mb": 91.1,
+    "generated": "2026-03-06T17:53:34"
+  },
+  "GM0345": {
+    "naam": "GM0345",
+    "count": 36664,
+    "size_mb": 12.2,
+    "generated": "2026-03-06T17:53:35"
+  },
+  "GM0351": {
+    "naam": "GM0351",
+    "count": 20057,
+    "size_mb": 6.7,
+    "generated": "2026-03-06T17:53:35"
+  },
+  "GM0352": {
+    "naam": "GM0352",
+    "count": 15566,
+    "size_mb": 5.2,
+    "generated": "2026-03-06T17:53:35"
+  },
+  "GM0353": {
+    "naam": "GM0353",
+    "count": 28772,
+    "size_mb": 9.5,
+    "generated": "2026-03-06T17:53:36"
+  },
+  "GM0355": {
+    "naam": "GM0355",
+    "count": 62693,
+    "size_mb": 20.8,
+    "generated": "2026-03-06T17:53:36"
+  },
+  "GM0356": {
+    "naam": "GM0356",
+    "count": 40458,
+    "size_mb": 13.4,
+    "generated": "2026-03-06T17:53:36"
+  },
+  "GM0358": {
+    "naam": "GM0358",
+    "count": 51912,
+    "size_mb": 17.3,
+    "generated": "2026-03-06T17:53:37"
+  },
+  "GM0361": {
+    "naam": "GM0361",
+    "count": 125767,
+    "size_mb": 41.7,
+    "generated": "2026-03-06T17:53:38"
+  },
+  "GM0362": {
+    "naam": "GM0362",
+    "count": 79054,
+    "size_mb": 26.5,
+    "generated": "2026-03-06T17:53:38"
+  },
+  "GM0363": {
+    "naam": "GM0363",
+    "count": 688531,
+    "size_mb": 233.1,
+    "generated": "2026-03-06T17:53:43"
+  },
+  "GM0373": {
+    "naam": "GM0373",
+    "count": 73402,
+    "size_mb": 24.4,
+    "generated": "2026-03-06T17:53:44"
+  },
+  "GM0375": {
+    "naam": "GM0375",
+    "count": 49074,
+    "size_mb": 16.3,
+    "generated": "2026-03-06T17:53:45"
+  },
+  "GM0376": {
+    "naam": "GM0376",
+    "count": 32378,
+    "size_mb": 10.6,
+    "generated": "2026-03-06T17:53:45"
+  },
+  "GM0377": {
+    "naam": "GM0377",
+    "count": 55830,
+    "size_mb": 18.7,
+    "generated": "2026-03-06T17:53:45"
+  },
+  "GM0383": {
+    "naam": "GM0383",
+    "count": 27511,
+    "size_mb": 9.1,
+    "generated": "2026-03-06T17:53:45"
+  },
+  "GM0384": {
+    "naam": "GM0384",
+    "count": 63434,
+    "size_mb": 21.1,
+    "generated": "2026-03-06T17:53:46"
+  },
+  "GM0385": {
+    "naam": "GM0385",
+    "count": 54739,
+    "size_mb": 18.1,
+    "generated": "2026-03-06T17:53:46"
+  },
+  "GM0388": {
+    "naam": "GM0388",
+    "count": 21642,
+    "size_mb": 7.2,
+    "generated": "2026-03-06T17:53:47"
+  },
+  "GM0392": {
+    "naam": "GM0392",
+    "count": 122769,
+    "size_mb": 40.9,
+    "generated": "2026-03-06T17:53:48"
+  },
+  "GM0394": {
+    "naam": "GM0394",
+    "count": 326866,
+    "size_mb": 108.9,
+    "generated": "2026-03-06T17:53:50"
+  },
+  "GM0396": {
+    "naam": "GM0396",
+    "count": 44428,
+    "size_mb": 14.8,
+    "generated": "2026-03-06T17:53:51"
+  },
+  "GM0397": {
+    "naam": "GM0397",
+    "count": 19429,
+    "size_mb": 6.5,
+    "generated": "2026-03-06T17:53:51"
+  },
+  "GM0399": {
+    "naam": "GM0399",
+    "count": 22164,
+    "size_mb": 7.3,
+    "generated": "2026-03-06T17:53:52"
+  },
+  "GM0400": {
+    "naam": "GM0400",
+    "count": 38211,
+    "size_mb": 12.8,
+    "generated": "2026-03-06T17:53:52"
+  },
+  "GM0402": {
+    "naam": "Hilversum",
+    "count": 50982,
+    "size_mb": 19.0,
+    "generated": "2026-03-06T17:39:52"
+  },
+  "GM0405": {
+    "naam": "GM0405",
+    "count": 43349,
+    "size_mb": 14.1,
+    "generated": "2026-03-06T17:53:53"
+  },
+  "GM0406": {
+    "naam": "GM0406",
+    "count": 31094,
+    "size_mb": 10.2,
+    "generated": "2026-03-06T17:53:53"
+  },
+  "GM0415": {
+    "naam": "GM0415",
+    "count": 12671,
+    "size_mb": 4.2,
+    "generated": "2026-03-06T17:53:53"
+  },
+  "GM0417": {
+    "naam": "GM0417",
+    "count": 22213,
+    "size_mb": 7.4,
+    "generated": "2026-03-06T17:53:53"
+  },
+  "GM0420": {
+    "naam": "GM0420",
+    "count": 55345,
+    "size_mb": 18.3,
+    "generated": "2026-03-06T17:53:53"
+  },
+  "GM0431": {
+    "naam": "GM0431",
+    "count": 13688,
+    "size_mb": 4.5,
+    "generated": "2026-03-06T17:53:54"
+  },
+  "GM0432": {
+    "naam": "GM0432",
+    "count": 11683,
+    "size_mb": 3.9,
+    "generated": "2026-03-06T17:53:54"
+  },
+  "GM0437": {
+    "naam": "GM0437",
+    "count": 68830,
+    "size_mb": 23.3,
+    "generated": "2026-03-06T17:53:54"
+  },
+  "GM0439": {
+    "naam": "GM0439",
+    "count": 60748,
+    "size_mb": 20.1,
+    "generated": "2026-03-06T17:53:55"
+  },
+  "GM0441": {
+    "naam": "GM0441",
+    "count": 49807,
+    "size_mb": 16.6,
+    "generated": "2026-03-06T17:53:55"
+  },
+  "GM0448": {
+    "naam": "GM0448",
+    "count": 19067,
+    "size_mb": 6.4,
+    "generated": "2026-03-06T17:53:55"
+  },
+  "GM0450": {
+    "naam": "GM0450",
+    "count": 20493,
+    "size_mb": 6.8,
+    "generated": "2026-03-06T17:53:55"
+  },
+  "GM0451": {
+    "naam": "GM0451",
+    "count": 25248,
+    "size_mb": 8.4,
+    "generated": "2026-03-06T17:53:55"
+  },
+  "GM0453": {
+    "naam": "GM0453",
+    "count": 63281,
+    "size_mb": 21.1,
+    "generated": "2026-03-06T17:53:56"
+  },
+  "GM0473": {
+    "naam": "GM0473",
+    "count": 15436,
+    "size_mb": 5.2,
+    "generated": "2026-03-06T17:53:56"
+  },
+  "GM0479": {
+    "naam": "GM0479",
+    "count": 115313,
+    "size_mb": 38.2,
+    "generated": "2026-03-06T17:53:57"
+  },
+  "GM0482": {
+    "naam": "GM0482",
+    "count": 21533,
+    "size_mb": 7.2,
+    "generated": "2026-03-06T17:53:57"
+  },
+  "GM0484": {
+    "naam": "GM0484",
+    "count": 86475,
+    "size_mb": 29.1,
+    "generated": "2026-03-06T17:53:57"
+  },
+  "GM0489": {
+    "naam": "GM0489",
+    "count": 35299,
+    "size_mb": 11.7,
+    "generated": "2026-03-06T17:53:58"
+  },
+  "GM0498": {
+    "naam": "GM0498",
+    "count": 27735,
+    "size_mb": 9.2,
+    "generated": "2026-03-06T17:53:58"
+  },
+  "GM0502": {
+    "naam": "GM0502",
+    "count": 93503,
+    "size_mb": 31.6,
+    "generated": "2026-03-06T17:53:58"
+  },
+  "GM0503": {
+    "naam": "GM0503",
+    "count": 74495,
+    "size_mb": 24.5,
+    "generated": "2026-03-06T17:53:59"
+  },
+  "GM0505": {
+    "naam": "GM0505",
+    "count": 96060,
+    "size_mb": 32.0,
+    "generated": "2026-03-06T17:54:00"
+  },
+  "GM0512": {
+    "naam": "GM0512",
+    "count": 24215,
+    "size_mb": 8.1,
+    "generated": "2026-03-06T17:54:00"
+  },
+  "GM0513": {
+    "naam": "GM0513",
+    "count": 43590,
+    "size_mb": 14.3,
+    "generated": "2026-03-06T17:54:00"
+  },
+  "GM0518": {
+    "naam": "GM0518",
+    "count": 425121,
+    "size_mb": 143.2,
+    "generated": "2026-03-06T17:54:03"
+  },
+  "GM0523": {
+    "naam": "GM0523",
+    "count": 12190,
+    "size_mb": 4.2,
+    "generated": "2026-03-06T17:54:03"
+  },
+  "GM0531": {
+    "naam": "GM0531",
+    "count": 36143,
+    "size_mb": 12.1,
+    "generated": "2026-03-06T17:54:04"
+  },
+  "GM0532": {
+    "naam": "GM0532",
+    "count": 12025,
+    "size_mb": 4.0,
+    "generated": "2026-03-06T17:54:04"
+  },
+  "GM0534": {
+    "naam": "GM0534",
+    "count": 16452,
+    "size_mb": 5.5,
+    "generated": "2026-03-06T17:54:04"
+  },
+  "GM0537": {
+    "naam": "Katwijk",
+    "count": 42086,
+    "size_mb": 15.7,
+    "generated": "2026-03-06T17:41:06"
+  },
+  "GM0542": {
+    "naam": "GM0542",
+    "count": 34331,
+    "size_mb": 11.7,
+    "generated": "2026-03-06T17:54:04"
+  },
+  "GM0546": {
+    "naam": "Leiden",
+    "count": 50790,
+    "size_mb": 18.8,
+    "generated": "2026-03-06T17:43:01"
+  },
+  "GM0547": {
+    "naam": "GM0547",
+    "count": 21248,
+    "size_mb": 7.1,
+    "generated": "2026-03-06T17:54:05"
+  },
+  "GM0553": {
+    "naam": "GM0553",
+    "count": 19587,
+    "size_mb": 6.5,
+    "generated": "2026-03-06T17:54:05"
+  },
+  "GM0556": {
+    "naam": "GM0556",
+    "count": 26546,
+    "size_mb": 8.8,
+    "generated": "2026-03-06T17:54:05"
+  },
+  "GM0569": {
+    "naam": "GM0569",
+    "count": 31739,
+    "size_mb": 10.5,
+    "generated": "2026-03-06T17:54:06"
+  },
+  "GM0575": {
+    "naam": "GM0575",
+    "count": 61907,
+    "size_mb": 20.6,
+    "generated": "2026-03-06T17:54:06"
+  },
+  "GM0579": {
+    "naam": "GM0579",
+    "count": 38997,
+    "size_mb": 13.0,
+    "generated": "2026-03-06T17:54:06"
+  },
+  "GM0589": {
+    "naam": "GM0589",
+    "count": 8384,
+    "size_mb": 2.8,
+    "generated": "2026-03-06T17:54:06"
+  },
+  "GM0590": {
+    "naam": "GM0590",
+    "count": 18290,
+    "size_mb": 6.1,
+    "generated": "2026-03-06T17:54:07"
+  },
+  "GM0597": {
+    "naam": "GM0597",
+    "count": 57053,
+    "size_mb": 19.0,
+    "generated": "2026-03-06T17:54:07"
+  },
+  "GM0599": {
+    "naam": "GM0599",
+    "count": 707366,
+    "size_mb": 237.5,
+    "generated": "2026-03-06T17:54:12"
+  },
+  "GM0603": {
+    "naam": "GM0603",
+    "count": 82911,
+    "size_mb": 27.7,
+    "generated": "2026-03-06T17:54:13"
+  },
+  "GM0606": {
+    "naam": "GM0606",
+    "count": 59680,
+    "size_mb": 20.0,
+    "generated": "2026-03-06T17:54:13"
+  },
+  "GM0610": {
+    "naam": "GM0610",
+    "count": 14395,
+    "size_mb": 4.8,
+    "generated": "2026-03-06T17:54:13"
+  },
+  "GM0613": {
+    "naam": "GM0613",
+    "count": 19488,
+    "size_mb": 6.4,
+    "generated": "2026-03-06T17:54:13"
+  },
+  "GM0622": {
+    "naam": "GM0622",
+    "count": 52974,
+    "size_mb": 17.8,
+    "generated": "2026-03-06T17:54:14"
+  },
+  "GM0626": {
+    "naam": "GM0626",
+    "count": 23162,
+    "size_mb": 7.7,
+    "generated": "2026-03-06T17:54:14"
+  },
+  "GM0627": {
+    "naam": "GM0627",
+    "count": 37894,
+    "size_mb": 12.5,
+    "generated": "2026-03-06T17:54:14"
+  },
+  "GM0629": {
+    "naam": "GM0629",
+    "count": 41027,
+    "size_mb": 13.7,
+    "generated": "2026-03-06T17:54:15"
+  },
+  "GM0632": {
+    "naam": "GM0632",
+    "count": 34081,
+    "size_mb": 11.2,
+    "generated": "2026-03-06T17:54:15"
+  },
+  "GM0637": {
+    "naam": "GM0637",
+    "count": 70216,
+    "size_mb": 23.3,
+    "generated": "2026-03-06T17:54:15"
+  },
+  "GM0638": {
+    "naam": "GM0638",
+    "count": 20910,
+    "size_mb": 6.9,
+    "generated": "2026-03-06T17:54:15"
+  },
+  "GM0642": {
+    "naam": "GM0642",
+    "count": 56170,
+    "size_mb": 18.8,
+    "generated": "2026-03-06T17:54:16"
+  },
+  "GM0654": {
+    "naam": "GM0654",
+    "count": 22850,
+    "size_mb": 7.6,
+    "generated": "2026-03-06T17:54:16"
+  },
+  "GM0664": {
+    "naam": "GM0664",
+    "count": 30263,
+    "size_mb": 10.0,
+    "generated": "2026-03-06T17:54:16"
+  },
+  "GM0668": {
+    "naam": "GM0668",
+    "count": 35747,
+    "size_mb": 11.8,
+    "generated": "2026-03-06T17:54:16"
+  },
+  "GM0677": {
+    "naam": "GM0677",
+    "count": 16822,
+    "size_mb": 5.6,
+    "generated": "2026-03-06T17:54:17"
+  },
+  "GM0678": {
+    "naam": "Kapelle",
+    "count": 11214,
+    "size_mb": 4.2,
+    "generated": "2026-03-06T17:43:19"
+  },
+  "GM0687": {
+    "naam": "GM0687",
+    "count": 33483,
+    "size_mb": 11.2,
+    "generated": "2026-03-06T17:54:17"
+  },
+  "GM0703": {
+    "naam": "GM0703",
+    "count": 23439,
+    "size_mb": 7.8,
+    "generated": "2026-03-06T17:54:17"
+  },
+  "GM0715": {
+    "naam": "GM0715",
+    "count": 35923,
+    "size_mb": 11.9,
+    "generated": "2026-03-06T17:54:17"
+  },
+  "GM0716": {
+    "naam": "GM0716",
+    "count": 24715,
+    "size_mb": 8.2,
+    "generated": "2026-03-06T17:54:17"
+  },
+  "GM0717": {
+    "naam": "GM0717",
+    "count": 62955,
+    "size_mb": 21.1,
+    "generated": "2026-03-06T17:54:18"
+  },
+  "GM0718": {
+    "naam": "GM0718",
+    "count": 81891,
+    "size_mb": 27.4,
+    "generated": "2026-03-06T17:54:18"
+  },
+  "GM0736": {
+    "naam": "GM0736",
+    "count": 111435,
+    "size_mb": 37.1,
+    "generated": "2026-03-06T17:54:19"
+  },
+  "GM0737": {
+    "naam": "GM0737",
+    "count": 44996,
+    "size_mb": 14.9,
+    "generated": "2026-03-06T17:54:20"
+  },
+  "GM0743": {
+    "naam": "GM0743",
+    "count": 20509,
+    "size_mb": 6.7,
+    "generated": "2026-03-06T17:54:20"
+  },
+  "GM0744": {
+    "naam": "GM0744",
+    "count": 5754,
+    "size_mb": 2.0,
+    "generated": "2026-03-06T17:54:20"
+  },
+  "GM0748": {
+    "naam": "GM0748",
+    "count": 43479,
+    "size_mb": 14.6,
+    "generated": "2026-03-06T17:54:20"
+  },
+  "GM0753": {
+    "naam": "GM0753",
+    "count": 19773,
+    "size_mb": 6.5,
+    "generated": "2026-03-06T17:54:20"
+  },
+  "GM0755": {
+    "naam": "GM0755",
+    "count": 6148,
+    "size_mb": 2.0,
+    "generated": "2026-03-06T17:54:20"
+  },
+  "GM0757": {
+    "naam": "GM0757",
+    "count": 18992,
+    "size_mb": 6.2,
+    "generated": "2026-03-06T17:54:21"
+  },
+  "GM0758": {
+    "naam": "GM0758",
+    "count": 135577,
+    "size_mb": 44.8,
+    "generated": "2026-03-06T17:54:21"
+  },
+  "GM0762": {
+    "naam": "GM0762",
+    "count": 34182,
+    "size_mb": 11.2,
+    "generated": "2026-03-06T17:54:22"
+  },
+  "GM0765": {
+    "naam": "GM0765",
+    "count": 8804,
+    "size_mb": 3.0,
+    "generated": "2026-03-06T17:54:22"
+  },
+  "GM0766": {
+    "naam": "GM0766",
+    "count": 15822,
+    "size_mb": 5.2,
+    "generated": "2026-03-06T17:54:22"
+  },
+  "GM0770": {
+    "naam": "GM0770",
+    "count": 29546,
+    "size_mb": 9.7,
+    "generated": "2026-03-06T17:54:22"
+  },
+  "GM0772": {
+    "naam": "GM0772",
+    "count": 187533,
+    "size_mb": 62.2,
+    "generated": "2026-03-06T17:54:23"
+  },
+  "GM0777": {
+    "naam": "GM0777",
+    "count": 30159,
+    "size_mb": 10.0,
+    "generated": "2026-03-06T17:54:24"
+  },
+  "GM0779": {
+    "naam": "GM0779",
+    "count": 12108,
+    "size_mb": 4.1,
+    "generated": "2026-03-06T17:54:24"
+  },
+  "GM0784": {
+    "naam": "GM0784",
+    "count": 23451,
+    "size_mb": 7.7,
+    "generated": "2026-03-06T17:54:24"
+  },
+  "GM0785": {
+    "naam": "GM0785",
+    "count": 15644,
+    "size_mb": 5.2,
+    "generated": "2026-03-06T17:54:24"
+  },
+  "GM0794": {
+    "naam": "GM0794",
+    "count": 58850,
+    "size_mb": 19.4,
+    "generated": "2026-03-06T17:54:25"
+  },
+  "GM0796": {
+    "naam": "GM0796",
+    "count": 116241,
+    "size_mb": 39.0,
+    "generated": "2026-03-06T17:54:25"
+  },
+  "GM0797": {
+    "naam": "GM0797",
+    "count": 32169,
+    "size_mb": 10.7,
+    "generated": "2026-03-06T17:54:26"
+  },
+  "GM0798": {
+    "naam": "GM0798",
+    "count": 33111,
+    "size_mb": 11.1,
+    "generated": "2026-03-06T17:54:26"
+  },
+  "GM0809": {
+    "naam": "GM0809",
+    "count": 20566,
+    "size_mb": 6.9,
+    "generated": "2026-03-06T17:54:26"
+  },
+  "GM0820": {
+    "naam": "GM0820",
+    "count": 29038,
+    "size_mb": 9.6,
+    "generated": "2026-03-06T17:54:26"
+  },
+  "GM0823": {
+    "naam": "GM0823",
+    "count": 24937,
+    "size_mb": 8.3,
+    "generated": "2026-03-06T17:54:26"
+  },
+  "GM0824": {
+    "naam": "GM0824",
+    "count": 29751,
+    "size_mb": 9.9,
+    "generated": "2026-03-06T17:54:27"
+  },
+  "GM0826": {
+    "naam": "GM0826",
+    "count": 85249,
+    "size_mb": 28.2,
+    "generated": "2026-03-06T17:54:27"
+  },
+  "GM0828": {
+    "naam": "GM0828",
+    "count": 73119,
+    "size_mb": 24.0,
+    "generated": "2026-03-06T17:54:28"
+  },
+  "GM0840": {
+    "naam": "GM0840",
+    "count": 23100,
+    "size_mb": 7.7,
+    "generated": "2026-03-06T17:54:28"
+  },
+  "GM0845": {
+    "naam": "GM0845",
+    "count": 53513,
+    "size_mb": 18.0,
+    "generated": "2026-03-06T17:54:28"
+  },
+  "GM0847": {
+    "naam": "GM0847",
+    "count": 20879,
+    "size_mb": 6.9,
+    "generated": "2026-03-06T17:54:29"
+  },
+  "GM0848": {
+    "naam": "GM0848",
+    "count": 10353,
+    "size_mb": 3.5,
+    "generated": "2026-03-06T17:54:29"
+  },
+  "GM0851": {
+    "naam": "GM0851",
+    "count": 16563,
+    "size_mb": 5.5,
+    "generated": "2026-03-06T17:54:29"
+  },
+  "GM0852": {
+    "naam": "GM0852",
+    "count": 18490,
+    "size_mb": 6.1,
+    "generated": "2026-03-06T17:54:29"
+  },
+  "GM0855": {
+    "naam": "GM0855",
+    "count": 151708,
+    "size_mb": 50.4,
+    "generated": "2026-03-06T17:54:30"
+  },
+  "GM0858": {
+    "naam": "GM0858",
+    "count": 20244,
+    "size_mb": 6.8,
+    "generated": "2026-03-06T17:54:30"
+  },
+  "GM0861": {
+    "naam": "GM0861",
+    "count": 29610,
+    "size_mb": 9.7,
+    "generated": "2026-03-06T17:54:30"
+  },
+  "GM0865": {
+    "naam": "GM0865",
+    "count": 36094,
+    "size_mb": 12.1,
+    "generated": "2026-03-06T17:54:31"
+  },
+  "GM0866": {
+    "naam": "GM0866",
+    "count": 9508,
+    "size_mb": 3.1,
+    "generated": "2026-03-06T17:54:31"
+  },
+  "GM0867": {
+    "naam": "GM0867",
+    "count": 37256,
+    "size_mb": 12.4,
+    "generated": "2026-03-06T17:54:31"
+  },
+  "GM0873": {
+    "naam": "GM0873",
+    "count": 13189,
+    "size_mb": 4.4,
+    "generated": "2026-03-06T17:54:31"
+  },
+  "GM0879": {
+    "naam": "GM0879",
+    "count": 20759,
+    "size_mb": 6.9,
+    "generated": "2026-03-06T17:54:31"
+  },
+  "GM0880": {
+    "naam": "GM0880",
+    "count": 25043,
+    "size_mb": 8.3,
+    "generated": "2026-03-06T17:54:31"
+  },
+  "GM0882": {
+    "naam": "GM0882",
+    "count": 38283,
+    "size_mb": 12.7,
+    "generated": "2026-03-06T17:54:32"
+  },
+  "GM0888": {
+    "naam": "GM0888",
+    "count": 18412,
+    "size_mb": 6.1,
+    "generated": "2026-03-06T17:54:32"
+  },
+  "GM0889": {
+    "naam": "GM0889",
+    "count": 9674,
+    "size_mb": 3.2,
+    "generated": "2026-03-06T17:54:32"
+  },
+  "GM0893": {
+    "naam": "GM0893",
+    "count": 23722,
+    "size_mb": 7.8,
+    "generated": "2026-03-06T17:54:32"
+  },
+  "GM0899": {
+    "naam": "GM0899",
+    "count": 20811,
+    "size_mb": 6.9,
+    "generated": "2026-03-06T17:54:32"
+  },
+  "GM0907": {
+    "naam": "Gennep",
+    "count": 17614,
+    "size_mb": 6.5,
+    "generated": "2026-03-06T17:43:45"
+  },
+  "GM0917": {
+    "naam": "GM0917",
+    "count": 88883,
+    "size_mb": 29.4,
+    "generated": "2026-03-06T17:54:33"
+  },
+  "GM0928": {
+    "naam": "GM0928",
+    "count": 45622,
+    "size_mb": 15.2,
+    "generated": "2026-03-06T17:54:33"
+  },
+  "GM0935": {
+    "naam": "GM0935",
+    "count": 86454,
+    "size_mb": 29.5,
+    "generated": "2026-03-06T17:54:34"
+  },
+  "GM0938": {
+    "naam": "GM0938",
+    "count": 16435,
+    "size_mb": 5.5,
+    "generated": "2026-03-06T17:54:34"
+  },
+  "GM0944": {
+    "naam": "GM0944",
+    "count": 15317,
+    "size_mb": 5.0,
+    "generated": "2026-03-06T17:54:34"
+  },
+  "GM0946": {
+    "naam": "GM0946",
+    "count": 33610,
+    "size_mb": 11.1,
+    "generated": "2026-03-06T17:54:34"
+  },
+  "GM0957": {
+    "naam": "GM0957",
+    "count": 43106,
+    "size_mb": 14.3,
+    "generated": "2026-03-06T17:54:35"
+  },
+  "GM0965": {
+    "naam": "GM0965",
+    "count": 9728,
+    "size_mb": 3.2,
+    "generated": "2026-03-06T17:54:35"
+  },
+  "GM0971": {
+    "naam": "GM0971",
+    "count": 14439,
+    "size_mb": 4.8,
+    "generated": "2026-03-06T17:54:35"
+  },
+  "GM0981": {
+    "naam": "GM0981",
+    "count": 8128,
+    "size_mb": 2.7,
+    "generated": "2026-03-06T17:54:35"
+  },
+  "GM0983": {
+    "naam": "GM0983",
+    "count": 74193,
+    "size_mb": 24.4,
+    "generated": "2026-03-06T17:54:35"
+  },
+  "GM0984": {
+    "naam": "GM0984",
+    "count": 38559,
+    "size_mb": 12.7,
+    "generated": "2026-03-06T17:54:36"
+  },
+  "GM0986": {
+    "naam": "GM0986",
+    "count": 15276,
+    "size_mb": 5.1,
+    "generated": "2026-03-06T17:54:36"
+  },
+  "GM0988": {
+    "naam": "GM0988",
+    "count": 40565,
+    "size_mb": 13.4,
+    "generated": "2026-03-06T17:54:36"
+  },
+  "GM0994": {
+    "naam": "Valkenburg aan de Geul",
+    "count": 17155,
+    "size_mb": 6.4,
+    "generated": "2026-03-06T17:44:11"
+  },
+  "GM0995": {
+    "naam": "GM0995",
+    "count": 70008,
+    "size_mb": 22.9,
+    "generated": "2026-03-06T17:54:37"
+  },
+  "GM0998": {
+    "naam": "GM0998",
+    "count": 3782,
+    "size_mb": 1.3,
+    "generated": "2026-03-06T17:54:37"
+  },
+  "GM1507": {
+    "naam": "GM1507",
+    "count": 41998,
+    "size_mb": 13.9,
+    "generated": "2026-03-06T17:54:37"
+  },
+  "GM1509": {
+    "naam": "GM1509",
+    "count": 41465,
+    "size_mb": 13.8,
+    "generated": "2026-03-06T17:54:37"
+  },
+  "GM1525": {
+    "naam": "Teylingen",
+    "count": 36297,
+    "size_mb": 13.6,
+    "generated": "2026-03-06T17:45:17"
+  },
+  "GM1581": {
+    "naam": "GM1581",
+    "count": 61788,
+    "size_mb": 20.8,
+    "generated": "2026-03-06T17:54:38"
+  },
+  "GM1586": {
+    "naam": "GM1586",
+    "count": 18337,
+    "size_mb": 6.1,
+    "generated": "2026-03-06T17:54:38"
+  },
+  "GM1598": {
+    "naam": "GM1598",
+    "count": 22092,
+    "size_mb": 7.3,
+    "generated": "2026-03-06T17:54:38"
+  },
+  "GM1621": {
+    "naam": "GM1621",
+    "count": 106805,
+    "size_mb": 35.5,
+    "generated": "2026-03-06T17:54:39"
+  },
+  "GM1640": {
+    "naam": "GM1640",
+    "count": 59577,
+    "size_mb": 19.8,
+    "generated": "2026-03-06T17:54:40"
+  },
+  "GM1641": {
+    "naam": "GM1641",
+    "count": 27252,
+    "size_mb": 9.0,
+    "generated": "2026-03-06T17:54:40"
+  },
+  "GM1652": {
+    "naam": "GM1652",
+    "count": 29501,
+    "size_mb": 9.7,
+    "generated": "2026-03-06T17:54:40"
+  },
+  "GM1655": {
+    "naam": "GM1655",
+    "count": 23609,
+    "size_mb": 7.9,
+    "generated": "2026-03-06T17:54:40"
+  },
+  "GM1658": {
+    "naam": "GM1658",
+    "count": 36143,
+    "size_mb": 11.9,
+    "generated": "2026-03-06T17:54:40"
+  },
+  "GM1659": {
+    "naam": "GM1659",
+    "count": 17694,
+    "size_mb": 5.9,
+    "generated": "2026-03-06T17:54:40"
+  },
+  "GM1667": {
+    "naam": "GM1667",
+    "count": 7584,
+    "size_mb": 2.5,
+    "generated": "2026-03-06T17:54:41"
+  },
+  "GM1669": {
+    "naam": "GM1669",
+    "count": 36767,
+    "size_mb": 12.2,
+    "generated": "2026-03-06T17:54:41"
+  },
+  "GM1674": {
+    "naam": "GM1674",
+    "count": 51886,
+    "size_mb": 17.3,
+    "generated": "2026-03-06T17:54:41"
+  },
+  "GM1676": {
+    "naam": "GM1676",
+    "count": 45519,
+    "size_mb": 15.2,
+    "generated": "2026-03-06T17:54:42"
+  },
+  "GM1680": {
+    "naam": "GM1680",
+    "count": 55991,
+    "size_mb": 18.5,
+    "generated": "2026-03-06T17:54:42"
+  },
+  "GM1681": {
+    "naam": "GM1681",
+    "count": 33515,
+    "size_mb": 11.2,
+    "generated": "2026-03-06T17:54:42"
+  },
+  "GM1690": {
+    "naam": "GM1690",
+    "count": 46677,
+    "size_mb": 15.5,
+    "generated": "2026-03-06T17:54:42"
+  },
+  "GM1695": {
+    "naam": "GM1695",
+    "count": 11180,
+    "size_mb": 3.7,
+    "generated": "2026-03-06T17:54:43"
+  },
+  "GM1696": {
+    "naam": "GM1696",
+    "count": 24812,
+    "size_mb": 8.4,
+    "generated": "2026-03-06T17:54:43"
+  },
+  "GM1699": {
+    "naam": "GM1699",
+    "count": 41073,
+    "size_mb": 13.5,
+    "generated": "2026-03-06T17:54:43"
+  },
+  "GM1700": {
+    "naam": "GM1700",
+    "count": 21968,
+    "size_mb": 7.3,
+    "generated": "2026-03-06T17:54:43"
+  },
+  "GM1701": {
+    "naam": "GM1701",
+    "count": 28443,
+    "size_mb": 9.4,
+    "generated": "2026-03-06T17:54:43"
+  },
+  "GM1705": {
+    "naam": "Lingewaard",
+    "count": 49342,
+    "size_mb": 18.3,
+    "generated": "2026-03-06T17:47:09"
+  },
+  "GM1706": {
+    "naam": "GM1706",
+    "count": 14408,
+    "size_mb": 4.8,
+    "generated": "2026-03-06T17:54:44"
+  },
+  "GM1708": {
+    "naam": "GM1708",
+    "count": 52271,
+    "size_mb": 17.4,
+    "generated": "2026-03-06T17:54:44"
+  },
+  "GM1709": {
+    "naam": "GM1709",
+    "count": 26660,
+    "size_mb": 8.9,
+    "generated": "2026-03-06T17:54:44"
+  },
+  "GM1711": {
+    "naam": "GM1711",
+    "count": 27612,
+    "size_mb": 9.2,
+    "generated": "2026-03-06T17:54:45"
+  },
+  "GM1714": {
+    "naam": "GM1714",
+    "count": 25447,
+    "size_mb": 8.6,
+    "generated": "2026-03-06T17:54:45"
+  },
+  "GM1719": {
+    "naam": "GM1719",
+    "count": 25816,
+    "size_mb": 8.6,
+    "generated": "2026-03-06T17:54:45"
+  },
+  "GM1721": {
+    "naam": "GM1721",
+    "count": 27063,
+    "size_mb": 9.0,
+    "generated": "2026-03-06T17:54:45"
+  },
+  "GM1723": {
+    "naam": "GM1723",
+    "count": 14001,
+    "size_mb": 4.6,
+    "generated": "2026-03-06T17:54:45"
+  },
+  "GM1724": {
+    "naam": "GM1724",
+    "count": 27253,
+    "size_mb": 9.0,
+    "generated": "2026-03-06T17:54:45"
+  },
+  "GM1728": {
+    "naam": "GM1728",
+    "count": 17136,
+    "size_mb": 5.6,
+    "generated": "2026-03-06T17:54:45"
+  },
+  "GM1729": {
+    "naam": "GM1729",
+    "count": 14680,
+    "size_mb": 4.9,
+    "generated": "2026-03-06T17:54:46"
+  },
+  "GM1730": {
+    "naam": "GM1730",
+    "count": 66165,
+    "size_mb": 21.9,
+    "generated": "2026-03-06T17:54:46"
+  },
+  "GM1731": {
+    "naam": "GM1731",
+    "count": 57643,
+    "size_mb": 19.1,
+    "generated": "2026-03-06T17:54:46"
+  },
+  "GM1734": {
+    "naam": "GM1734",
+    "count": 78408,
+    "size_mb": 25.9,
+    "generated": "2026-03-06T17:54:47"
+  },
+  "GM1735": {
+    "naam": "GM1735",
+    "count": 43303,
+    "size_mb": 14.3,
+    "generated": "2026-03-06T17:54:47"
+  },
+  "GM1740": {
+    "naam": "GM1740",
+    "count": 20156,
+    "size_mb": 6.7,
+    "generated": "2026-03-06T17:54:47"
+  },
+  "GM1742": {
+    "naam": "GM1742",
+    "count": 21123,
+    "size_mb": 7.0,
+    "generated": "2026-03-06T17:54:48"
+  },
+  "GM1771": {
+    "naam": "GM1771",
+    "count": 29706,
+    "size_mb": 9.8,
+    "generated": "2026-03-06T17:54:48"
+  },
+  "GM1773": {
+    "naam": "GM1773",
+    "count": 17280,
+    "size_mb": 5.7,
+    "generated": "2026-03-06T17:54:48"
+  },
+  "GM1774": {
+    "naam": "GM1774",
+    "count": 61282,
+    "size_mb": 20.3,
+    "generated": "2026-03-06T17:54:48"
+  },
+  "GM1783": {
+    "naam": "GM1783",
+    "count": 139411,
+    "size_mb": 46.7,
+    "generated": "2026-03-06T17:54:49"
+  },
+  "GM1842": {
+    "naam": "GM1842",
+    "count": 133792,
+    "size_mb": 44.2,
+    "generated": "2026-03-06T17:54:50"
+  },
+  "GM1859": {
+    "naam": "GM1859",
+    "count": 48595,
+    "size_mb": 16.1,
+    "generated": "2026-03-06T17:54:51"
+  },
+  "GM1876": {
+    "naam": "GM1876",
+    "count": 63059,
+    "size_mb": 20.9,
+    "generated": "2026-03-06T17:54:51"
+  },
+  "GM1883": {
+    "naam": "GM1883",
+    "count": 77775,
+    "size_mb": 25.7,
+    "generated": "2026-03-06T17:54:52"
+  },
+  "GM1884": {
+    "naam": "GM1884",
+    "count": 28291,
+    "size_mb": 9.5,
+    "generated": "2026-03-06T17:54:52"
+  },
+  "GM1891": {
+    "naam": "GM1891",
+    "count": 18543,
+    "size_mb": 6.2,
+    "generated": "2026-03-06T17:54:52"
+  },
+  "GM1892": {
+    "naam": "GM1892",
+    "count": 107207,
+    "size_mb": 36.0,
+    "generated": "2026-03-06T17:54:53"
+  },
+  "GM1894": {
+    "naam": "GM1894",
+    "count": 36980,
+    "size_mb": 12.2,
+    "generated": "2026-03-06T17:54:53"
+  },
+  "GM1895": {
+    "naam": "GM1895",
+    "count": 30246,
+    "size_mb": 10.0,
+    "generated": "2026-03-06T17:54:53"
+  },
+  "GM1896": {
+    "naam": "GM1896",
+    "count": 12261,
+    "size_mb": 4.1,
+    "generated": "2026-03-06T17:54:53"
+  },
+  "GM1900": {
+    "naam": "Súdwest-Fryslân",
+    "count": 50465,
+    "size_mb": 18.7,
+    "generated": "2026-03-06T17:50:46"
+  },
+  "GM1901": {
+    "naam": "GM1901",
+    "count": 64936,
+    "size_mb": 21.5,
+    "generated": "2026-03-06T17:54:54"
+  },
+  "GM1903": {
+    "naam": "GM1903",
+    "count": 57836,
+    "size_mb": 19.8,
+    "generated": "2026-03-06T17:54:55"
+  },
+  "GM1904": {
+    "naam": "GM1904",
+    "count": 70711,
+    "size_mb": 23.6,
+    "generated": "2026-03-06T17:54:55"
+  },
+  "GM1911": {
+    "naam": "GM1911",
+    "count": 80122,
+    "size_mb": 26.7,
+    "generated": "2026-03-06T17:54:56"
+  },
+  "GM1916": {
+    "naam": "GM1916",
+    "count": 109455,
+    "size_mb": 36.7,
+    "generated": "2026-03-06T17:54:56"
+  },
+  "GM1924": {
+    "naam": "GM1924",
+    "count": 110132,
+    "size_mb": 36.7,
+    "generated": "2026-03-06T17:54:57"
+  },
+  "GM1926": {
+    "naam": "GM1926",
+    "count": 56444,
+    "size_mb": 18.8,
+    "generated": "2026-03-06T17:54:58"
+  },
+  "GM1930": {
+    "naam": "GM1930",
+    "count": 89425,
+    "size_mb": 29.9,
+    "generated": "2026-03-06T17:54:58"
+  },
+  "GM1931": {
+    "naam": "GM1931",
+    "count": 139228,
+    "size_mb": 46.8,
+    "generated": "2026-03-06T17:54:59"
+  },
+  "GM1940": {
+    "naam": "GM1940",
+    "count": 87061,
+    "size_mb": 28.8,
+    "generated": "2026-03-06T17:55:00"
+  },
+  "GM1942": {
+    "naam": "Gooise Meren",
+    "count": 50787,
+    "size_mb": 18.8,
+    "generated": "2026-02-17T21:28:09"
+  },
+  "GM1945": {
+    "naam": "GM1945",
+    "count": 29131,
+    "size_mb": 9.7,
+    "generated": "2026-03-06T17:55:01"
+  },
+  "GM1948": {
+    "naam": "GM1948",
+    "count": 69348,
+    "size_mb": 23.0,
+    "generated": "2026-03-06T17:55:01"
+  },
+  "GM1949": {
+    "naam": "GM1949",
+    "count": 31417,
+    "size_mb": 10.5,
+    "generated": "2026-03-06T17:55:01"
+  },
+  "GM1950": {
+    "naam": "Westerwolde",
+    "count": 29376,
+    "size_mb": 11.0,
+    "generated": "2026-03-06T17:51:46"
+  },
+  "GM1952": {
+    "naam": "GM1952",
+    "count": 66135,
+    "size_mb": 22.0,
+    "generated": "2026-03-06T17:55:02"
+  },
+  "GM1954": {
+    "naam": "GM1954",
+    "count": 122149,
+    "size_mb": 40.4,
+    "generated": "2026-03-06T17:55:03"
+  },
+  "GM1955": {
+    "naam": "GM1955",
+    "count": 51550,
+    "size_mb": 17.1,
+    "generated": "2026-03-06T17:55:03"
+  },
+  "GM1959": {
+    "naam": "Altena",
+    "count": 46999,
+    "size_mb": 17.6,
+    "generated": "2026-03-06T17:53:43"
+  },
+  "GM1960": {
+    "naam": "GM1960",
+    "count": 68383,
+    "size_mb": 22.6,
+    "generated": "2026-03-06T17:55:04"
+  },
+  "GM1961": {
+    "naam": "GM1961",
+    "count": 45164,
+    "size_mb": 14.9,
+    "generated": "2026-03-06T17:55:04"
+  },
+  "GM1963": {
+    "naam": "GM1963",
+    "count": 82900,
+    "size_mb": 27.6,
+    "generated": "2026-03-06T17:55:05"
+  },
+  "GM1966": {
+    "naam": "GM1966",
+    "count": 56655,
+    "size_mb": 18.7,
+    "generated": "2026-03-06T17:55:05"
+  },
+  "GM1969": {
+    "naam": "GM1969",
+    "count": 55917,
+    "size_mb": 18.4,
+    "generated": "2026-03-06T17:55:06"
+  },
+  "GM1970": {
+    "naam": "GM1970",
+    "count": 48190,
+    "size_mb": 15.9,
+    "generated": "2026-03-06T17:55:06"
+  },
+  "GM1978": {
+    "naam": "GM1978",
+    "count": 101234,
+    "size_mb": 33.9,
+    "generated": "2026-03-06T17:55:07"
+  },
+  "GM1979": {
+    "naam": "GM1979",
+    "count": 51336,
+    "size_mb": 17.0,
+    "generated": "2026-03-06T17:55:07"
+  },
+  "GM1980": {
+    "naam": "GM1980",
+    "count": 87775,
+    "size_mb": 29.2,
+    "generated": "2026-03-06T17:55:08"
+  },
+  "GM1982": {
+    "naam": "GM1982",
+    "count": 80973,
+    "size_mb": 26.7,
+    "generated": "2026-03-06T17:55:08"
+  },
+  "GM1991": {
+    "naam": "GM1991",
+    "count": 46058,
+    "size_mb": 15.1,
+    "generated": "2026-03-06T17:55:09"
+  },
+  "GM1992": {
+    "naam": "GM1992",
+    "count": 51019,
+    "size_mb": 17.0,
+    "generated": "2026-03-06T17:55:09"
   }
 }
