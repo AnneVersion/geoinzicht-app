@@ -909,8 +909,9 @@ select option{background:var(--bg);color:var(--tx)}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <h3 id="infoBuurtNaam" style="margin:0;flex:1"><span class="mi mi-sm">place</span> -</h3>
         <div style="display:flex;gap:4px;flex-shrink:0">
+          <button class="btn-s" onclick="showNLOverview()" title="Landelijk overzicht" style="padding:4px 10px;font-size:10px;cursor:pointer;border:1px solid var(--glass-bd);background:var(--glass);color:var(--tx);border-radius:6px;display:flex;align-items:center;gap:3px"><span class="mi" style="font-size:14px">flag</span>NL</button>
           <button class="btn-s" onclick="printInfoPanel()" title="Exporteer als rapport" style="padding:4px 10px;font-size:10px;cursor:pointer;border:1px solid var(--glass-bd);background:var(--glass);color:var(--tx);border-radius:6px;display:flex;align-items:center;gap:3px"><span class="mi" style="font-size:14px">print</span>Rapport</button>
-          <button class="btn-s" onclick="_infoPinned=false;document.getElementById('infoPanel').classList.remove('show')" title="Sluiten" style="padding:4px 8px;cursor:pointer;border:1px solid var(--glass-bd);background:var(--glass);color:var(--mt);border-radius:6px"><span class="mi" style="font-size:14px">close</span></button>
+          <button class="btn-s" onclick="_infoPinned=false;_nlOverviewVisible=false;document.getElementById('infoPanel').classList.remove('show')" title="Sluiten" style="padding:4px 8px;cursor:pointer;border:1px solid var(--glass-bd);background:var(--glass);color:var(--mt);border-radius:6px"><span class="mi" style="font-size:14px">close</span></button>
         </div>
       </div>
       <div id="infoContent"></div>
@@ -1459,6 +1460,9 @@ function switchYear(year){
     // Update indicator definities op Info tab
     renderIndicatorDefs();
 
+    // Toon NL overzicht bij eerste keer laden
+    if(!_infoPinned) showNLOverview();
+
     // Herlaad buurten en wijken op achtergrond (altijd, voor filters en stats)
     setTimeout(function(){ loadBackgroundCbsData(); }, 500);
 
@@ -1568,10 +1572,18 @@ function buildMapTooltip(p, cfg, type){
     if(!ind) return;
     var v = p[key];
     var valStr = (v !== undefined && v !== null && v >= 0) ? v.toLocaleString('nl-NL') : '-';
+    var cmpArrow = '';
+    if(v !== undefined && v !== null && v >= 0 && _nationalStats && _nationalStats[key]){
+      var ns = _nationalStats[key];
+      var zs = ns.stddev > 0 ? (v - ns.avg) / ns.stddev : 0;
+      if(zs > 0.5) cmpArrow = '<span style="color:#4ade80;font-size:9px;margin-left:2px">&#x25B2;</span>';
+      else if(zs < -0.5) cmpArrow = '<span style="color:#ef4444;font-size:9px;margin-left:2px">&#x25BC;</span>';
+      else cmpArrow = '<span style="color:#38bdf8;font-size:7px;margin-left:2px">&#x25CF;</span>';
+    }
     var cls = i === 0 ? 'tt-prim' : 'tt-sec';
     html += '<div class="tt-row">';
     html += '<span class="tt-label"><span class="mi" style="font-size:12px">'+ind.icon+'</span> '+ind.naam+'</span>';
-    html += '<span class="tt-val '+cls+'">'+valStr;
+    html += '<span class="tt-val '+cls+'">'+valStr+cmpArrow;
     if(ind.eenheid && v !== undefined && v !== null && v >= 0) html += ' <span style="font-weight:400;opacity:.5;font-size:8px">'+ind.eenheid+'</span>';
     html += '</span></div>';
   });
@@ -5142,6 +5154,7 @@ function selectSearchResult(id, label){
 function showFeatureInfo(p, cfg, type, isClick, geoFeature){
   // Zorg dat nationalStats altijd berekend is (nodig voor AI interpretatie)
   if(!_nationalStats || Object.keys(_nationalStats).length === 0) computeNationalStats();
+  if(isClick) _nlOverviewVisible = false;
 
   var name = p[cfg.nameField] || p[cfg.codeField] || '-';
   var typeIcon = type === 'buurten' ? 'grid_on' : (type === 'wijken' ? 'grid_view' : 'domain');
@@ -5569,6 +5582,7 @@ function toggleIndicator(key){
   buildIndicatorList();
   updateMap();
   updateActiveStats();
+  if(_nlOverviewVisible) showNLOverview();
 }
 
 function setPrimaryIndicator(key){
@@ -5580,6 +5594,93 @@ function setPrimaryIndicator(key){
   buildIndicatorList();
   updateMap();
   updateActiveStats();
+  if(_nlOverviewVisible) showNLOverview();
+}
+
+// ============================================================
+// NEDERLAND OVERZICHT — Landelijke statistieken
+// ============================================================
+var _nlOverviewVisible = false;
+
+function showNLOverview(){
+  if(!_nationalStats || !Object.keys(_nationalStats).length) computeNationalStats();
+  if(!Object.keys(_nationalStats).length) return;
+
+  _nlOverviewVisible = true;
+  _infoPinned = false;
+
+  var data = getActiveData();
+  var nGebieden = data ? data.features.length : 0;
+  var niveau = _buurtData ? 'buurten' : (_wijkData ? 'wijken' : 'gemeenten');
+
+  // Header
+  document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">flag</span> Nederland';
+
+  var html = '';
+
+  // Meta info
+  html += '<div style="font:400 10px \'Space Mono\',monospace;color:var(--mt);margin-bottom:10px">';
+  html += 'CBS peiljaar '+(_activeYear||2022)+' &middot; '+nGebieden+' '+niveau+' &middot; '+_activeIndicators.length+' actieve indicatoren';
+  html += '</div>';
+
+  // Actieve indicatoren — uitgebreid met distributie
+  _activeIndicators.forEach(function(key){
+    var ns = _nationalStats[key];
+    if(!ns) return;
+    var fm = getIndicator(key);
+    html += '<div style="margin-bottom:12px;padding:10px 12px;background:rgba(15,20,35,.5);border-radius:10px;border-left:3px solid var(--ai)">';
+    // Naam + gemiddelde
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+    html += '<span style="font:600 13px \'DM Sans\',sans-serif;color:var(--tx);display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px;color:var(--ai)">'+fm.icon+'</span>'+fm.naam+'</span>';
+    html += '<span style="font:700 15px \'Space Mono\',monospace;color:var(--ac)">'+formatVal(ns.avg)+' <span style="font-size:10px;font-weight:400;color:var(--mt)">'+fm.eenheid+'</span></span>';
+    html += '</div>';
+    // Stats rij
+    html += '<div style="display:flex;gap:12px;font:400 10px \'Space Mono\',monospace;color:var(--mt);margin-bottom:4px;flex-wrap:wrap">';
+    html += '<span>mediaan: <span style="color:var(--tx)">'+formatVal(ns.median)+'</span></span>';
+    html += '<span>min: <span style="color:var(--tx)">'+formatVal(ns.min)+'</span></span>';
+    html += '<span>max: <span style="color:var(--tx)">'+formatVal(ns.max)+'</span></span>';
+    html += '<span>stddev: <span style="color:var(--tx)">'+formatVal(ns.stddev)+'</span></span>';
+    html += '</div>';
+    // Distributie
+    html += '<div style="font-size:10px;color:var(--mt);margin-bottom:2px">Verdeling: <span style="color:var(--ai)">'+ns.distType+'</span> &middot; '+ns.count+' '+niveau+' met data</div>';
+    html += buildDistSvg(0, ns.distType);
+    // Bar met p10-p90 range
+    var range = ns.max - ns.min;
+    var p10pos = range > 0 ? ((ns.p10 - ns.min) / range * 100) : 10;
+    var p90pos = range > 0 ? ((ns.p90 - ns.min) / range * 100) : 90;
+    html += '<div class="info-bar" style="height:6px;margin:4px 0 0;border-radius:3px;position:relative">';
+    html += '<div style="position:absolute;left:'+p10pos+'%;width:'+(p90pos-p10pos)+'%;height:100%;background:var(--ai);opacity:.4;border-radius:3px"></div>';
+    html += '</div>';
+    html += '<div style="display:flex;justify-content:space-between;margin-top:2px">';
+    html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.6">'+formatVal(ns.min)+'</span>';
+    html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--ai)">p10-p90: '+formatVal(ns.p10)+' - '+formatVal(ns.p90)+'</span>';
+    html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.6">'+formatVal(ns.max)+'</span>';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  // Compact overzicht alle categorieën
+  html += '<div style="margin-top:12px;padding:10px 12px;background:rgba(15,20,35,.3);border-radius:10px">';
+  html += '<div style="font:600 11px \'DM Sans\',sans-serif;color:var(--ai);margin-bottom:8px;display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:14px">analytics</span>Alle domeinen</div>';
+  INDICATOR_CATEGORIES.forEach(function(cat){
+    var catInds = INDICATORS.filter(function(ind){ return ind.cat === cat.id && _nationalStats[ind.key]; });
+    if(!catInds.length) return;
+    html += '<div style="margin-bottom:6px">';
+    html += '<div style="font:500 10px \'DM Sans\',sans-serif;color:'+cat.color+';margin-bottom:3px;display:flex;align-items:center;gap:3px"><span class="mi" style="font-size:12px">'+cat.icon+'</span>'+cat.naam+'</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    catInds.forEach(function(ind){
+      var ns = _nationalStats[ind.key];
+      var isActive = _activeIndicators.indexOf(ind.key) >= 0;
+      html += '<span onclick="toggleIndicator(\''+ind.key+'\')" style="cursor:pointer;font:400 9px \'Space Mono\',monospace;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,'+(isActive?'.12':'.04')+');color:'+(isActive?'var(--ac)':'var(--mt)')+';border:1px solid '+(isActive?'var(--ai)':'transparent')+'" title="'+ind.naam+': gem. '+formatVal(ns.avg)+' '+ind.eenheid+'">';
+      html += ind.naam.substring(0,18)+(ind.naam.length>18?'..':'')+' <span style="color:var(--tx)">'+formatVal(ns.avg)+'</span>';
+      html += '</span>';
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  document.getElementById('infoContent').innerHTML = html;
+  document.getElementById('infoPanel').classList.add('show');
 }
 
 function getActiveData(){
