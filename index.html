@@ -948,6 +948,9 @@ select option{background:var(--bg);color:var(--tx)}
 // CONFIG
 // ============================================================
 var _cacheBust = '?v=' + Date.now();
+// BAG data: lokaal laden als app niet op localhost draait (GitHub Pages → localhost:8091)
+var BAG_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? '' : 'http://localhost:8091/';
 var CBS_YEARS = [2012, 2017, 2018, 2019, 2022, 2023, 2024];
 var _activeYear = 2022;  // Start met meest complete jaar (alle 24 indicatoren)
 function gemUrl(y){ return 'gemeenten_'+(y||_activeYear)+'.geojson'+_cacheBust; }
@@ -1151,6 +1154,143 @@ var INDICATORS = [
   {key:'bag_gem_oppervlakte',   naam:'Gem. oppervlakte',         eenheid:'m²',        icon:'straighten',          cat:'bag_adressen'},
   {key:'bag_med_bouwjaar',      naam:'Mediaan bouwjaar',         eenheid:'jaar',      icon:'calendar_today',      cat:'bag_adressen'},
 ];
+
+// Statistische metadata per indicator (functie, methode, toelichting)
+var STAT_META = {
+ // Bevolking
+ 'aantal_inwoners':{f:'Lineair groeiend',m:'Lineaire regressie',i:'Bevolking groeit doorgaans monotoon.'},
+ 'mannen':{f:'Lineair',m:'Lineaire regressie',i:'Volgt bevolkingstrend.'},
+ 'vrouwen':{f:'Lineair',m:'Lineaire regressie',i:'Volgt bevolkingstrend.'},
+ 'bevolkingsdichtheid':{f:'Lineair',m:'Lineaire regressie',i:'Afgeleid van inwoners/oppervlakte.'},
+ // Leeftijd
+ 'pct_0_14':{f:'Bounded',m:'Lineaire regressie',i:'Verandert traag door geboortecijfer en migratie.'},
+ 'pct_15_24':{f:'Bounded',m:'Lineaire regressie',i:'Jongvolwassenen: beïnvloed door studentensteden.'},
+ 'pct_25_44':{f:'Bounded',m:'Lineaire regressie',i:'Werkende leeftijd: stabiel aandeel.'},
+ 'pct_45_64':{f:'Bounded',m:'Lineaire regressie',i:'Middelbare leeftijd: cohorteffecten babyboomers.'},
+ 'pct_65_plus':{f:'Bounded',m:'Automatisch (R²)',i:'Vergrijzing: sterk stijgend door babyboomeffect.'},
+ // Herkomst
+ 'pct_nl_achtergrond':{f:'Bounded',m:'Lineaire regressie',i:'Aandeel autochtoon: langzame verschuiving.'},
+ 'pct_westerse_migr':{f:'Bounded',m:'Lineaire regressie',i:'Westers migratieaandeel: traag veranderend.'},
+ 'pct_niet_westerse_migr':{f:'Bounded',m:'Lineaire regressie',i:'Niet-westers migratieaandeel.'},
+ // Huishoudens
+ 'huishoudens':{f:'Lineair groeiend',m:'Lineaire regressie',i:'Groei door verdunning en bevolkingsgroei.'},
+ 'gem_huishouden_grootte':{f:'Bounded (1–4)',m:'Lineaire regressie',i:'Dalend door individualisering en vergrijzing.'},
+ 'pct_eenpersoonshhd':{f:'Bounded',m:'Lineaire regressie',i:'Stijgend door individualisering.'},
+ 'pct_hhd_met_kind':{f:'Bounded',m:'Lineaire regressie',i:'Dalend in vergrijzende gebieden.'},
+ 'pct_hhd_zonder_kind':{f:'Bounded',m:'Lineaire regressie',i:'Complementair aan huishoudens met kinderen.'},
+ 'pct_gehuwd':{f:'Bounded',m:'Lineaire regressie',i:'Aandeel gehuwden: beïnvloed door leeftijdsopbouw.'},
+ 'pct_ongehuwd':{f:'Bounded',m:'Lineaire regressie',i:'Complementair aan gehuwden.'},
+ // Opleiding
+ 'opl_hoog':{f:'Bounded',m:'Lineaire regressie',i:'Stijgend door onderwijsexpansie.'},
+ 'opl_midden':{f:'Bounded',m:'Lineaire regressie',i:'Stabiel tot licht dalend.'},
+ 'opl_laag':{f:'Bounded',m:'Lineaire regressie',i:'Dalend door stijgend opleidingsniveau.'},
+ // Inkomen
+ 'gem_inkomen_inwoner':{f:'Lineair groeiend',m:'Automatisch (R²)',i:'Nominaal inkomen stijgt door inflatie en loonontwikkeling.'},
+ 'gem_inkomen_ontvanger':{f:'Lineair groeiend',m:'Automatisch (R²)',i:'Inkomen per ontvanger stijgt door loongroei.'},
+ 'gem_gestand_inkomen':{f:'Lineair groeiend',m:'Automatisch (R²)',i:'Gestandaardiseerd inkomen corrigeert voor huishoudensgrootte.'},
+ 'mediaan_vermogen':{f:'Kwadratisch',m:'Automatisch (R²)',i:'Vermogen groeit niet-lineair door vastgoedwaarde.'},
+ 'pct_hh_hoog_inkomen':{f:'Snapshot',m:'n.v.t.',i:'Eenmalige meting. Geen tijdreeks.'},
+ 'pct_hh_laag_inkomen':{f:'Snapshot',m:'n.v.t.',i:'Eenmalige meting. Geen tijdreeks.'},
+ 'pct_rond_sociaal_min':{f:'Snapshot',m:'n.v.t.',i:'Eenmalige meting. Geen tijdreeks.'},
+ // Wonen
+ 'gem_woz_waarde':{f:'Kwadratisch / cyclisch',m:'Automatisch (R²)',i:'Vastgoedprijzen volgen conjunctuurcycli.'},
+ 'woningvoorraad':{f:'Lineair groeiend',m:'Lineaire regressie',i:'Groei door nieuwbouw. Monotoon stijgend.'},
+ 'koopwoningen':{f:'Bounded',m:'Lineaire regressie',i:'Eigendomsverhouding verandert traag.'},
+ 'huurwoningen':{f:'Bounded',m:'Lineaire regressie',i:'Complementair aan koopwoningen.'},
+ 'pct_eengezins':{f:'Bounded',m:'Lineaire regressie',i:'Aandeel verandert langzaam door nieuwbouwtype.'},
+ 'pct_meergezins':{f:'Bounded',m:'Lineaire regressie',i:'Stijgend door verdichting in steden.'},
+ 'pct_bouwjaar_na_2000':{f:'Stijgend',m:'Lineaire regressie',i:'Cumulatief: steeds meer nieuwbouw na 2000.'},
+ 'pct_leegstand':{f:'Variabel',m:'Automatisch (R²)',i:'Conjunctuurafhankelijk. Sterk variërend per regio.'},
+ 'pct_stadsverwarming':{f:'Bounded',m:'Lineaire regressie',i:'Langzaam stijgend door energietransitie.'},
+ 'pct_huurcorporatie':{f:'Bounded',m:'Lineaire regressie',i:'Dalend door uitponden woningcorporaties.'},
+ // Energie
+ 'gem_aardgas':{f:'Lineair dalend',m:'Lineaire regressie',i:'Daalt door energietransitie en isolatie.'},
+ 'gem_elektriciteit':{f:'Variabel',m:'Automatisch (R²)',i:'Complexe trend: efficiëntie vs. elektrificatie.'},
+ // Economie
+ 'arbeidsparticipatie':{f:'Bounded',m:'Lineaire regressie',i:'Stijgend door emancipatie en vergrijzingsbeleid.'},
+ 'bedrijfsvestigingen':{f:'Lineair groeiend',m:'Lineaire regressie',i:'Groei door ZZP-trend en economische groei.'},
+ 'pct_werknemers':{f:'Bounded',m:'Lineaire regressie',i:'Stabiel. Licht beïnvloed door ZZP-groei.'},
+ 'pct_zelfstandigen':{f:'Bounded',m:'Lineaire regressie',i:'Stijgend door ZZP-trend.'},
+ // Sociale zekerheid
+ 'wmo_per_1000':{f:'Variabel',m:'Automatisch (R²)',i:'WMO-gebruik beïnvloed door vergrijzing en beleid.'},
+ 'pct_jeugdzorg':{f:'Variabel',m:'Automatisch (R²)',i:'Jeugdzorggebruik variabel door beleidswijzigingen.'},
+ // Voorzieningen
+ 'afstand_huisarts':{f:'Stabiel',m:'Lineaire regressie',i:'Verandert traag door huisartsenspreiding.'},
+ 'afstand_supermarkt':{f:'Stabiel',m:'Lineaire regressie',i:'Dicht netwerk in NL. Lichte verandering.'},
+ 'afstand_treinstation':{f:'Stabiel',m:'n.v.t.',i:'Treinnetwerk verandert nauwelijks.'},
+ 'afstand_apotheek':{f:'Stabiel',m:'Lineaire regressie',i:'Apotheeknetwerk verandert langzaam.'},
+ 'afstand_basisonderwijs':{f:'Stabiel',m:'Lineaire regressie',i:'Beïnvloed door scholenfusies.'},
+ 'afstand_kdv':{f:'Stabiel',m:'Lineaire regressie',i:'Kinderopvang volgt vraag.'},
+ 'afstand_ziekenhuis':{f:'Stabiel',m:'n.v.t.',i:'Ziekenhuizen sluiten zelden. Beïnvloed door fusies.'},
+ 'afstand_bibliotheek':{f:'Licht stijgend',m:'Lineaire regressie',i:'Bibliotheken sluiten in krimpgebieden.'},
+ 'afstand_restaurant':{f:'Stabiel',m:'n.v.t.',i:'Horecaspreiding is markgestuurd.'},
+ 'afstand_cafe':{f:'Stabiel',m:'n.v.t.',i:'Horecaspreiding is markgestuurd.'},
+ // Natuur
+ 'afstand_park':{f:'Stabiel',m:'n.v.t.',i:'Groenvoorziening verandert langzaam.'},
+ 'afstand_bos':{f:'Constant',m:'n.v.t.',i:'Bosareaal verandert nauwelijks.'},
+ 'afstand_openbaar_groen':{f:'Stabiel',m:'n.v.t.',i:'Openbaar groen verandert langzaam.'},
+ 'afstand_natuur':{f:'Constant',m:'n.v.t.',i:'Natuurterreinen zijn beschermd.'},
+ 'afstand_sportterrein':{f:'Stabiel',m:'n.v.t.',i:'Sportvoorzieningen veranderen langzaam.'},
+ // Mobiliteit
+ 'personenautos':{f:'Lineair groeiend',m:'Lineaire regressie',i:'Autopark groeit geleidelijk.'},
+ 'auto_per_huishouden':{f:'Stabiel',m:'n.v.t.',i:'Relatief stabiel autobezit per huishouden.'},
+ 'auto_per_km2':{f:'Lineair',m:'Lineaire regressie',i:'Dichtheid stijgt met autopark.'},
+ 'motorfietsen':{f:'Lineair',m:'Lineaire regressie',i:'Geleidelijk groeiend.'},
+ 'afstand_oprit':{f:'Stabiel',m:'n.v.t.',i:'Snelwegennetwerk verandert nauwelijks.'},
+ // Oppervlakte
+ 'opp_land':{f:'Constant',m:'n.v.t.',i:'Oppervlakte verandert nauwelijks.'},
+ 'opp_water':{f:'Constant',m:'n.v.t.',i:'Wateroppervlakte verandert nauwelijks.'},
+ // Bodemgebruik
+ 'pct_bebouwd':{f:'Licht stijgend',m:'Lineaire regressie',i:'Verstedelijking: geleidelijke toename bebouwd areaal.'},
+ 'pct_agrarisch':{f:'Licht dalend',m:'Lineaire regressie',i:'Landbouwgrond wordt omgezet in woon- en natuurgebied.'},
+ 'pct_natuur':{f:'Stabiel',m:'n.v.t.',i:'Natuurbeleid: beschermd areaal relatief stabiel.'},
+ 'pct_recreatie':{f:'Stabiel',m:'n.v.t.',i:'Recreatieterrein verandert langzaam.'},
+ 'opp_woonterrein_ha':{f:'Licht stijgend',m:'Lineaire regressie',i:'Woongebied groeit door nieuwbouw.'},
+ 'opp_bedrijventerrein_ha':{f:'Stabiel',m:'n.v.t.',i:'Bedrijventerrein groeit beperkt.'},
+ // Flora & Fauna
+ 'ff_totaal_soorten':{f:'Cumulatief',m:'n.v.t.',i:'Cumulatieve waarnemingen via GBIF. Stijgt door betere monitoring.'},
+ 'ff_totaal_waarnemingen':{f:'Cumulatief',m:'n.v.t.',i:'Totaal waarnemingen: groeit exponentieel door citizen science.'},
+ 'ff_soorten_vogels':{f:'Cumulatief',m:'n.v.t.',i:'Vogelwaarnemingen: goed gedocumenteerd door vogeltellingen.'},
+ 'ff_soorten_zoogdieren':{f:'Cumulatief',m:'n.v.t.',i:'Zoogdieren: minder waarnemingen, moeilijker te monitoren.'},
+ 'ff_soorten_planten':{f:'Cumulatief',m:'n.v.t.',i:'Planten: veel inventarisatiedata via floracartografie.'},
+ // Landbouw
+ 'lbt_totaal_cultuurgrond_ha':{f:'Dalend',m:'Lineaire regressie',i:'Cultuurgrond krimpt door verstedelijking en natuurontwikkeling.'},
+ 'lbt_totaal_rundvee':{f:'Dalend',m:'Lineaire regressie',i:'Veestapel krimpt door stikstofbeleid.'},
+ 'lbt_totaal_varkens':{f:'Dalend',m:'Lineaire regressie',i:'Varkenshouderij krimpt door sanering.'},
+ 'lbt_totaal_kippen':{f:'Variabel',m:'Automatisch (R²)',i:'Pluimvee: conjunctuurgevoelig.'},
+ 'lbt_aantal_bedrijven':{f:'Dalend',m:'Lineaire regressie',i:'Schaalvergroting: minder maar grotere bedrijven.'},
+ // Zorgkosten
+ 'zk_kosten_totaal':{f:'Lineair stijgend',m:'Lineaire regressie',i:'Zorgkosten stijgen structureel door vergrijzing en technologie.'},
+ 'zk_kosten_medspec':{f:'Lineair stijgend',m:'Lineaire regressie',i:'Specialistische zorg groeit door complexere zorgvraag.'},
+ 'zk_kosten_farmacie':{f:'Variabel',m:'Automatisch (R²)',i:'Farmaciekosten beïnvloed door patentverloop en innovatie.'},
+ 'zk_kosten_ggz':{f:'Variabel',m:'Automatisch (R²)',i:'GGZ-kosten variabel door beleidswijzigingen.'},
+ 'zk_kosten_huisarts':{f:'Lineair stijgend',m:'Lineaire regressie',i:'Huisartszorg groeit door verschuiving van tweede naar eerste lijn.'},
+ 'zk_kosten_paramedisch':{f:'Stabiel',m:'n.v.t.',i:'Paramedische zorg relatief stabiel.'},
+ 'zk_aantal_verzekerden':{f:'Lineair',m:'Lineaire regressie',i:'Volgt bevolkingstrend.'},
+ // Criminaliteit
+ 'cr_totaal_misdrijven':{f:'Dalend',m:'Lineaire regressie',i:'Totale criminaliteit daalt trendmatig sinds 2012.'},
+ 'cr_inbraak_woning':{f:'Sterk dalend',m:'Lineaire regressie',i:'Woninginbraak daalt door betere beveiliging.'},
+ 'cr_diefstal_fietsen':{f:'Dalend',m:'Lineaire regressie',i:'Fietsendiefstal daalt door sloten en registratie.'},
+ 'cr_diefstal_motor':{f:'Dalend',m:'Lineaire regressie',i:'Autodiefstal daalt door startonderbrekers.'},
+ 'cr_mishandeling':{f:'Variabel',m:'Automatisch (R²)',i:'Geweldsdelicten: variabel per buurt.'},
+ 'cr_bedreiging':{f:'Variabel',m:'Automatisch (R²)',i:'Bedreigingen: variabel, beïnvloed door online aangifte.'},
+ 'cr_vernieling':{f:'Dalend',m:'Lineaire regressie',i:'Vernieling daalt trendmatig.'},
+ 'cr_straatroof':{f:'Dalend',m:'Lineaire regressie',i:'Straatroof daalt door camera\'s en surveillance.'},
+ 'cr_drugs_drank':{f:'Variabel',m:'Automatisch (R²)',i:'Overlast: sterk locatieafhankelijk.'},
+ 'cr_winkeldiefstal':{f:'Dalend',m:'Lineaire regressie',i:'Winkeldiefstal daalt door beveiligingstechnologie.'},
+ 'cr_cybercrime':{f:'Stijgend',m:'Lineaire regressie',i:'Cybercrime stijgt structureel door digitalisering.'},
+ 'cr_fraude':{f:'Variabel',m:'Automatisch (R²)',i:'Fraude: conjunctuur- en gelegenheidsafhankelijk.'},
+ 'cr_inbraak_bedrijven':{f:'Dalend',m:'Lineaire regressie',i:'Bedrijfsinbraak daalt door beveiliging.'},
+ // BAG Adressen
+ 'bag_adressen_totaal':{f:'Snapshot',m:'n.v.t.',i:'BAG-adresdata: momentopname.'},
+ 'bag_adressen_woon':{f:'Snapshot',m:'n.v.t.',i:'BAG woonfunctie: momentopname.'},
+ 'bag_adressen_kantoor':{f:'Snapshot',m:'n.v.t.',i:'BAG kantoorfunctie: momentopname.'},
+ 'bag_adressen_winkel':{f:'Snapshot',m:'n.v.t.',i:'BAG winkelfunctie: momentopname.'},
+ 'bag_adressen_industrie':{f:'Snapshot',m:'n.v.t.',i:'BAG industriefunctie: momentopname.'},
+ 'bag_adressen_overig':{f:'Snapshot',m:'n.v.t.',i:'BAG overige functies: momentopname.'},
+ 'bag_gem_oppervlakte':{f:'Snapshot',m:'n.v.t.',i:'Gem. gebouwoppervlakte: BAG momentopname.'},
+ 'bag_med_bouwjaar':{f:'Snapshot',m:'n.v.t.',i:'Mediaan bouwjaar: BAG momentopname.'}
+};
 
 // Welke categorieën zijn ingeklapt (default: alles dicht)
 var _collapsedCategories = {
@@ -1805,15 +1945,51 @@ function saveBagGemeenteToIDB(code, features){
   }).catch(function(e){ console.warn('IDB save error:', code, e); });
 }
 
-// Compat wrapper: saveBagToIDB wordt nog door andere code aangeroepen
+// Compat wrapper: saveBagToIDB groepeert features per gemeente en slaat op in IndexedDB
 function saveBagToIDB(features){
   if(!features || !features.length) return Promise.resolve();
+  // Groepeer per gemeente code (eerste 4 cijfers van identificatie)
+  var perGem = {};
   features.forEach(function(f){
     var id = f.properties && (f.properties.identificatie || f.properties.id);
-    if(id && !_bagMem[id]){ _bagMem[id] = f; _bagMemCount++; }
+    if(!id) return;
+    if(!_bagMem[id]){ _bagMem[id] = f; _bagMemCount++; }
+    var gemCode = 'GM' + id.substring(0, 4);
+    if(!perGem[gemCode]) perGem[gemCode] = [];
+    perGem[gemCode].push(f);
   });
   updateBagCacheUI();
-  return Promise.resolve();
+  // Sla elke gemeente apart op in IndexedDB (merge met bestaande data)
+  var saves = Object.keys(perGem).map(function(code){
+    var newFeats = perGem[code];
+    // Merge met eventueel al gecachte features voor deze gemeente
+    return openBagIDB().then(function(db){
+      return new Promise(function(resolve){
+        var tx = db.transaction(BAG_IDB_STORE, 'readwrite');
+        var store = tx.objectStore(BAG_IDB_STORE);
+        var getReq = store.get(code);
+        getReq.onsuccess = function(){
+          var existing = (getReq.result && getReq.result.features) || [];
+          // Merge: voeg nieuwe features toe, skip duplicaten
+          var ids = {};
+          existing.forEach(function(f){
+            var fid = f.properties && (f.properties.identificatie || f.properties.id);
+            if(fid) ids[fid] = true;
+          });
+          newFeats.forEach(function(f){
+            var fid = f.properties && (f.properties.identificatie || f.properties.id);
+            if(fid && !ids[fid]) existing.push(f);
+          });
+          store.put({code: code, count: existing.length, features: existing});
+          _bagCachedGems[code] = existing.length;
+          tx.oncomplete = function(){ resolve(); };
+          tx.onerror = function(){ resolve(); };
+        };
+        getReq.onerror = function(){ resolve(); };
+      });
+    }).catch(function(){ });
+  });
+  return Promise.all(saves);
 }
 
 // Haal alle gecachte features in de huidige viewport uit memory
@@ -2301,6 +2477,16 @@ function showBagFeatureInfo(p, latlng){
   // Pand uitleg
   html += '<div style="font:400 9px \'Space Mono\',monospace;color:var(--mt);padding:4px 8px;margin:2px 0 6px;background:rgba(139,94,60,.08);border-radius:6px;border-left:2px solid #8B5E3C;line-height:1.5"><span class="mi mi-sm" style="font-size:11px;vertical-align:-2px;color:#8B5E3C">info</span> Panden (bruin op de kaart) kunnen meerdere verblijfsobjecten (adressen) bevatten.</div>';
 
+  // === BUURT / WIJK / GEMEENTE NAMEN ===
+  var _geoNames = _findGeoNames(latlng);
+  if(_geoNames){
+   html += '<div style="display:flex;flex-wrap:wrap;gap:3px;margin:4px 0 8px">';
+   if(_geoNames.buurt) html += '<span style="font:500 9px DM Sans;color:var(--ac);background:rgba(56,189,248,.08);padding:1px 6px;border-radius:10px;cursor:pointer" onclick="_navToGeoArea(\'buurt\',\''+(_geoNames.buurtCode||'')+'\')">📍 '+_geoNames.buurt+'</span>';
+   if(_geoNames.wijk) html += '<span style="font:500 9px DM Sans;color:#a78bfa;background:rgba(167,139,250,.08);padding:1px 6px;border-radius:10px;cursor:pointer" onclick="_navToGeoArea(\'wijk\',\''+(_geoNames.wijkCode||'')+'\')">🏘️ '+_geoNames.wijk+'</span>';
+   if(_geoNames.gemeente) html += '<span style="font:500 9px DM Sans;color:#f59e0b;background:rgba(245,158,11,.08);padding:1px 6px;border-radius:10px;cursor:pointer" onclick="_navToGeoArea(\'gemeente\',\''+(_geoNames.gemeenteCode||'')+'\')">🏢 '+_geoNames.gemeente+'</span>';
+   html += '</div>';
+  }
+
   // === ADRES IN CONTEXT: oppervlakte/bouwjaar t.o.v. buurt/wijk/gemeente ===
   try { html += buildAdresContextHtml(p, latlng); } catch(e){}
 
@@ -2310,9 +2496,188 @@ function showBagFeatureInfo(p, latlng){
   // === CBS STATISTIEKEN: alle niveaus (buurt, wijk, gemeente, landelijk) ===
   html += buildMultiLevelStatsHtml(latlng);
 
+  // Placeholder voor levenscyclus en siblings (async laden)
+  var vboId = p.identificatie || '';
+  if(vboId){
+   html += '<div id="bagLvcSection" style="margin-top:8px"></div>';
+   html += '<div id="bagSiblingsSection" style="margin-top:4px"></div>';
+  }
+
   document.getElementById('infoContent').innerHTML = html;
   document.getElementById('infoPanel').classList.add('show');
   logEvent('adres_klik', (straat+' '+hnr).trim() + (p.woonplaats ? ', '+p.woonplaats : ''));
+
+  // Async: laad BAG levenscyclus en gerelateerde VBO's
+  if(vboId) _loadBagLvcAndSiblings(vboId, latlng, p);
+}
+
+// === GEO NAMES LOOKUP: vind buurt/wijk/gemeente voor een punt ===
+function _findGeoNames(latlng){
+  var result = {};
+  // Zoek buurt
+  if(_buurtData){
+    var bf = findFeatureInData(_buurtData, latlng);
+    if(bf && bf.properties){
+      result.buurt = bf.properties.buurtnaam || '';
+      result.buurtCode = bf.properties.buurtcode || '';
+      result.wijk = bf.properties.wijknaam || '';
+      result.wijkCode = bf.properties.wijkcode || '';
+      result.gemeente = bf.properties.gemeentenaam || '';
+      result.gemeenteCode = bf.properties.gemeentecode || '';
+    }
+  }
+  // Fallback: zoek in wijkdata
+  if(!result.wijk && _wijkData){
+    var wf = findFeatureInData(_wijkData, latlng);
+    if(wf && wf.properties){
+      result.wijk = wf.properties.wijknaam || '';
+      result.wijkCode = wf.properties.wijkcode || '';
+      if(!result.gemeente){ result.gemeente = wf.properties.gemeentenaam || ''; result.gemeenteCode = wf.properties.gemeentecode || ''; }
+    }
+  }
+  // Fallback: zoek in gemeentedata
+  if(!result.gemeente && _gemeenteData && _gemeenteData.features){
+    var gf = findFeatureInData(_gemeenteData, latlng);
+    if(gf && gf.properties){
+      result.gemeente = gf.properties.gemeentenaam || '';
+      result.gemeenteCode = gf.properties.gemeentecode || '';
+    }
+  }
+  return (result.buurt || result.wijk || result.gemeente) ? result : null;
+}
+
+// Navigeer naar buurt/wijk/gemeente op de kaart
+function _navToGeoArea(type, code){
+  if(!code) return;
+  var dataSet = type === 'buurt' ? _buurtData : type === 'wijk' ? _wijkData : (_gemeenteData ? _gemeenteData : null);
+  if(!dataSet || !dataSet.features) return;
+  var codeField = type === 'buurt' ? 'buurtcode' : type === 'wijk' ? 'wijkcode' : 'gemeentecode';
+  for(var i = 0; i < dataSet.features.length; i++){
+    if(dataSet.features[i].properties[codeField] === code){
+      try {
+        var layer = L.geoJSON(dataSet.features[i]);
+        var bounds = layer.getBounds();
+        if(bounds.isValid()) _map.fitBounds(bounds, {padding:[30,30], maxZoom:16});
+        toast('📍 '+dataSet.features[i].properties[type+'naam'] || code);
+      } catch(e){}
+      return;
+    }
+  }
+}
+
+// === BAG LEVENSCYCLUS + SIBLINGS laden ===
+function _loadBagLvcAndSiblings(vboId, latlng, props){
+  // 1. Levenscyclus via API server (als beschikbaar)
+  var lvcEl = document.getElementById('bagLvcSection');
+  var sibEl = document.getElementById('bagSiblingsSection');
+
+  // Probeer LVC via lokale API server
+  fetch('/api/bag/lvc?id='+encodeURIComponent(vboId)).then(function(r){return r.json()}).then(function(lvcData){
+    if(!lvcEl) return;
+    if(lvcData.versies && lvcData.versies.length > 0){
+      var h = '<div style="border-top:1px solid var(--glass-bd);padding-top:8px">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+      h += '<span style="font:700 11px Space Mono,monospace;color:#7c3aed"><span class="mi mi-sm" style="vertical-align:-2px">history</span> Levenscyclus ('+lvcData.versies.length+')</span>';
+      h += '<span style="font:500 8px Space Mono,monospace;color:var(--mt);background:var(--glass-bg);padding:1px 5px;border-radius:3px">'+lvcData.bron+'</span></div>';
+      h += '<div style="position:relative;padding-left:14px">';
+      h += '<div style="position:absolute;left:4px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#7c3aed,#a78bfa,var(--glass-bd))"></div>';
+      for(var vi = lvcData.versies.length - 1; vi >= 0; vi--){
+        var v = lvcData.versies[vi];
+        var isAct = !v.eindGeldigheid;
+        var dotCol = isAct ? '#22c55e' : vi === 0 ? '#ef4444' : '#a78bfa';
+        h += '<div style="position:relative;margin-bottom:5px;padding:3px 6px;background:'+(isAct?'rgba(34,197,94,.06)':'transparent')+';border:1px solid '+(isAct?'rgba(34,197,94,.15)':'transparent')+';border-radius:4px">';
+        h += '<div style="position:absolute;left:-13px;top:5px;width:7px;height:7px;border-radius:50%;background:'+dotCol+';border:2px solid var(--bg)">';
+        if(isAct) h += '<div style="position:absolute;top:-2px;left:-2px;width:11px;height:11px;border-radius:50%;border:1px solid #22c55e;animation:pulse 2s infinite"></div>';
+        h += '</div>';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1px">';
+        h += '<span style="font:700 8px Space Mono,monospace;color:var(--tx)">'+(v.beginGeldigheid||'?');
+        h += v.eindGeldigheid ? ' → '+v.eindGeldigheid : ' → <span style="color:#22c55e">heden</span>';
+        h += '</span>';
+        if(isAct) h += '<span style="font:700 5px DM Sans;background:#22c55e;color:#fff;padding:1px 4px;border-radius:3px">ACTUEEL</span>';
+        if(v.voorkomen) h += '<span style="font:400 5px Space Mono;color:var(--mt);margin-left:3px">#'+v.voorkomen+'</span>';
+        h += '</div>';
+        var sc = (v.status||'').indexOf('in gebruik') >= 0 ? '#22c55e' : (v.status||'').indexOf('ingetrokken') >= 0 ? '#ef4444' : (v.status||'').indexOf('gevormd') >= 0 ? '#38bdf8' : '#eab308';
+        h += '<div style="display:flex;gap:6px;flex-wrap:wrap;font:400 7px DM Sans;color:var(--mt)">';
+        h += '<span style="color:'+sc+';font-weight:600">● '+(v.status||'')+'</span>';
+        if(v.gebruiksdoel) h += '<span>🏢 '+v.gebruiksdoel+'</span>';
+        if(v.oppervlakte) h += '<span>📏 '+v.oppervlakte+' m²</span>';
+        h += '</div>';
+        if(v.documentdatum || v.documentnummer){
+          h += '<div style="font:400 6px Space Mono;color:var(--mt);margin-top:1px">';
+          if(v.documentdatum) h += '📄 '+v.documentdatum;
+          if(v.documentnummer) h += ' ('+v.documentnummer+')';
+          h += '</div>';
+        }
+        h += '</div>';
+      }
+      h += '</div></div>';
+      lvcEl.innerHTML = h;
+    } else if(lvcData.error){
+      // Toon hint
+      lvcEl.innerHTML = '<div style="border-top:1px solid var(--glass-bd);padding:6px 0;font:400 7px DM Sans;color:var(--mt)"><span style="color:#a78bfa;font-weight:700">💡 Tip:</span> Voor volledige levenscyclus (splitsingen, statuswijzigingen) configureer een <a href="https://kadaster.nl/zakelijk/producten/adressen-en-gebouwen/bag-api-individuele-bevragingen" target="_blank" style="color:var(--ac);text-decoration:underline">gratis PDOK BAG API key</a>.</div>';
+    }
+  }).catch(function(){
+    // API server niet beschikbaar — geen LVC
+    if(lvcEl) lvcEl.innerHTML = '';
+  });
+
+  // 2. Gerelateerde VBO's (siblings) — eerst via API, fallback naar _bagMem
+  fetch('/api/bag/siblings?id='+encodeURIComponent(vboId)+'&lat='+latlng.lat+'&lon='+latlng.lng).then(function(r){return r.json()}).then(function(sd){
+    if(!sibEl) return;
+    _renderSiblings(sibEl, sd.siblings || [], vboId);
+  }).catch(function(){
+    // API niet beschikbaar → fallback: zoek in _bagMem
+    if(!sibEl) return;
+    var siblings = [];
+    var radius = 0.00005; // ~5m
+    for(var id in _bagMem){
+      if(id === vboId) continue;
+      var f = _bagMem[id];
+      if(!f.geometry || !f.geometry.coordinates) continue;
+      var dx = f.geometry.coordinates[0] - latlng.lng;
+      var dy = f.geometry.coordinates[1] - latlng.lat;
+      if(Math.abs(dx) < radius && Math.abs(dy) < radius){
+        var sp = f.properties || {};
+        siblings.push({
+          identificatie: sp.identificatie || id,
+          volledig_adres: (sp.openbare_ruimte_naam||sp.openbare_ruimte||'')+' '+(sp.huisnummer||'')+(sp.huisletter||'')+(sp.toevoeging?' '+sp.toevoeging:''),
+          oppervlakte: sp.oppervlakte,
+          gebruiksdoel: sp.gebruiksdoel,
+          bouwjaar: sp.bouwjaar,
+          status: sp.status
+        });
+      }
+    }
+    _renderSiblings(sibEl, siblings, vboId);
+  });
+}
+
+function _renderSiblings(el, siblings, vboId){
+  if(!siblings || siblings.length === 0){ el.innerHTML = ''; return; }
+  var h = '<div style="border-top:1px solid var(--glass-bd);padding-top:8px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">';
+  h += '<span style="font:700 11px Space Mono,monospace;color:#f59e0b"><span class="mi mi-sm" style="vertical-align:-2px">apartment</span> Gerelateerd ('+siblings.length+')</span>';
+  h += '<span style="font:500 7px DM Sans;color:var(--mt);background:rgba(245,158,11,.08);padding:1px 5px;border-radius:3px">mogelijk gesplitst</span></div>';
+  h += '<div style="display:flex;flex-direction:column;gap:3px">';
+  for(var i = 0; i < siblings.length && i < 10; i++){
+    var sv = siblings[i];
+    var svCol = sv.status && sv.status.indexOf('in gebruik') >= 0 ? '#22c55e' : sv.status && sv.status.indexOf('ingetrokken') >= 0 ? '#ef4444' : '#eab308';
+    h += '<div style="display:flex;align-items:center;gap:5px;padding:2px 5px;background:rgba(245,158,11,.04);border:1px solid rgba(245,158,11,.1);border-radius:4px;cursor:pointer;font:400 8px DM Sans" ';
+    h += 'onclick="(function(){var f=_bagMem[\''+sv.identificatie+'\'];if(f&&f.properties){selectBagAdres(f.properties,L.latLng(f.geometry.coordinates[1],f.geometry.coordinates[0]))}else{toast(\'VBO niet in cache\')}})()">';
+    h += '<span style="color:'+svCol+';font-size:7px">●</span>';
+    h += '<div style="flex:1;min-width:0;overflow:hidden">';
+    h += '<div style="font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:8px">'+(sv.volledig_adres||sv.identificatie)+'</div>';
+    h += '<div style="font-size:6px;color:var(--mt)">';
+    if(sv.oppervlakte) h += '📏 '+sv.oppervlakte+' m² ';
+    if(sv.gebruiksdoel) h += '🏢 '+sv.gebruiksdoel+' ';
+    if(sv.bouwjaar) h += '📅 '+sv.bouwjaar;
+    h += '</div></div>';
+    h += '<span class="mi" style="font-size:12px;color:var(--ac)">open_in_new</span>';
+    h += '</div>';
+  }
+  if(siblings.length > 10) h += '<div style="font:400 6px DM Sans;color:var(--mt);text-align:center">... en '+(siblings.length-10)+' meer</div>';
+  h += '</div></div>';
+  el.innerHTML = h;
 }
 
 // Bereken volledige descriptive statistics van een gesorteerde array
@@ -3458,7 +3823,7 @@ function redrawBagVectorTiles(){
 // Laad bag_index.json (bevat beschikbare gemeenten + aantal adressen)
 function loadBagIndex(){
   if(_bagIndex) return Promise.resolve(_bagIndex);
-  return fetch('bag/bag_index.json'+_cacheBust).then(function(r){
+  return fetch(BAG_BASE+'bag/bag_index.json'+_cacheBust).then(function(r){
     if(!r.ok) return {};
     return r.json();
   }).then(function(d){
@@ -3751,7 +4116,7 @@ function loadBagForGemeente(code){
   if(_bagCachedGems[code] && _bagCachedGems[code] > 0){
     return Promise.resolve(0); // Al gecacht, features al in _bagMem
   }
-  var url = 'bag/bag_'+code+'.geojson'+_cacheBust;
+  var url = BAG_BASE+'bag/bag_'+code+'.geojson'+_cacheBust;
   return fetch(url).then(function(r){
     if(!r.ok) throw new Error('BAG '+code+' niet beschikbaar ('+r.status+')');
     return r.json();
@@ -5059,7 +5424,10 @@ function buildIndicatorList(){
           var idx = fm.naam.toLowerCase().indexOf(search);
           displayName = fm.naam.substring(0,idx)+'<span class="ind-search-highlight">'+fm.naam.substring(idx,idx+search.length)+'</span>'+fm.naam.substring(idx+search.length);
         }
-        html += '<div class="'+cls+'" data-ind="'+fm.key+'" style="--cat-color:'+cat.color+'" onclick="toggleIndicator(\''+fm.key+'\')" title="Dubbelklik: maak primair (kaartkleur)">';
+        var smTip = 'Dubbelklik: maak primair (kaartkleur)';
+        var sm = STAT_META[fm.key];
+        if(sm) smTip += '\n─── Analyse ───\nFunctie: '+sm.f+'\nMethode: '+sm.m+'\n'+sm.i;
+        html += '<div class="'+cls+'" data-ind="'+fm.key+'" style="--cat-color:'+cat.color+'" onclick="toggleIndicator(\''+fm.key+'\')" title="'+smTip+'">';
         html += '<div class="ind-icon"><span class="mi">check</span></div>';
         html += '<span class="ind-name">'+displayName+'</span>';
         html += '<span class="ind-unit">'+fm.eenheid+'</span>';
@@ -6632,10 +7000,35 @@ function getSessionId(){
 function collectVisitorInfo(){
   var nav = navigator;
   var scr = screen;
+  var conn = nav.connection || nav.mozConnection || nav.webkitConnection || {};
+  var ua = nav.userAgent || '';
+
+  // Parse browser & OS uit user agent
+  var browserInfo = parseBrowser(ua);
+  var osInfo = parseOS(ua);
+
+  // Performance timing
+  var perf = {};
+  try {
+    var navEntry = performance.getEntriesByType('navigation')[0] || performance.timing || {};
+    if (navEntry.loadEventEnd) {
+      perf.page_load_ms = Math.round(navEntry.loadEventEnd - (navEntry.startTime || 0));
+      perf.dns_ms = Math.round((navEntry.domainLookupEnd || 0) - (navEntry.domainLookupStart || 0));
+      perf.tcp_ms = Math.round((navEntry.connectEnd || 0) - (navEntry.connectStart || 0));
+      perf.ttfb_ms = Math.round((navEntry.responseStart || 0) - (navEntry.requestStart || 0));
+      perf.dom_interactive_ms = Math.round((navEntry.domInteractive || 0) - (navEntry.startTime || 0));
+    }
+    var resources = performance.getEntriesByType('resource');
+    perf.resources_count = resources.length;
+    var totalTransfer = 0;
+    resources.forEach(function(r){ totalTransfer += r.transferSize || 0; });
+    perf.transfer_size_kb = Math.round(totalTransfer / 1024);
+  } catch(e){}
+
   return {
     visitor_id: getVisitorId(),
     session_id: getSessionId(),
-    user_agent: nav.userAgent || '',
+    user_agent: ua,
     platform: nav.platform || (nav.userAgentData && nav.userAgentData.platform) || '',
     language: nav.language || nav.userLanguage || '',
     languages: (nav.languages || []).join(','),
@@ -6643,7 +7036,7 @@ function collectVisitorInfo(){
     viewport_w: window.innerWidth, viewport_h: window.innerHeight,
     pixel_ratio: window.devicePixelRatio || 1,
     color_depth: scr.colorDepth || scr.pixelDepth || 0,
-    connection_type: nav.connection ? nav.connection.effectiveType || nav.connection.type || '' : '',
+    connection_type: conn.effectiveType || conn.type || '',
     cores: nav.hardwareConcurrency || 0,
     memory: nav.deviceMemory || 0,
     touch: 'ontouchstart' in window || nav.maxTouchPoints > 0,
@@ -6653,7 +7046,75 @@ function collectVisitorInfo(){
     canvas_hash: getCanvasFingerprint(),
     gpu: getGPUInfo(),
     visit_count: parseInt(localStorage.getItem('geoinzicht_visits') || '0') + 1,
+    // Performance & Web Vitals
+    page_load_ms: perf.page_load_ms || null,
+    dns_ms: perf.dns_ms || null,
+    tcp_ms: perf.tcp_ms || null,
+    ttfb_ms: perf.ttfb_ms || null,
+    dom_interactive_ms: perf.dom_interactive_ms || null,
+    resources_count: perf.resources_count || 0,
+    transfer_size_kb: perf.transfer_size_kb || 0,
+    // Netwerk uitbreiding
+    downlink_mbps: conn.downlink || null,
+    rtt_ms: conn.rtt || null,
+    save_data: !!(conn.saveData),
+    online: nav.onLine !== false,
+    // Browser & OS details
+    browser_name: browserInfo.name,
+    browser_version: browserInfo.version,
+    os_name: osInfo.name,
+    os_version: osInfo.version,
+    dark_mode: window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches,
+    reduced_motion: window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    do_not_track: nav.doNotTrack === '1' || nav.doNotTrack === 'yes',
+    pdf_viewer: !!nav.pdfViewerEnabled,
+    cookies_enabled: !!nav.cookieEnabled,
+    ad_blocker: false, // wordt async gedetecteerd
+    // Device uitbreiding
+    max_touch_points: nav.maxTouchPoints || 0,
+    orientation: (scr.orientation && scr.orientation.type) ? scr.orientation.type.split('-')[0] : (window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'),
+    battery_level: null,  // wordt async ingevuld
+    battery_charging: null,
+    // Storage & Capabilities
+    storage_quota_mb: null,  // wordt async ingevuld
+    storage_used_mb: null,
+    indexeddb_support: !!window.indexedDB,
+    webgl_version: getWebGLVersion(),
+    webgpu_support: !!nav.gpu,
+    wasm_support: typeof WebAssembly === 'object',
   };
+}
+
+function parseBrowser(ua){
+  var m;
+  if(m = ua.match(/Edg\/(\d+[\.\d]*)/)) return {name:'Edge', version:m[1]};
+  if(m = ua.match(/OPR\/(\d+[\.\d]*)/)) return {name:'Opera', version:m[1]};
+  if(m = ua.match(/Firefox\/(\d+[\.\d]*)/)) return {name:'Firefox', version:m[1]};
+  if(m = ua.match(/Chrome\/(\d+[\.\d]*)/)) return {name:'Chrome', version:m[1]};
+  if(m = ua.match(/Safari\/(\d+[\.\d]*)/)){
+    var sv = ua.match(/Version\/(\d+[\.\d]*)/);
+    return {name:'Safari', version: sv ? sv[1] : m[1]};
+  }
+  return {name:'Overig', version:''};
+}
+
+function parseOS(ua){
+  var m;
+  if(m = ua.match(/Windows NT (\d+[\.\d]*)/)) return {name:'Windows', version: m[1]==='10.0'?'10/11':m[1]};
+  if(m = ua.match(/Mac OS X (\d+[_\.\d]*)/)) return {name:'macOS', version:m[1].replace(/_/g,'.')};
+  if(m = ua.match(/Android (\d+[\.\d]*)/)) return {name:'Android', version:m[1]};
+  if(m = ua.match(/iPhone OS (\d+[_\.\d]*)/)) return {name:'iOS', version:m[1].replace(/_/g,'.')};
+  if(ua.match(/Linux/)) return {name:'Linux', version:''};
+  return {name:'Overig', version:''};
+}
+
+function getWebGLVersion(){
+  try {
+    var c = document.createElement('canvas');
+    if(c.getContext('webgl2')) return '2';
+    if(c.getContext('webgl') || c.getContext('experimental-webgl')) return '1';
+  } catch(e){}
+  return '';
 }
 
 function getCanvasFingerprint(){
@@ -6850,6 +7311,32 @@ async function initAnalytics(){
       }
     } catch(e){ /* IP ophalen mislukt, geen probleem */ }
 
+    // Async metadata ophalen: battery, storage, ad blocker
+    try {
+      if(navigator.getBattery){
+        var batt = await navigator.getBattery();
+        info.battery_level = Math.round(batt.level * 100);
+        info.battery_charging = batt.charging;
+      }
+    } catch(e){}
+    try {
+      if(navigator.storage && navigator.storage.estimate){
+        var est = await navigator.storage.estimate();
+        info.storage_quota_mb = Math.round((est.quota || 0) / 1048576);
+        info.storage_used_mb = Math.round((est.usage || 0) / 1048576);
+      }
+    } catch(e){}
+    try {
+      var adDiv = document.createElement('div');
+      adDiv.className = 'ad ads adsbox ad-placement';
+      adDiv.style.cssText = 'position:absolute;top:-999px;left:-999px;width:1px;height:1px;';
+      adDiv.innerHTML = '&nbsp;';
+      document.body.appendChild(adDiv);
+      await new Promise(function(r){ setTimeout(r, 100); });
+      info.ad_blocker = adDiv.offsetHeight === 0 || adDiv.clientHeight === 0;
+      document.body.removeChild(adDiv);
+    } catch(e){}
+
     // Sessie record
     var session = {
       visitor_id: _visitorId,
@@ -6882,6 +7369,38 @@ async function initAnalytics(){
       started_at: new Date().toISOString(),
       ended_at: null,
       duration_seconds: null,
+      // Nieuwe metadata velden
+      page_load_ms: info.page_load_ms,
+      dns_ms: info.dns_ms,
+      tcp_ms: info.tcp_ms,
+      ttfb_ms: info.ttfb_ms,
+      dom_interactive_ms: info.dom_interactive_ms,
+      resources_count: info.resources_count,
+      transfer_size_kb: info.transfer_size_kb,
+      downlink_mbps: info.downlink_mbps,
+      rtt_ms: info.rtt_ms,
+      save_data: info.save_data,
+      online: info.online,
+      browser_name: info.browser_name,
+      browser_version: info.browser_version,
+      os_name: info.os_name,
+      os_version: info.os_version,
+      dark_mode: info.dark_mode,
+      reduced_motion: info.reduced_motion,
+      do_not_track: info.do_not_track,
+      pdf_viewer: info.pdf_viewer,
+      cookies_enabled: info.cookies_enabled,
+      ad_blocker: info.ad_blocker,
+      max_touch_points: info.max_touch_points,
+      orientation: info.orientation,
+      battery_level: info.battery_level,
+      battery_charging: info.battery_charging,
+      storage_quota_mb: info.storage_quota_mb,
+      storage_used_mb: info.storage_used_mb,
+      indexeddb_support: info.indexeddb_support,
+      webgl_version: info.webgl_version,
+      webgpu_support: info.webgpu_support,
+      wasm_support: info.wasm_support,
       synced: 0   // 0 = niet gesynct, 1 = gesynct naar SQL Server
     };
 
@@ -6893,12 +7412,93 @@ async function initAnalytics(){
     // Start sync engine
     startSyncEngine();
 
+    // Herstel eerder geüploade data van server
+    restoreUploadsFromServer(_visitorId);
+
   } catch(e){
     console.warn('Analytics init error:', e.message);
     // Zelfs als IDB faalt, markeer als ready zodat events niet verloren gaan
     _analyticsReady = true;
   }
 }
+
+// --------------- Restore uploads van server ---------------
+async function restoreUploadsFromServer(visitorId){
+  try {
+    var r = await fetch(ANALYTICS_API + '/uploads/' + visitorId, {signal: AbortSignal.timeout(5000)});
+    if(!r.ok) return;
+    var uploads = await r.json();
+    if(!uploads || !uploads.length) return;
+    console.log('Analytics: ' + uploads.length + ' eerder geüploade datasets gevonden op server');
+    // Dispatch custom event zodat de kaart-module ze kan oppikken
+    window.dispatchEvent(new CustomEvent('uploads-restored', {detail: uploads}));
+  } catch(e){ /* server niet bereikbaar, geen probleem */ }
+}
+
+// --------------- Extra Event Handlers ---------------
+// JS errors bijhouden
+window.addEventListener('error', function(e){
+  trackEvent('error', {message: e.message || '', source: (e.filename || '').split('/').pop(), line: e.lineno, col: e.colno});
+});
+window.addEventListener('unhandledrejection', function(e){
+  trackEvent('error', {message: 'Promise rejection: ' + (e.reason && e.reason.message || String(e.reason || '')).substring(0, 200)});
+});
+
+// Scroll depth tracking
+(function(){
+  var maxScroll = 0;
+  var scrollTimer = null;
+  window.addEventListener('scroll', function(){
+    var docH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight) - window.innerHeight;
+    if(docH <= 0) return;
+    var pct = Math.round(window.scrollY / docH * 100);
+    if(pct > maxScroll) maxScroll = pct;
+    clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(function(){ trackEvent('scroll_depth', maxScroll + '%'); }, 2000);
+  });
+})();
+
+// Focus / blur tracking
+window.addEventListener('blur', function(){ trackEvent('focus_lost', ''); });
+window.addEventListener('focus', function(){ trackEvent('focus_gained', ''); });
+
+// Viewport resize tracking
+(function(){
+  var resizeTimer = null;
+  window.addEventListener('resize', function(){
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function(){
+      trackEvent('resize', window.innerWidth + 'x' + window.innerHeight);
+    }, 1000);
+  });
+})();
+
+// Network connection change
+if(navigator.connection){
+  navigator.connection.addEventListener('change', function(){
+    var c = navigator.connection;
+    trackEvent('connection_change', (c.effectiveType || '') + ' ' + (c.downlink || '?') + 'Mbps rtt=' + (c.rtt || '?'));
+  });
+}
+
+// Idle time tracking (geen interactie >60s)
+(function(){
+  var idleTimer = null;
+  var idleStart = null;
+  function resetIdle(){
+    if(idleStart){
+      var sec = Math.round((Date.now() - idleStart) / 1000);
+      if(sec > 60) trackEvent('idle_time', sec + 's');
+      idleStart = null;
+    }
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(function(){ idleStart = Date.now(); }, 60000);
+  }
+  ['mousemove','keydown','click','scroll','touchstart'].forEach(function(ev){
+    window.addEventListener(ev, resetIdle, {passive: true});
+  });
+  resetIdle();
+})();
 
 // --------------- Track Events ---------------
 function trackEvent(type, detail){
