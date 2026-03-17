@@ -185,7 +185,89 @@ def fetch_criminaliteit(conn):
     return result
 
 
-def enrich_file(filename, zk_data, cr_data, domains):
+def fetch_sociale_analyse(conn):
+    """
+    Haal sociale analyse data per gemeente uit DWH.
+    Combineert: CBS bevolking, Vektis verzekerden, CBS uitkeringen.
+    Returns dict: {(gemeente_code, jaar): {field: val, ...}}
+    """
+    log.info("Sociale analyse ophalen uit DWH...")
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+            bg.gemeentecode, bg.jaar, bg.bevolking,
+            fz.aantal_verzekerden,
+            CASE WHEN fz.aantal_verzekerden IS NOT NULL
+                 THEN bg.bevolking - fz.aantal_verzekerden
+            END AS geschat_onverzekerd,
+            CASE WHEN bg.bevolking > 0 AND fz.aantal_verzekerden IS NOT NULL
+                 THEN ROUND((bg.bevolking - fz.aantal_verzekerden) * 100.0 / bg.bevolking, 2)
+            END AS pct_onverzekerd,
+            u.uitkeringen_totaal, u.ww_uitkeringen, u.bijstand_totaal,
+            u.ao_totaal, u.wajong_uitkeringen,
+            CASE WHEN bg.bevolking > 0 AND u.uitkeringen_totaal IS NOT NULL
+                 THEN ROUND(u.uitkeringen_totaal * 100.0 / bg.bevolking, 2)
+            END AS pct_uitkeringen,
+            CASE WHEN bg.bevolking > 0 AND u.uitkeringen_totaal IS NOT NULL
+                 AND fz.aantal_verzekerden IS NOT NULL
+                 AND bg.bevolking > fz.aantal_verzekerden
+                 THEN ROUND(CAST(u.uitkeringen_totaal AS FLOAT) *
+                      (bg.bevolking - fz.aantal_verzekerden) * 1.0 / bg.bevolking, 0)
+            END AS uitk_onverzekerd
+        FROM dwh.fact_bevolking_gemeente bg
+        LEFT JOIN (
+            SELECT COALESCE(fz2.gemeentecode, m.gemeentecode) AS gemeentecode,
+                   fz2.jaar, fz2.aantal_verzekerden
+            FROM dwh.fact_zorgkosten fz2
+            LEFT JOIN transform.gemeente_naam_mapping m
+                ON UPPER(LTRIM(RTRIM(fz2.gemeentenaam))) = UPPER(LTRIM(RTRIM(m.vektis_naam)))
+        ) fz ON bg.gemeentecode = fz.gemeentecode AND bg.jaar = fz.jaar
+        LEFT JOIN dwh.fact_uitkeringen u ON bg.gemeentecode = u.gemeentecode AND bg.jaar = u.jaar
+    """)
+
+    result = {}
+    count = 0
+    for row in cursor.fetchall():
+        gm_code = str(row[0]).strip()
+        jaar = int(row[1])
+
+        def safe_int(v):
+            if v is None:
+                return None
+            try:
+                return int(float(v))
+            except (ValueError, TypeError):
+                return None
+
+        def safe_round(v, d=2):
+            if v is None:
+                return None
+            try:
+                return round(float(v), d)
+            except (ValueError, TypeError):
+                return None
+
+        result[(gm_code, jaar)] = {
+            "sa_bevolking": safe_int(row[2]),
+            "sa_verzekerden": safe_int(row[3]),
+            "sa_onverzekerd": safe_int(row[4]),
+            "sa_pct_onverzekerd": safe_round(row[5]),
+            "sa_uitkeringen": safe_int(row[6]),
+            "sa_ww": safe_int(row[7]),
+            "sa_bijstand": safe_int(row[8]),
+            "sa_ao": safe_int(row[9]),
+            "sa_wajong": safe_int(row[10]),
+            "sa_pct_uitkeringen": safe_round(row[11]),
+            "sa_uitk_onverzekerd": safe_int(row[12]),
+        }
+        count += 1
+
+    cursor.close()
+    log.info("  %d gemeente x jaar combinaties", count)
+    return result
+
+
+def enrich_file(filename, zk_data, cr_data, domains, sa_data=None):
     """Enrich a single GeoJSON file."""
     base = os.path.splitext(os.path.basename(filename))[0]
     parts = base.split("_")
@@ -289,6 +371,46 @@ def enrich_file(filename, zk_data, cr_data, domains):
                             any_added = True
                     props["cr_jaar"] = cr_year
 
+        # ── Sociale Analyse (match op gemeentecode) ──
+        if "onverzekerden" in domains and sa_data:
+            # Clear oude sa_ waarden om stale data te voorkomen
+            for k in list(props.keys()):
+                if k.startswith("sa_"):
+                    del props[k]
+
+            # Gebruik alleen jaren waar verzekerden-data beschikbaar is
+            # (bevolking gaat tot 2025, maar Vektis/uitkeringen stoppen eerder)
+            sa_complete_years = sorted(set(
+                j for (_, j), v in sa_data.items()
+                if v.get("sa_verzekerden") is not None
+            ))
+            sa_year = nearest_year(
+                sa_complete_years if sa_complete_years else
+                sorted(set(j for (_, j) in sa_data.keys())), year
+            )
+            if sa_year:
+                match_code = None
+                if feat_type == "gemeenten":
+                    match_code = gem_code
+                elif feat_type == "buurten":
+                    bc = str(gem_code).strip()
+                    if bc.startswith("BU") and len(bc) >= 6:
+                        match_code = "GM" + bc[2:6]
+                elif feat_type == "wijken":
+                    wc = str(gem_code).strip()
+                    if wc.startswith("WK") and len(wc) >= 6:
+                        match_code = "GM" + wc[2:6]
+
+                if match_code:
+                    sa_row = sa_data.get((match_code, sa_year))
+                    if sa_row:
+                        for key, val in sa_row.items():
+                            if val is not None:
+                                props[key] = val
+                                indicators_with_data.add(key)
+                                any_added = True
+                        props["sa_jaar"] = sa_year
+
         if any_added:
             enriched += 1
 
@@ -309,6 +431,11 @@ def enrich_file(filename, zk_data, cr_data, domains):
         meta["zk_jaar"] = zk_year
     if cr_year and "criminaliteit" in domains:
         meta["cr_jaar"] = cr_year
+    if "onverzekerden" in domains and sa_data:
+        sa_years = sorted(set(j for (_, j) in sa_data.keys()))
+        sa_year = nearest_year(sa_years, year) if sa_years else None
+        if sa_year:
+            meta["sa_jaar"] = sa_year
     meta["dwh_source"] = "CBS_Buurtdata DWH"
     geojson["metadata"] = meta
 
@@ -351,8 +478,8 @@ def main():
                         help="Feature type (default: alle)")
     parser.add_argument("--year", type=int, help="CBS jaar (default: alle)")
     parser.add_argument("--domains", nargs="+",
-                        choices=["zorgkosten", "criminaliteit"],
-                        default=["zorgkosten", "criminaliteit"],
+                        choices=["zorgkosten", "criminaliteit", "onverzekerden"],
+                        default=["zorgkosten", "criminaliteit", "onverzekerden"],
                         help="Welke domeinen (default: alle)")
     parser.add_argument("--server", default="localhost",
                         help="SQL Server instance (default: localhost)")
@@ -380,6 +507,7 @@ def main():
     # Fetch domain data
     zk_data = {}
     cr_data = {}
+    sa_data = {}
 
     if "zorgkosten" in args.domains:
         zk_data = fetch_zorgkosten(conn)
@@ -391,9 +519,14 @@ def main():
         if not cr_data:
             log.warning("Geen criminaliteit data!")
 
+    if "onverzekerden" in args.domains:
+        sa_data = fetch_sociale_analyse(conn)
+        if not sa_data:
+            log.warning("Geen sociale analyse data!")
+
     conn.close()
 
-    if not zk_data and not cr_data:
+    if not zk_data and not cr_data and not sa_data:
         log.error("Geen data beschikbaar - kan niet verrijken")
         return 1
 
@@ -401,7 +534,7 @@ def main():
     success = 0
     for filename in files:
         try:
-            if enrich_file(filename, zk_data, cr_data, args.domains):
+            if enrich_file(filename, zk_data, cr_data, args.domains, sa_data):
                 success += 1
         except Exception as e:
             log.error("FOUT bij %s: %s", filename, e)

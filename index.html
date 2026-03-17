@@ -995,6 +995,7 @@ var INDICATOR_CATEGORIES = [
   {id:'flora_fauna',     naam:'Flora & Fauna',            icon:'pets',               color:'#84cc16', bron:'GBIF (Global Biodiversity Information Facility)', jaar:'gbif'},
   {id:'landbouw',        naam:'Landbouw',                 icon:'agriculture',        color:'#ca8a04', bron:'CBS Landbouwtelling (tabel 80781ned)', jaar:'cbsjaar'},
   {id:'zorgkosten',      naam:'Zorgkosten',               icon:'local_pharmacy',     color:'#ef4444', bron:'Vektis Open Data (zorgverzekeraars)', jaar:'zk'},
+  {id:'onverzekerden',   naam:'Onverzekerden & Uitkeringen', icon:'shield_question', color:'#be123c', bron:'CBS Bevolking + Vektis + CBS Uitkeringen (proxy-analyse)', jaar:'sa'},
   {id:'criminaliteit',   naam:'Criminaliteit',            icon:'gavel',              color:'#dc2626', bron:'Politie (data.politie.nl)', jaar:'cr'},
   {id:'bag_adressen',    naam:'BAG Adressen',             icon:'home',               color:'#39ff14', bron:'Kadaster BAG via PDOK', jaar:'bag'},
 ];
@@ -1130,6 +1131,19 @@ var INDICATORS = [
   {key:'zk_kosten_huisarts',    naam:'Huisarts/verz.',           eenheid:'\u20ac',    icon:'stethoscope',         cat:'zorgkosten'},
   {key:'zk_kosten_paramedisch', naam:'Paramedisch/verz.',        eenheid:'\u20ac',    icon:'physiotherapy',       cat:'zorgkosten'},
   {key:'zk_aantal_verzekerden', naam:'Aantal verzekerden',       eenheid:'personen',  icon:'health_and_safety',   cat:'zorgkosten'},
+
+  // ── Onverzekerden & Uitkeringen (Proxy-analyse) ──
+  {key:'sa_bevolking',         naam:'CBS Bevolking',            eenheid:'personen',  icon:'groups',              cat:'onverzekerden'},
+  {key:'sa_verzekerden',       naam:'Vektis Verzekerden',       eenheid:'personen',  icon:'health_and_safety',   cat:'onverzekerden'},
+  {key:'sa_onverzekerd',       naam:'Geschat onverzekerd',      eenheid:'personen',  icon:'shield_question',     cat:'onverzekerden'},
+  {key:'sa_pct_onverzekerd',   naam:'% Geschat onverzekerd',    eenheid:'%',         icon:'percent',             cat:'onverzekerden'},
+  {key:'sa_uitkeringen',       naam:'Uitkeringsontvangers',     eenheid:'personen',  icon:'account_balance',     cat:'onverzekerden'},
+  {key:'sa_ww',                naam:'WW-uitkeringen',           eenheid:'personen',  icon:'work_off',            cat:'onverzekerden'},
+  {key:'sa_bijstand',          naam:'Bijstand',                 eenheid:'personen',  icon:'volunteer_activism',  cat:'onverzekerden'},
+  {key:'sa_ao',                naam:'Arbeidsongeschiktheid',    eenheid:'personen',  icon:'accessible',          cat:'onverzekerden'},
+  {key:'sa_wajong',            naam:'Wajong',                   eenheid:'personen',  icon:'child_care',          cat:'onverzekerden'},
+  {key:'sa_pct_uitkeringen',   naam:'% Uitkeringsontvangers',   eenheid:'%',         icon:'percent',             cat:'onverzekerden'},
+  {key:'sa_uitk_onverzekerd',  naam:'Uitk.ontv. zonder verz.',  eenheid:'personen',  icon:'warning',             cat:'onverzekerden'},
 
   // ── Criminaliteit (Politie) ──
   {key:'cr_totaal_misdrijven',  naam:'Totaal misdrijven',        eenheid:'aantal',    icon:'gavel',               cat:'criminaliteit'},
@@ -5279,6 +5293,7 @@ function showFeatureInfo(p, cfg, type, isClick, geoFeature){
         else if(cat.jaar==='gbif') _pjLabel='cumulatief';
         else if(cat.jaar==='zk'){var _zj=_pjMeta.zk_jaar||'?';_pjLabel='peiljaar '+_zj;}
         else if(cat.jaar==='cr'){var _cj=_pjMeta.cr_jaar||'?';_pjLabel='peiljaar '+_cj;}
+        else if(cat.jaar==='sa'){var _sj=_pjMeta.sa_jaar||'?';_pjLabel='peiljaar '+_sj;}
         else if(cat.jaar==='bag'){var _bd=_pjMeta.enriched_at||'';_pjLabel=_bd?'bijgewerkt '+_bd.substring(0,10):'actueel';}
         html += '<div style="font:600 10px DM Sans,sans-serif;color:'+cat.color+';margin-bottom:4px;display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span class="mi mi-sm" style="font-size:13px">'+cat.icon+'</span> '+cat.naam+' <span style="font-weight:400;color:var(--mt)">('+catCount+')</span>';
         if(_pjLabel) html += ' <span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.7"><span class="mi" style="font-size:9px">update</span> '+_pjLabel+'</span>';
@@ -5420,6 +5435,7 @@ function buildIndicatorList(){
     else if(cat.jaar==='gbif') _ilJaar = 'cum.';
     else if(cat.jaar==='zk') _ilJaar = _ilMeta.zk_jaar||'?';
     else if(cat.jaar==='cr') _ilJaar = _ilMeta.cr_jaar||'?';
+    else if(cat.jaar==='sa') _ilJaar = _ilMeta.sa_jaar||'?';
     else if(cat.jaar==='bag'){var _bd2=_ilMeta.enriched_at||'';_ilJaar=_bd2?_bd2.substring(0,10):'actueel';}
     if(_ilJaar) html += '<span style="font:500 8px Space Mono,monospace;color:var(--mt);opacity:.7;margin-left:4px" title="'+cat.bron+'">'+_ilJaar+'</span>';
     html += '</div>';
@@ -6691,6 +6707,7 @@ function renderIndicatorDefs(){
     else if(cat.jaar === 'gbif'){ _catJaarLabel = cat.bron; _catBijgewerkt = 'cumulatief (alle jaren)'; }
     else if(cat.jaar === 'zk'){ var _zkJr=_meta.zk_jaar||'?'; _catJaarLabel = cat.bron; _catBijgewerkt = 'peiljaar '+_zkJr; }
     else if(cat.jaar === 'cr'){ var _crJr=_meta.cr_jaar||'?'; _catJaarLabel = cat.bron; _catBijgewerkt = 'peiljaar '+_crJr; }
+    else if(cat.jaar === 'sa'){ var _saJr=_meta.sa_jaar||'?'; _catJaarLabel = cat.bron; _catBijgewerkt = 'peiljaar '+_saJr; }
     else if(cat.jaar === 'bag'){ _catJaarLabel = cat.bron; var _bagDt=_meta.enriched_at||''; _catBijgewerkt = _bagDt ? 'bijgewerkt '+_bagDt.substring(0,10) : 'actueel'; }
     if(_catJaarLabel){
       html += '<div style="display:flex;align-items:center;gap:4px;margin-top:1px;margin-bottom:2px;flex-wrap:wrap">';
@@ -9182,7 +9199,11 @@ function showComparisonReport(){
     var jaarLabel = '';
     if(cat.jaar === 'cbsjaar') jaarLabel = 'CBS peildatum 1 jan '+_activeYear;
     else if(cat.jaar === 'bbg') jaarLabel = 'CBS Bodemgebruik peiljaar '+bbgJaar;
-    else if(cat.jaar === 'cumulatief') jaarLabel = 'GBIF cumulatief (alle jaren)' + (enrichedAt ? ', verrijkt '+enrichedAt : '');
+    else if(cat.jaar === 'gbif') jaarLabel = 'GBIF cumulatief (alle jaren)' + (enrichedAt ? ', verrijkt '+enrichedAt : '');
+    else if(cat.jaar === 'zk'){ var _zkJr2=meta.zk_jaar||'?'; jaarLabel = 'Vektis peiljaar '+_zkJr2; }
+    else if(cat.jaar === 'cr'){ var _crJr2=meta.cr_jaar||'?'; jaarLabel = 'Politie peiljaar '+_crJr2; }
+    else if(cat.jaar === 'sa'){ var _saJr2=meta.sa_jaar||'?'; jaarLabel = 'Proxy-analyse peiljaar '+_saJr2; }
+    else if(cat.jaar === 'bag') jaarLabel = 'BAG ' + (enrichedAt ? 'bijgewerkt '+enrichedAt : 'actueel');
     return {
       label: cat.naam,
       icon: cat.icon,
@@ -10247,6 +10268,9 @@ async function init(){
     loadBar.style.width = '90%';
     renderChoropleth('gemeenten');
     updateActiveStats();
+
+    // Toon NL overzicht bij eerste keer laden
+    setTimeout(function(){ if(!_infoPinned) showNLOverview(); }, 800);
 
     // Dataset metadata + indicatoren filteren op beschikbaarheid
     var meta = _gemeenteData.metadata || {};
