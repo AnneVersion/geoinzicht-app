@@ -9,4 +9,12 @@ bag/bag_GM*.geojson
 # Temp files
 %TEMP%*
 NUL
+nul
 *.tmp
+*.log
+
+# Claude Code
+.claude/
+
+# Cache
+*_cache.json

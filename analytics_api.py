@@ -71,6 +71,52 @@ def ensure_tables():
             IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='analytics_uploads' AND COLUMN_NAME='description')
                 ALTER TABLE analytics_uploads ADD description NVARCHAR(2000) DEFAULT '';
         """)
+        # Nieuwe metadata kolommen toevoegen aan analytics_sessions
+        new_cols = [
+            # Performance & Web Vitals
+            ("page_load_ms", "INT"),
+            ("dns_ms", "INT"),
+            ("tcp_ms", "INT"),
+            ("ttfb_ms", "INT"),
+            ("dom_interactive_ms", "INT"),
+            ("resources_count", "INT"),
+            ("transfer_size_kb", "INT"),
+            # Netwerk uitbreiding
+            ("downlink_mbps", "FLOAT"),
+            ("rtt_ms", "INT"),
+            ("save_data", "BIT DEFAULT 0"),
+            ("online", "BIT DEFAULT 1"),
+            # Browser & OS details
+            ("browser_name", "VARCHAR(100) DEFAULT ''"),
+            ("browser_version", "VARCHAR(50) DEFAULT ''"),
+            ("os_name", "VARCHAR(100) DEFAULT ''"),
+            ("os_version", "VARCHAR(50) DEFAULT ''"),
+            ("dark_mode", "BIT DEFAULT 0"),
+            ("reduced_motion", "BIT DEFAULT 0"),
+            ("do_not_track", "BIT DEFAULT 0"),
+            ("pdf_viewer", "BIT DEFAULT 0"),
+            ("cookies_enabled", "BIT DEFAULT 1"),
+            ("ad_blocker", "BIT DEFAULT 0"),
+            # Device uitbreiding
+            ("max_touch_points", "INT DEFAULT 0"),
+            ("orientation", "VARCHAR(20) DEFAULT ''"),
+            ("battery_level", "FLOAT"),
+            ("battery_charging", "BIT"),
+            # Storage & Capabilities
+            ("storage_quota_mb", "INT"),
+            ("storage_used_mb", "INT"),
+            ("indexeddb_support", "BIT DEFAULT 1"),
+            ("webgl_version", "VARCHAR(10) DEFAULT ''"),
+            ("webgpu_support", "BIT DEFAULT 0"),
+            ("wasm_support", "BIT DEFAULT 0"),
+        ]
+        cursor2 = conn.cursor()
+        for col_name, col_type in new_cols:
+            cursor2.execute(f"""
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+                               WHERE TABLE_NAME='analytics_sessions' AND COLUMN_NAME='{col_name}')
+                    ALTER TABLE analytics_sessions ADD {col_name} {col_type};
+            """)
         conn.close()
     except Exception as e:
         print(f"  Tabel-check fout (niet kritiek): {e}")
@@ -119,8 +165,18 @@ def create_session():
                 screen_w, screen_h, viewport_w, viewport_h, pixel_ratio,
                 color_depth, connection_type, cores, memory_gb, touch_device,
                 referrer, page_url, timezone, canvas_hash, gpu, visit_count,
-                started_at
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                started_at,
+                page_load_ms, dns_ms, tcp_ms, ttfb_ms, dom_interactive_ms,
+                resources_count, transfer_size_kb,
+                downlink_mbps, rtt_ms, save_data, online,
+                browser_name, browser_version, os_name, os_version,
+                dark_mode, reduced_motion, do_not_track, pdf_viewer,
+                cookies_enabled, ad_blocker,
+                max_touch_points, orientation, battery_level, battery_charging,
+                storage_quota_mb, storage_used_mb, indexeddb_support,
+                webgl_version, webgpu_support, wasm_support
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,
+                      ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             d.get('visitor_id',''), d.get('session_id',''),
             d.get('ip_address',''), d.get('city',''), d.get('region',''),
@@ -136,7 +192,28 @@ def create_session():
             (d.get('referrer',''))[:500], (d.get('page_url',''))[:500],
             d.get('timezone',''), d.get('canvas_hash',''),
             (d.get('gpu',''))[:200], d.get('visit_count', 1),
-            d.get('started_at', datetime.datetime.utcnow().isoformat())
+            d.get('started_at', datetime.datetime.utcnow().isoformat()),
+            # Performance
+            d.get('page_load_ms'), d.get('dns_ms'), d.get('tcp_ms'),
+            d.get('ttfb_ms'), d.get('dom_interactive_ms'),
+            d.get('resources_count'), d.get('transfer_size_kb'),
+            # Netwerk
+            d.get('downlink_mbps'), d.get('rtt_ms'),
+            d.get('save_data', False), d.get('online', True),
+            # Browser & OS
+            (d.get('browser_name',''))[:100], (d.get('browser_version',''))[:50],
+            (d.get('os_name',''))[:100], (d.get('os_version',''))[:50],
+            d.get('dark_mode', False), d.get('reduced_motion', False),
+            d.get('do_not_track', False), d.get('pdf_viewer', False),
+            d.get('cookies_enabled', True), d.get('ad_blocker', False),
+            # Device
+            d.get('max_touch_points', 0), (d.get('orientation',''))[:20],
+            d.get('battery_level'), d.get('battery_charging'),
+            # Storage & Capabilities
+            d.get('storage_quota_mb'), d.get('storage_used_mb'),
+            d.get('indexeddb_support', True),
+            (d.get('webgl_version',''))[:10],
+            d.get('webgpu_support', False), d.get('wasm_support', False),
         ))
         conn.close()
         return jsonify({'status': 'ok'}), 201
@@ -398,6 +475,62 @@ def get_stats():
         """)
         stats['daily'] = [{'date': r[0].isoformat(), 'count': r[1]} for r in cursor.fetchall()]
 
+        # Nieuwe metadata statistieken (alleen als kolommen bestaan)
+        try:
+            # Top OS
+            cursor.execute("""
+                SELECT TOP 5 os_name, COUNT(*) as cnt FROM analytics_sessions
+                WHERE os_name IS NOT NULL AND os_name != ''
+                GROUP BY os_name ORDER BY cnt DESC
+            """)
+            stats['top_os'] = [{'os': r[0], 'count': r[1]} for r in cursor.fetchall()]
+
+            # Top browser (nieuwe kolom)
+            cursor.execute("""
+                SELECT TOP 5 browser_name, COUNT(*) as cnt FROM analytics_sessions
+                WHERE browser_name IS NOT NULL AND browser_name != ''
+                GROUP BY browser_name ORDER BY cnt DESC
+            """)
+            stats['top_browsers_parsed'] = [{'browser': r[0], 'count': r[1]} for r in cursor.fetchall()]
+
+            # Performance gemiddelden
+            cursor.execute("""
+                SELECT AVG(page_load_ms), AVG(ttfb_ms), AVG(dom_interactive_ms),
+                       AVG(transfer_size_kb), AVG(resources_count)
+                FROM analytics_sessions
+                WHERE page_load_ms IS NOT NULL
+            """)
+            perf = cursor.fetchone()
+            stats['perf_avg'] = {
+                'page_load_ms': int(perf[0]) if perf[0] else None,
+                'ttfb_ms': int(perf[1]) if perf[1] else None,
+                'dom_interactive_ms': int(perf[2]) if perf[2] else None,
+                'transfer_size_kb': int(perf[3]) if perf[3] else None,
+                'resources_count': int(perf[4]) if perf[4] else None,
+            }
+
+            # Dark mode percentage
+            cursor.execute("SELECT COUNT(*) FROM analytics_sessions WHERE dark_mode = 1")
+            dm = cursor.fetchone()[0]
+            stats['dark_mode_pct'] = round(dm / max(stats['total_sessions'], 1) * 100)
+
+            # Touch vs non-touch
+            cursor.execute("SELECT COUNT(*) FROM analytics_sessions WHERE touch_device = 1")
+            touch = cursor.fetchone()[0]
+            stats['touch_pct'] = round(touch / max(stats['total_sessions'], 1) * 100)
+
+            # Ad blocker percentage
+            cursor.execute("SELECT COUNT(*) FROM analytics_sessions WHERE ad_blocker = 1")
+            ab = cursor.fetchone()[0]
+            stats['ad_blocker_pct'] = round(ab / max(stats['total_sessions'], 1) * 100)
+
+            # Uploads count
+            cursor.execute("SELECT COUNT(*) FROM analytics_uploads")
+            stats['total_uploads'] = cursor.fetchone()[0]
+
+        except Exception:
+            pass  # Kolommen bestaan nog niet, geen probleem
+
         conn.close()
         return jsonify(stats)
     except Exception as e:
@@ -429,7 +562,7 @@ def get_feedback():
 
 @app.route('/api/upload', methods=['POST'])
 def save_upload():
-    """Sla een gebruikers-upload op (metadata + data als JSON)."""
+    """Sla een gebruikers-upload op (metadata + data als JSON + bestand)."""
     try:
         d = request.get_json(force=True)
         conn = get_conn()
@@ -450,9 +583,44 @@ def save_upload():
             d.get('uploaded_at', datetime.datetime.utcnow().isoformat())
         ))
         conn.close()
+
+        # Ook als bestand opslaan voor persistentie
+        visitor_id = d.get('visitor_id', 'unknown')
+        upload_id = d.get('upload_id', 'unknown')
+        upload_dir = os.path.join(os.path.dirname(__file__), 'uploads', visitor_id)
+        os.makedirs(upload_dir, exist_ok=True)
+        filepath = os.path.join(upload_dir, f'{upload_id}.json')
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(d, f, ensure_ascii=False)
+
         return jsonify({'status': 'ok'}), 201
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/api/uploads/<visitor_id>', methods=['GET'])
+def get_visitor_uploads(visitor_id):
+    """Haal alle uploads op voor een specifieke bezoeker."""
+    try:
+        conn = get_conn()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT upload_id, name, description, filename, icon, color,
+                   label_column, columns_json, data_json, row_count, uploaded_at
+            FROM analytics_uploads
+            WHERE visitor_id = ?
+            ORDER BY uploaded_at DESC
+        """, (visitor_id,))
+        columns = [col[0] for col in cursor.description]
+        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        conn.close()
+        for row in rows:
+            for k, v in row.items():
+                if isinstance(v, datetime.datetime):
+                    row[k] = v.isoformat()
+        return jsonify(rows)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/admin/uploads', methods=['GET'])

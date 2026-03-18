@@ -266,7 +266,7 @@ def fetch_area(bbox, seen_ids):
     return features
 
 
-def download_gemeente(gemeente, resume=False):
+def download_gemeente(gemeente, resume=False, update=False, max_age_days=90):
     """Download all BAG verblijfsobjecten for one gemeente."""
     code = gemeente["code"]
     naam = gemeente["naam"]
@@ -275,14 +275,30 @@ def download_gemeente(gemeente, resume=False):
     outfile = os.path.join(BAG_DIR, f"bag_{code}.geojson")
 
     # Resume: skip if file exists and is > 1KB
-    if resume and os.path.exists(outfile) and os.path.getsize(outfile) > 1024:
-        log.info("  SKIP %s %s (bestand bestaat)", code, naam)
-        try:
-            with open(outfile, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            return code, len(data.get("features", [])), True
-        except Exception:
-            pass  # Re-download if file is corrupted
+    if (resume or update) and os.path.exists(outfile) and os.path.getsize(outfile) > 1024:
+        # Update mode: check file age
+        if update:
+            file_age_days = (time.time() - os.path.getmtime(outfile)) / 86400
+            if file_age_days < max_age_days:
+                log.info("  SKIP %s %s (%.0f dagen oud, max %d)",
+                         code, naam, file_age_days, max_age_days)
+                try:
+                    with open(outfile, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    return code, len(data.get("features", [])), True
+                except Exception:
+                    pass  # Re-download if file is corrupted
+            else:
+                log.info("  UPDATE %s %s (%.0f dagen oud > %d)",
+                         code, naam, file_age_days, max_age_days)
+        else:
+            log.info("  SKIP %s %s (bestand bestaat)", code, naam)
+            try:
+                with open(outfile, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return code, len(data.get("features", [])), True
+            except Exception:
+                pass  # Re-download if file is corrupted
 
     # Step 1: Get total count
     total = fetch_hits(bbox)
@@ -386,6 +402,10 @@ def main():
                         help="Aantal gemeenten tegelijk (default: 1)")
     parser.add_argument("--index-only", action="store_true",
                         help="Alleen index herbouwen")
+    parser.add_argument("--update", action="store_true",
+                        help="Alleen bestanden ouder dan --max-age dagen opnieuw downloaden")
+    parser.add_argument("--max-age", type=int, default=90,
+                        help="Max leeftijd in dagen voor --update modus (default: 90)")
     args = parser.parse_args()
 
     os.makedirs(BAG_DIR, exist_ok=True)
@@ -428,7 +448,8 @@ def main():
         log.info("\n[%d/%d] (%.0f%%) ETA: %.0f min",
                  i + 1, len(gemeenten), pct, eta_min)
 
-        code, count, ok = download_gemeente(gemeente, resume=args.resume)
+        code, count, ok = download_gemeente(gemeente, resume=args.resume,
+                                              update=args.update, max_age_days=args.max_age)
         if ok:
             success += 1
             total_adressen += count
