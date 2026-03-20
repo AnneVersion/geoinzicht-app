@@ -199,7 +199,7 @@ select:hover{background:rgba(30,40,65,.7)}
 select option{background:var(--bg);color:var(--tx)}
 
 /* Legend */
-.legend{display:flex;flex-direction:column;gap:0;margin-top:8px;background:var(--glass);border:1px solid var(--glass-bd);border-radius:10px;padding:10px 12px;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+.legend{display:flex;flex-direction:column;gap:0;margin-top:8px;background:var(--glass);border:1px solid var(--glass-bd);border-radius:12px;padding:12px 14px;box-shadow:0 4px 16px rgba(0,0,0,.2)}
 .legend-row{display:flex;align-items:center;gap:10px;font-size:11px;padding:4px 0;transition:opacity .2s;color:var(--tx)}
 .legend-row:hover{opacity:.85}
 .legend-color{width:32px;height:12px;border-radius:3px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.25);flex-shrink:0}
@@ -422,6 +422,7 @@ select option{background:var(--bg);color:var(--tx)}
 
     <div class="tabs">
       <div class="tab active" data-tab="kaart" onclick="switchTab('kaart')"><span class="mi mi-sm" style="vertical-align:-3px">map</span> Kaart</div>
+      <div class="tab" data-tab="vergelijk" onclick="switchTab('vergelijk');renderVergelijkTab()"><span class="mi mi-sm" style="vertical-align:-3px">compare_arrows</span> Vergelijk</div>
       <div class="tab" data-tab="upload" onclick="switchTab('upload')"><span class="mi mi-sm" style="vertical-align:-3px">upload_file</span> Upload</div>
       <div class="tab" data-tab="info" onclick="switchTab('info')"><span class="mi mi-sm" style="vertical-align:-3px">info</span> Info</div>
       <div class="tab" data-tab="log" id="tabLog" style="display:none" onclick="switchTab('log');renderLogView()"><span class="mi mi-sm" style="vertical-align:-3px">admin_panel_settings</span> Log</div>
@@ -557,7 +558,7 @@ select option{background:var(--bg);color:var(--tx)}
       </div>
       <div style="display:flex;gap:6px">
         <button class="ms-loadbtn" id="loadSelectionBtn" onclick="loadSelection()" style="display:none;flex:1"><span class="mi mi-sm">download</span> Laad selectie</button>
-        <button class="ms-loadbtn" id="compareBtn" onclick="showCompareDialog()" style="display:none;flex:1;background:linear-gradient(135deg,rgba(56,189,248,.15),rgba(6,182,212,.1));color:var(--ai);border-color:rgba(56,189,248,.2)"><span class="mi mi-sm">compare_arrows</span> Vergelijk</button>
+        <button class="ms-loadbtn" id="compareBtn" onclick="showInlineComparison()" style="display:none;flex:1;background:linear-gradient(135deg,rgba(56,189,248,.15),rgba(6,182,212,.1));color:var(--ai);border-color:rgba(56,189,248,.2)"><span class="mi mi-sm">compare_arrows</span> Vergelijk</button>
       </div>
 
       <!-- Achtergrond CBS data laden statusbalk -->
@@ -788,6 +789,22 @@ select option{background:var(--bg);color:var(--tx)}
             <div style="display:flex;align-items:center;gap:4px;padding:2px 0"><span class="mi mi-sm" style="color:var(--ac)">query_stats</span> <b style="color:var(--tx)">CBS</b> &#8212; Kerncijfers wijken en buurten</div>
             <div style="display:flex;align-items:center;gap:4px;padding:2px 0"><span class="mi mi-sm" style="color:var(--cyan)">public</span> <b style="color:var(--tx)">PDOK</b> &#8212; Geometrie, BAG WMS, Locatieserver</div>
             <div style="display:flex;align-items:center;gap:4px;padding:2px 0"><span class="mi mi-sm" style="color:var(--ai)">domain</span> <b style="color:var(--tx)">Kadaster</b> &#8212; BAG verblijfsobjecten &amp; panden</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VERGELIJK TAB -->
+    <div class="pane" id="p-vergelijk">
+      <div class="sh"><span class="mi">compare_arrows</span> Gebieden Vergelijken</div>
+      <div class="card" id="vergelijkContent">
+        <div style="text-align:center;padding:20px 10px;color:var(--mt)">
+          <span class="mi" style="font-size:40px;display:block;margin-bottom:8px;opacity:.3">compare_arrows</span>
+          <div style="font:600 12px 'DM Sans',sans-serif;color:var(--tx);margin-bottom:6px">Selecteer gebieden om te vergelijken</div>
+          <div style="font:400 10px 'DM Sans',sans-serif;line-height:1.6">
+            Gebruik de gemeente/wijk/buurt filters in het Kaart-tabblad om minimaal 2 gebieden te selecteren.
+            Of klik direct op gebieden in de kaart.<br><br>
+            <span style="color:var(--ac)">Tip:</span> Selecteer 2+ gemeenten, wijken of buurten en klik op "Vergelijk" om een side-by-side vergelijking te zien.
           </div>
         </div>
       </div>
@@ -1573,6 +1590,47 @@ function fixLayerOrder(){
   if(_bagVectorLayer) _bagVectorLayer.bringToFront();
 }
 
+// Format waarden met duizendtallenscheiding, percentages, euro's
+function formatTooltipVal(v, eenheid, key){
+  if(v === undefined || v === null || (typeof v === 'number' && v < 0)) return '-';
+  if(typeof v !== 'number') return String(v);
+  // Euro waarden
+  if(eenheid === '\u20ac') return '\u20ac' + v.toLocaleString('nl-NL', {minimumFractionDigits:0, maximumFractionDigits:0});
+  if(eenheid === 'x1000'){
+    if(key && (key.indexOf('inkomen')>=0 || key.indexOf('vermogen')>=0 || key.indexOf('woz')>=0))
+      return '\u20ac' + (v*1000).toLocaleString('nl-NL', {minimumFractionDigits:0, maximumFractionDigits:0});
+    return v.toLocaleString('nl-NL') + 'k';
+  }
+  if(eenheid === '%') return v.toLocaleString('nl-NL', {minimumFractionDigits:1, maximumFractionDigits:1}) + '%';
+  if(eenheid === '\u2030') return v.toLocaleString('nl-NL', {minimumFractionDigits:1, maximumFractionDigits:1}) + '\u2030';
+  if(eenheid === 'km') return v.toLocaleString('nl-NL', {minimumFractionDigits:1, maximumFractionDigits:1}) + ' km';
+  if(eenheid === '/km\u00b2' || eenheid === 'adr/km\u00b2') return v.toLocaleString('nl-NL') + ' /km\u00b2';
+  if(eenheid === 'm\u00b3') return v.toLocaleString('nl-NL') + ' m\u00b3';
+  if(eenheid === 'kWh') return v.toLocaleString('nl-NL') + ' kWh';
+  if(eenheid === 'ha') return v.toLocaleString('nl-NL', {minimumFractionDigits:0, maximumFractionDigits:1}) + ' ha';
+  if(eenheid === 'm\u00b2') return v.toLocaleString('nl-NL') + ' m\u00b2';
+  if(eenheid === 'jaar') return Math.round(v).toString();
+  if(eenheid === 'pers.') return v.toLocaleString('nl-NL', {minimumFractionDigits:1, maximumFractionDigits:1});
+  // Grote getallen
+  if(v >= 1000000) return (v/1000000).toLocaleString('nl-NL', {minimumFractionDigits:1, maximumFractionDigits:1}) + 'M';
+  return v.toLocaleString('nl-NL');
+}
+
+// Bereken percentiel positie
+function getPercentile(val, key){
+  if(!_nationalStats || !_nationalStats[key]) return null;
+  var ns = _nationalStats[key];
+  if(ns.count < 10) return null;
+  // Schat percentiel via z-score en normaalverdeling
+  var z = ns.stddev > 0 ? (val - ns.avg) / ns.stddev : 0;
+  // CDF benadering
+  var t = 1/(1+0.2316419*Math.abs(z));
+  var d = 0.3989422804 * Math.exp(-z*z/2);
+  var p = d*t*(0.3193815 + t*(-0.3565638 + t*(1.781478 + t*(-1.821256 + t*1.330274))));
+  if(z > 0) p = 1 - p;
+  return Math.round(p * 100);
+}
+
 // Bouw compacte tooltip-inhoud voor hover op kaart
 function buildMapTooltip(p, cfg, type){
   var name = p[cfg.nameField] || '-';
@@ -1588,21 +1646,29 @@ function buildMapTooltip(p, cfg, type){
     var ind = indLookup[key];
     if(!ind) return;
     var v = p[key];
-    var valStr = (v !== undefined && v !== null && v >= 0) ? v.toLocaleString('nl-NL') : '-';
+    var valStr = formatTooltipVal(v, ind.eenheid, key);
     var cmpArrow = '';
+    var pctLabel = '';
     if(v !== undefined && v !== null && v >= 0 && _nationalStats && _nationalStats[key]){
       var ns = _nationalStats[key];
       var zs = ns.stddev > 0 ? (v - ns.avg) / ns.stddev : 0;
-      if(zs > 0.5) cmpArrow = '<span style="color:#4ade80;font-size:9px;margin-left:2px">&#x25B2;</span>';
-      else if(zs < -0.5) cmpArrow = '<span style="color:#ef4444;font-size:9px;margin-left:2px">&#x25BC;</span>';
-      else cmpArrow = '<span style="color:#38bdf8;font-size:7px;margin-left:2px">&#x25CF;</span>';
+      var isReverse = REVERSE_KEYS.indexOf(key) >= 0;
+      var effectiveZ = isReverse ? -zs : zs;
+      if(effectiveZ > 0.5) cmpArrow = '<span style="color:#4ade80;font-size:9px;margin-left:2px">\u25B2</span>';
+      else if(effectiveZ < -0.5) cmpArrow = '<span style="color:#ef4444;font-size:9px;margin-left:2px">\u25BC</span>';
+      else cmpArrow = '<span style="color:#38bdf8;font-size:7px;margin-left:2px">\u25CF</span>';
+      // Percentiel positie
+      var pct = getPercentile(v, key);
+      if(pct !== null){
+        pctLabel = '<div style="font:400 8px \'Space Mono\',monospace;color:rgba(148,163,184,.7);text-align:right;margin-top:-1px">Top '+(isReverse ? (100-pct) : pct)+'% NL</div>';
+      }
     }
     var cls = i === 0 ? 'tt-prim' : 'tt-sec';
     html += '<div class="tt-row">';
     html += '<span class="tt-label"><span class="mi" style="font-size:12px">'+ind.icon+'</span> '+ind.naam+'</span>';
-    html += '<span class="tt-val '+cls+'">'+valStr+cmpArrow;
-    if(ind.eenheid && v !== undefined && v !== null && v >= 0) html += ' <span style="font-weight:400;opacity:.5;font-size:8px">'+ind.eenheid+'</span>';
+    html += '<span class="tt-val '+cls+'" style="display:flex;flex-direction:column;align-items:flex-end">'+valStr+cmpArrow;
     html += '</span></div>';
+    if(pctLabel) html += pctLabel;
   });
   // BAG adressen als beschikbaar
   var bagCount = null;
@@ -5168,6 +5234,128 @@ function selectSearchResult(id, label){
 // ============================================================
 // FEATURE INFO PANEL (hover + click)
 // ============================================================
+// ============================================================
+// CONTEXTUELE VERGELIJKINGSTABEL (buurt vs wijk vs gemeente vs NL)
+// ============================================================
+function buildContextTable(p, type, name){
+  if(!_nationalStats || !Object.keys(_nationalStats).length) return '';
+  // Zoek contextdata: gemeente voor buurt/wijk, wijk voor buurt
+  var gemProps = null, wijkProps = null, buurtProps = null;
+  var gemName = p.gemeentenaam || '';
+  var wijkName = p.wijknaam || '';
+
+  if(type === 'buurten' || type === 'wijken'){
+    // Zoek gemeente-gemiddelden
+    if(_gemeenteData && gemName){
+      for(var i=0; i<_gemeenteData.features.length; i++){
+        if(_gemeenteData.features[i].properties.gemeentenaam === gemName){
+          gemProps = _gemeenteData.features[i].properties; break;
+        }
+      }
+    }
+  }
+  if(type === 'buurten' && _wijkData && wijkName){
+    for(var i=0; i<_wijkData.features.length; i++){
+      if(_wijkData.features[i].properties.wijknaam === wijkName){
+        wijkProps = _wijkData.features[i].properties; break;
+      }
+    }
+  }
+
+  // Kies key indicators voor de tabel
+  var ctxKeys = _activeIndicators.slice(0, 6);
+  if(ctxKeys.length === 0) return '';
+
+  // Bereken NL gemiddelden
+  var hasContext = gemProps || wijkProps || Object.keys(_nationalStats).length > 0;
+  if(!hasContext) return '';
+
+  var html = '<div style="margin:8px 0;padding:10px;background:rgba(56,189,248,.04);border-radius:10px;border:1px solid rgba(56,189,248,.1)">';
+  html += '<div style="font:600 11px \'DM Sans\',sans-serif;color:var(--ai);margin-bottom:8px;display:flex;align-items:center;gap:5px">';
+  html += '<span class="mi" style="font-size:14px">compare_arrows</span> Context vergelijking';
+  html += '</div>';
+
+  // Tabel header
+  html += '<table style="width:100%;border-collapse:collapse;font-size:10px">';
+  html += '<thead><tr style="border-bottom:1px solid rgba(255,255,255,.08)">';
+  html += '<th style="text-align:left;padding:3px 4px;font:500 9px \'DM Sans\',sans-serif;color:var(--mt)">Indicator</th>';
+  var typeLabels = {buurten:'Buurt', wijken:'Wijk', gemeenten:'Gemeente'};
+  html += '<th style="text-align:right;padding:3px 4px;font:600 9px \'Space Mono\',monospace;color:var(--ac)">' + (typeLabels[type]||'Gebied') + '</th>';
+  if(type === 'buurten' && wijkProps) html += '<th style="text-align:right;padding:3px 4px;font:600 9px \'Space Mono\',monospace;color:var(--cyan)">Wijk</th>';
+  if((type === 'buurten' || type === 'wijken') && gemProps) html += '<th style="text-align:right;padding:3px 4px;font:600 9px \'Space Mono\',monospace;color:var(--wn)">Gemeente</th>';
+  html += '<th style="text-align:right;padding:3px 4px;font:600 9px \'Space Mono\',monospace;color:var(--mt)">NL gem.</th>';
+  html += '</tr></thead><tbody>';
+
+  ctxKeys.forEach(function(key){
+    var ind = getIndicator(key);
+    var v = p[key];
+    if(v === undefined || v === null) return;
+    var ns = _nationalStats[key];
+    if(!ns) return;
+    var isReverse = REVERSE_KEYS.indexOf(key) >= 0;
+
+    html += '<tr style="border-bottom:1px solid rgba(255,255,255,.04)">';
+    html += '<td style="padding:3px 4px;font:500 9px \'DM Sans\',sans-serif;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px" title="'+ind.naam+'">'+ind.naam+'</td>';
+
+    // Geselecteerde waarde met kleur
+    var zMain = ns.stddev > 0 ? (v - ns.avg) / ns.stddev : 0;
+    var mainColor = getContextColor(zMain, isReverse);
+    html += '<td style="text-align:right;padding:3px 4px;font:700 10px \'Space Mono\',monospace;color:'+mainColor+'">'+formatTooltipVal(v, ind.eenheid, key)+'</td>';
+
+    // Wijk waarde
+    if(type === 'buurten' && wijkProps){
+      var wv = wijkProps[key];
+      if(wv !== undefined && wv !== null){
+        var zW = ns.stddev > 0 ? (wv - ns.avg) / ns.stddev : 0;
+        html += '<td style="text-align:right;padding:3px 4px;font:400 10px \'Space Mono\',monospace;color:'+getContextColor(zW, isReverse)+'">'+formatTooltipVal(wv, ind.eenheid, key)+'</td>';
+      } else { html += '<td style="text-align:right;padding:3px 4px;color:var(--mt)">-</td>'; }
+    }
+
+    // Gemeente waarde
+    if((type === 'buurten' || type === 'wijken') && gemProps){
+      var gv = gemProps[key];
+      if(gv !== undefined && gv !== null){
+        var zG = ns.stddev > 0 ? (gv - ns.avg) / ns.stddev : 0;
+        html += '<td style="text-align:right;padding:3px 4px;font:400 10px \'Space Mono\',monospace;color:'+getContextColor(zG, isReverse)+'">'+formatTooltipVal(gv, ind.eenheid, key)+'</td>';
+      } else { html += '<td style="text-align:right;padding:3px 4px;color:var(--mt)">-</td>'; }
+    }
+
+    // NL gemiddelde
+    html += '<td style="text-align:right;padding:3px 4px;font:400 10px \'Space Mono\',monospace;color:var(--mt)">'+formatTooltipVal(ns.avg, ind.eenheid, key)+'</td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+
+  // Percentiel positie
+  var mainKey = ctxKeys[0];
+  var mainVal = p[mainKey];
+  if(mainVal !== undefined && mainVal !== null){
+    var pct = getPercentile(mainVal, mainKey);
+    if(pct !== null){
+      var isRev = REVERSE_KEYS.indexOf(mainKey) >= 0;
+      var topPct = isRev ? (100 - pct) : pct;
+      html += '<div style="margin-top:6px;font:500 9px \'DM Sans\',sans-serif;color:var(--mt);display:flex;align-items:center;gap:4px">';
+      html += '<span class="mi" style="font-size:12px;color:var(--ai)">emoji_events</span>';
+      html += 'Top <span style="font:700 10px \'Space Mono\',monospace;color:var(--ac)">'+topPct+'%</span> van Nederland';
+      html += ' voor '+getIndicator(mainKey).naam;
+      html += '</div>';
+    }
+  }
+
+  html += '</div>';
+  return html;
+}
+
+function getContextColor(z, isReverse){
+  var effectiveZ = isReverse ? -z : z;
+  if(effectiveZ > 1.0) return '#4ade80';
+  if(effectiveZ > 0.3) return '#86efac';
+  if(effectiveZ < -1.0) return '#ef4444';
+  if(effectiveZ < -0.3) return '#fca5a5';
+  return 'var(--tx)';
+}
+
 function showFeatureInfo(p, cfg, type, isClick, geoFeature){
   // Zorg dat nationalStats altijd berekend is (nodig voor AI interpretatie)
   if(!_nationalStats || Object.keys(_nationalStats).length === 0) computeNationalStats();
@@ -5264,12 +5452,18 @@ function showFeatureInfo(p, cfg, type, isClick, geoFeature){
   html += '</div>';
 
   // Bij hover: toon actieve indicatoren
-  // Bij klik: toon ALLE beschikbare indicatoren
+  // Bij klik: toon ALLE beschikbare indicatoren + contextuele vergelijking
   var indicatorKeys = isClick ? INDICATORS.map(function(fm){return fm.key}) : _activeIndicators;
   var findings = [];
 
+  // CONTEXTUELE VERGELIJKING TABEL (alleen bij klik)
+  if(isClick){
+    // Bouw multi-level vergelijkingstabel
+    var ctxHtml = buildContextTable(p, type, name);
+    if(ctxHtml) html += ctxHtml;
+  }
+
   // Groepeer indicatoren per categorie
-  // Gebruik centrale INDICATOR_CATEGORIES voor tooltip categorisering
   if(isClick){
     // UITGEBREID: alle indicatoren per categorie
     INDICATOR_CATEGORIES.forEach(function(cat){
@@ -5474,6 +5668,8 @@ function buildIndicatorList(){
         html += '<span class="ind-name">'+displayName+'</span>';
         html += '<span class="ind-unit">'+fm.eenheid+'</span>';
         html += '<span class="ind-badge">KAART</span>';
+        // Info knop met databron
+        html += '<span class="mi mi-sm" style="font-size:12px;color:var(--mt);opacity:.4;cursor:help;flex-shrink:0" onclick="event.stopPropagation();showIndInfo(\''+fm.key+'\')" title="Toon details over deze indicator">\u24D8</span>';
         html += '</div>';
       });
     }
@@ -5492,6 +5688,85 @@ function buildIndicatorList(){
 
   // Update domein-toggles
   if(typeof updateDomainToggles === 'function') updateDomainToggles();
+}
+
+// Toon indicator info popup
+function showIndInfo(key){
+  var ind = getIndicator(key);
+  var cat = INDICATOR_CATEGORIES.filter(function(c){ return c.id === ind.cat; })[0];
+  var sm = STAT_META[key];
+  var ns = _nationalStats[key];
+
+  var html = '<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)" onclick="if(event.target===this)this.remove()" id="indInfoPopup">';
+  html += '<div style="background:var(--bg);border:1px solid var(--glass-bd);border-radius:14px;padding:20px;max-width:380px;width:90%;color:var(--tx);font-family:\'DM Sans\',sans-serif;box-shadow:0 16px 64px rgba(0,0,0,.5)">';
+
+  // Header
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+  html += '<div style="display:flex;align-items:center;gap:6px"><span class="mi" style="font-size:18px;color:'+(cat?cat.color:'var(--ac)')+'">'+ind.icon+'</span>';
+  html += '<span style="font:700 14px \'DM Sans\',sans-serif">'+ind.naam+'</span></div>';
+  html += '<button onclick="document.getElementById(\'indInfoPopup\').remove()" style="background:none;border:none;color:var(--mt);cursor:pointer;font-size:18px">\u00D7</button>';
+  html += '</div>';
+
+  // Eenheid
+  html += '<div style="margin-bottom:10px;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:8px;font:400 11px \'Space Mono\',monospace;color:var(--mt)">';
+  html += 'Eenheid: <span style="color:var(--tx)">'+ind.eenheid+'</span>';
+  html += '</div>';
+
+  // Databron
+  if(cat){
+    html += '<div style="margin-bottom:10px;padding:8px 10px;background:rgba(57,255,20,.03);border-radius:8px;border-left:3px solid '+cat.color+'">';
+    html += '<div style="font:600 10px \'DM Sans\',sans-serif;color:'+cat.color+';margin-bottom:3px;display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:12px">source</span>Databron</div>';
+    html += '<div style="font:400 11px \'DM Sans\',sans-serif;color:var(--tx)">'+cat.bron+'</div>';
+    html += '<div style="font:400 9px \'DM Sans\',sans-serif;color:var(--mt);margin-top:2px">Domein: '+cat.naam+'</div>';
+    html += '</div>';
+  }
+
+  // Statistische metadata
+  if(sm){
+    html += '<div style="margin-bottom:10px;padding:8px 10px;background:rgba(56,189,248,.03);border-radius:8px;border-left:3px solid var(--ai)">';
+    html += '<div style="font:600 10px \'DM Sans\',sans-serif;color:var(--ai);margin-bottom:3px;display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:12px">analytics</span>Analyse</div>';
+    html += '<div style="font:400 11px \'DM Sans\',sans-serif;color:var(--tx);line-height:1.6">';
+    html += '<div><span style="color:var(--mt)">Functie:</span> '+sm.f+'</div>';
+    html += '<div><span style="color:var(--mt)">Methode:</span> '+sm.m+'</div>';
+    html += '<div style="margin-top:4px;color:var(--mt);font-style:italic">'+sm.i+'</div>';
+    html += '</div></div>';
+  }
+
+  // Landelijke statistieken
+  if(ns){
+    html += '<div style="padding:8px 10px;background:rgba(255,255,255,.02);border-radius:8px">';
+    html += '<div style="font:600 10px \'DM Sans\',sans-serif;color:var(--ac);margin-bottom:4px;display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:12px">flag</span>Nederland ('+ns.count+' gebieden)</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font:400 10px \'Space Mono\',monospace">';
+    html += '<span style="color:var(--mt)">Gemiddeld: <span style="color:var(--ac)">'+formatTooltipVal(ns.avg, ind.eenheid, key)+'</span></span>';
+    html += '<span style="color:var(--mt)">Mediaan: <span style="color:var(--tx)">'+formatTooltipVal(ns.median, ind.eenheid, key)+'</span></span>';
+    html += '<span style="color:var(--mt)">Minimum: <span style="color:var(--tx)">'+formatTooltipVal(ns.min, ind.eenheid, key)+'</span></span>';
+    html += '<span style="color:var(--mt)">Maximum: <span style="color:var(--tx)">'+formatTooltipVal(ns.max, ind.eenheid, key)+'</span></span>';
+    html += '<span style="color:var(--mt)">Std.dev: <span style="color:var(--tx)">'+formatTooltipVal(ns.stddev, ind.eenheid, key)+'</span></span>';
+    html += '<span style="color:var(--mt)">Verdeling: <span style="color:var(--ai)">'+ns.distType+'</span></span>';
+    html += '</div></div>';
+  }
+
+  // Datakwaliteit badge
+  html += '<div style="margin-top:10px;display:flex;gap:6px;align-items:center">';
+  if(ns && ns.count > 100){
+    html += '<span style="font:600 9px \'DM Sans\',sans-serif;padding:2px 8px;border-radius:6px;background:rgba(74,222,128,.1);color:#4ade80">Betrouwbaar</span>';
+  } else if(ns && ns.count > 20){
+    html += '<span style="font:600 9px \'DM Sans\',sans-serif;padding:2px 8px;border-radius:6px;background:rgba(251,191,36,.1);color:#fbbf24">Beperkt</span>';
+  } else {
+    html += '<span style="font:600 9px \'DM Sans\',sans-serif;padding:2px 8px;border-radius:6px;background:rgba(239,68,68,.1);color:#ef4444">Weinig data</span>';
+  }
+  html += '<span style="font:400 9px \'DM Sans\',sans-serif;color:var(--mt)">Peiljaar: '+_activeYear+'</span>';
+  html += '</div>';
+
+  html += '</div></div>';
+
+  // Verwijder bestaande popup
+  var ex = document.getElementById('indInfoPopup');
+  if(ex) ex.remove();
+
+  var div = document.createElement('div');
+  div.innerHTML = html;
+  document.body.appendChild(div.firstChild);
 }
 
 function filterIndicators(val){
@@ -5641,71 +5916,113 @@ function showNLOverview(){
   var data = getActiveData();
   var nGebieden = data ? data.features.length : 0;
   var niveau = _buurtData ? 'buurten' : (_wijkData ? 'wijken' : 'gemeenten');
+  var _nlMeta = (_gemeenteData||{}).metadata || {};
 
   // Header
   document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">flag</span> Nederland';
 
   var html = '';
 
-  // Meta info
-  html += '<div style="font:400 10px \'Space Mono\',monospace;color:var(--mt);margin-bottom:10px">';
-  html += 'CBS peiljaar '+(_activeYear||2022)+' &middot; '+nGebieden+' '+niveau+' &middot; '+_activeIndicators.length+' actieve indicatoren';
+  // Dashboard header
+  html += '<div style="padding:10px 12px;background:linear-gradient(135deg,rgba(57,255,20,.06),rgba(6,182,212,.04));border-radius:10px;margin-bottom:10px;border:1px solid rgba(57,255,20,.1)">';
+  html += '<div style="font:700 13px \'DM Sans\',sans-serif;color:var(--tx);margin-bottom:4px;display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px;color:var(--ac)">flag</span>Nederland in Cijfers</div>';
+  html += '<div style="font:400 10px \'Space Mono\',monospace;color:var(--mt)">CBS peiljaar '+(_activeYear||2024)+' \u00B7 '+nGebieden+' '+niveau+'</div>';
+
+  // Kern KPI's
+  var kpiKeys = ['aantal_inwoners', 'huishoudens', 'gem_woz_waarde', 'gem_inkomen_inwoner', 'woningvoorraad', 'arbeidsparticipatie'];
+  var kpiHtml = '';
+  var kpiCount = 0;
+  kpiKeys.forEach(function(key){
+    var ns = _nationalStats[key];
+    if(!ns) return;
+    var fm = getIndicator(key);
+    var totalVal = ns.avg * ns.count;
+    // Voor sommige indicatoren tonen we het totaal, voor anderen het gemiddelde
+    var showTotal = ['aantal_inwoners','huishoudens','woningvoorraad'].indexOf(key) >= 0;
+    var displayVal = showTotal ? formatTooltipVal(totalVal, fm.eenheid === 'x1000' ? 'x1000' : fm.eenheid, key) : formatTooltipVal(ns.avg, fm.eenheid, key);
+    var displayLabel = showTotal ? 'Totaal' : 'Gemiddeld';
+    kpiHtml += '<div style="flex:1;min-width:80px;text-align:center;padding:6px 4px;background:rgba(15,20,35,.4);border-radius:8px">';
+    kpiHtml += '<div style="font:700 14px \'Space Mono\',monospace;color:var(--ac)">'+displayVal+'</div>';
+    kpiHtml += '<div style="font:400 9px \'DM Sans\',sans-serif;color:var(--mt);margin-top:2px;display:flex;align-items:center;justify-content:center;gap:2px"><span class="mi" style="font-size:11px">'+fm.icon+'</span>'+fm.naam.replace('Gem. ','')+'</div>';
+    kpiHtml += '</div>';
+    kpiCount++;
+  });
+  if(kpiCount > 0){
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'+kpiHtml+'</div>';
+  }
   html += '</div>';
 
-  // Actieve indicatoren — uitgebreid met distributie
+  // Actieve indicatoren met distributie details
   _activeIndicators.forEach(function(key){
     var ns = _nationalStats[key];
     if(!ns) return;
     var fm = getIndicator(key);
-    html += '<div style="margin-bottom:12px;padding:10px 12px;background:rgba(15,20,35,.5);border-radius:10px;border-left:3px solid var(--ai)">';
+    var cat = INDICATOR_CATEGORIES.filter(function(c){ return c.id === fm.cat; })[0];
+    var catColor = cat ? cat.color : 'var(--ai)';
+    html += '<div style="margin-bottom:10px;padding:10px 12px;background:rgba(15,20,35,.5);border-radius:10px;border-left:3px solid '+catColor+'">';
     // Naam + gemiddelde
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
-    html += '<span style="font:600 13px \'DM Sans\',sans-serif;color:var(--tx);display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:16px;color:var(--ai)">'+fm.icon+'</span>'+fm.naam+'</span>';
-    html += '<span style="font:700 15px \'Space Mono\',monospace;color:var(--ac)">'+formatVal(ns.avg)+' <span style="font-size:10px;font-weight:400;color:var(--mt)">'+fm.eenheid+'</span></span>';
+    html += '<span style="font:600 12px \'DM Sans\',sans-serif;color:var(--tx);display:flex;align-items:center;gap:5px"><span class="mi" style="font-size:15px;color:'+catColor+'">'+fm.icon+'</span>'+fm.naam+'</span>';
+    html += '<span style="font:700 14px \'Space Mono\',monospace;color:var(--ac)">'+formatTooltipVal(ns.avg, fm.eenheid, key)+'</span>';
     html += '</div>';
     // Stats rij
-    html += '<div style="display:flex;gap:12px;font:400 10px \'Space Mono\',monospace;color:var(--mt);margin-bottom:4px;flex-wrap:wrap">';
-    html += '<span>mediaan: <span style="color:var(--tx)">'+formatVal(ns.median)+'</span></span>';
-    html += '<span>min: <span style="color:var(--tx)">'+formatVal(ns.min)+'</span></span>';
-    html += '<span>max: <span style="color:var(--tx)">'+formatVal(ns.max)+'</span></span>';
-    html += '<span>stddev: <span style="color:var(--tx)">'+formatVal(ns.stddev)+'</span></span>';
+    html += '<div style="display:flex;gap:10px;font:400 9px \'Space Mono\',monospace;color:var(--mt);margin-bottom:4px;flex-wrap:wrap">';
+    html += '<span>mediaan: <span style="color:var(--tx)">'+formatTooltipVal(ns.median, fm.eenheid, key)+'</span></span>';
+    html += '<span>min: <span style="color:var(--tx)">'+formatTooltipVal(ns.min, fm.eenheid, key)+'</span></span>';
+    html += '<span>max: <span style="color:var(--tx)">'+formatTooltipVal(ns.max, fm.eenheid, key)+'</span></span>';
     html += '</div>';
+    // Databron
+    if(cat){
+      html += '<div style="font:400 8px \'DM Sans\',sans-serif;color:var(--mt);margin-top:3px;display:flex;align-items:center;gap:3px">';
+      html += '<span class="mi" style="font-size:10px;color:'+catColor+'">source</span> Bron: '+cat.bron;
+      html += '</div>';
+    }
     // Distributie
-    html += '<div style="font-size:10px;color:var(--mt);margin-bottom:2px">Verdeling: <span style="color:var(--ai)">'+ns.distType+'</span> &middot; '+ns.count+' '+niveau+' met data</div>';
+    html += '<div style="font-size:9px;color:var(--mt);margin-top:3px">Verdeling: <span style="color:'+catColor+'">'+ns.distType+'</span> \u00B7 '+ns.count+' '+niveau+' met data</div>';
     html += buildDistSvg(0, ns.distType);
     // Bar met p10-p90 range
     var range = ns.max - ns.min;
     var p10pos = range > 0 ? ((ns.p10 - ns.min) / range * 100) : 10;
     var p90pos = range > 0 ? ((ns.p90 - ns.min) / range * 100) : 90;
     html += '<div class="info-bar" style="height:6px;margin:4px 0 0;border-radius:3px;position:relative">';
-    html += '<div style="position:absolute;left:'+p10pos+'%;width:'+(p90pos-p10pos)+'%;height:100%;background:var(--ai);opacity:.4;border-radius:3px"></div>';
+    html += '<div style="position:absolute;left:'+p10pos+'%;width:'+(p90pos-p10pos)+'%;height:100%;background:'+catColor+';opacity:.4;border-radius:3px"></div>';
     html += '</div>';
     html += '<div style="display:flex;justify-content:space-between;margin-top:2px">';
-    html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.6">'+formatVal(ns.min)+'</span>';
-    html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--ai)">p10-p90: '+formatVal(ns.p10)+' - '+formatVal(ns.p90)+'</span>';
-    html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.6">'+formatVal(ns.max)+'</span>';
+    html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.6">'+formatTooltipVal(ns.min, fm.eenheid, key)+'</span>';
+    html += '<span style="font:400 8px \'Space Mono\',monospace;color:'+catColor+'">p10-p90: '+formatTooltipVal(ns.p10, fm.eenheid, key)+' \u2013 '+formatTooltipVal(ns.p90, fm.eenheid, key)+'</span>';
+    html += '<span style="font:400 8px \'Space Mono\',monospace;color:var(--mt);opacity:.6">'+formatTooltipVal(ns.max, fm.eenheid, key)+'</span>';
     html += '</div>';
     html += '</div>';
   });
 
-  // Compact overzicht alle categorieën
-  html += '<div style="margin-top:12px;padding:10px 12px;background:rgba(15,20,35,.3);border-radius:10px">';
-  html += '<div style="font:600 11px \'DM Sans\',sans-serif;color:var(--ai);margin-bottom:8px;display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:14px">analytics</span>Alle domeinen</div>';
+  // Alle domeinen overzicht
+  html += '<div style="margin-top:10px;padding:10px 12px;background:rgba(15,20,35,.3);border-radius:10px">';
+  html += '<div style="font:600 11px \'DM Sans\',sans-serif;color:var(--ai);margin-bottom:8px;display:flex;align-items:center;gap:4px"><span class="mi" style="font-size:14px">analytics</span>Alle domeinen <span style="font-weight:400;color:var(--mt);font-size:9px">(klik om aan/uit te zetten)</span></div>';
   INDICATOR_CATEGORIES.forEach(function(cat){
     var catInds = INDICATORS.filter(function(ind){ return ind.cat === cat.id && _nationalStats[ind.key]; });
     if(!catInds.length) return;
-    html += '<div style="margin-bottom:6px">';
-    html += '<div style="font:500 10px \'DM Sans\',sans-serif;color:'+cat.color+';margin-bottom:3px;display:flex;align-items:center;gap:3px"><span class="mi" style="font-size:12px">'+cat.icon+'</span>'+cat.naam+'</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    html += '<div style="margin-bottom:8px">';
+    html += '<div style="font:500 10px \'DM Sans\',sans-serif;color:'+cat.color+';margin-bottom:4px;display:flex;align-items:center;gap:3px;flex-wrap:wrap">';
+    html += '<span class="mi" style="font-size:12px">'+cat.icon+'</span>'+cat.naam;
+    html += ' <span style="font:400 8px \'DM Sans\',sans-serif;color:var(--mt);margin-left:auto">'+cat.bron.split('(')[0].trim()+'</span>';
+    html += '</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:3px">';
     catInds.forEach(function(ind){
       var ns = _nationalStats[ind.key];
       var isActive = _activeIndicators.indexOf(ind.key) >= 0;
-      html += '<span onclick="toggleIndicator(\''+ind.key+'\')" style="cursor:pointer;font:400 9px \'Space Mono\',monospace;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,'+(isActive?'.12':'.04')+');color:'+(isActive?'var(--ac)':'var(--mt)')+';border:1px solid '+(isActive?'var(--ai)':'transparent')+'" title="'+ind.naam+': gem. '+formatVal(ns.avg)+' '+ind.eenheid+'">';
-      html += ind.naam.substring(0,18)+(ind.naam.length>18?'..':'')+' <span style="color:var(--tx)">'+formatVal(ns.avg)+'</span>';
+      html += '<span onclick="toggleIndicator(\''+ind.key+'\')" style="cursor:pointer;font:400 9px \'Space Mono\',monospace;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,'+(isActive?'.12':'.04')+');color:'+(isActive?'var(--ac)':'var(--mt)')+';border:1px solid '+(isActive?cat.color+'44':'transparent')+';transition:all .15s" title="'+ind.naam+': gem. '+formatTooltipVal(ns.avg, ind.eenheid, ind.key)+'">';
+      html += ind.naam.substring(0,20)+(ind.naam.length>20?'\u2026':'')+' <span style="color:var(--tx)">'+formatTooltipVal(ns.avg, ind.eenheid, ind.key)+'</span>';
       html += '</span>';
     });
     html += '</div></div>';
   });
+  html += '</div>';
+
+  // Data kwaliteit footer
+  html += '<div style="margin-top:10px;padding:8px 10px;background:rgba(255,255,255,.02);border-radius:8px;font:400 9px \'DM Sans\',sans-serif;color:var(--mt);line-height:1.6">';
+  html += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;font-weight:600;color:var(--tx)"><span class="mi" style="font-size:12px;color:var(--wn)">info</span> Databronnen</div>';
+  html += 'CBS Kerncijfers Wijken en Buurten \u00B7 Kadaster BAG \u00B7 GBIF Flora/Fauna \u00B7 Vektis Zorgkosten \u00B7 Politie Criminaliteit';
+  if(_nlMeta.enriched_at) html += '<br>Laatst verrijkt: <span style="color:var(--ac)">'+_nlMeta.enriched_at.substring(0,10)+'</span>';
   html += '</div>';
 
   document.getElementById('infoContent').innerHTML = html;
@@ -9029,6 +9346,234 @@ function countBagForArea(areaFeature, areaType){
     if(_bagBuurtIndex[bCode]) result.count = _bagBuurtIndex[bCode].count || 0;
   }
   return result;
+}
+
+// ============================================================
+// INLINE VERGELIJKING in info panel
+// ============================================================
+function showInlineComparison(){
+  if(!_nationalStats || !Object.keys(_nationalStats).length) computeNationalStats();
+
+  // Bepaal vergelijkingsitems
+  var items = [];
+  var nameField = 'gemeentenaam';
+  var compareType = 'gemeenten';
+
+  if(_selectedBuurten.length >= 2 && _buurtData){
+    compareType = 'buurten'; nameField = 'buurtnaam';
+    _buurtData.features.forEach(function(f){
+      if(_selectedBuurten.indexOf(f.properties.buurtnaam) >= 0) items.push(f);
+    });
+  } else if(_selectedWijken.length >= 2 && _wijkData){
+    compareType = 'wijken'; nameField = 'wijknaam';
+    _wijkData.features.forEach(function(f){
+      if(_selectedWijken.indexOf(f.properties.wijknaam) >= 0) items.push(f);
+    });
+  } else if(_selectedGemeenten.length >= 2 && _gemeenteData){
+    _gemeenteData.features.forEach(function(f){
+      if(_selectedGemeenten.indexOf(f.properties.gemeentenaam) >= 0) items.push(f);
+    });
+  }
+
+  if(items.length < 2){ toast('Selecteer minimaal 2 gebieden om te vergelijken'); return; }
+
+  _infoPinned = true;
+  _nlOverviewVisible = false;
+
+  var itemColors = ['#39ff14','#38bdf8','#fbbf24','#f472b6','#a78bfa','#06b6d4','#ef4444','#84cc16'];
+  document.getElementById('infoBuurtNaam').innerHTML = '<span class="mi mi-sm">compare_arrows</span> Vergelijking ('+items.length+' '+compareType+')';
+
+  var html = '';
+
+  // Item labels
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">';
+  items.forEach(function(item, idx){
+    var col = itemColors[idx % itemColors.length];
+    var n = item.properties[nameField] || '-';
+    html += '<span style="font:600 10px \'DM Sans\',sans-serif;padding:3px 8px;border-radius:6px;background:'+col+'18;color:'+col+';border:1px solid '+col+'33">';
+    html += '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+col+';margin-right:4px;vertical-align:-1px"></span>'+n+'</span>';
+  });
+  html += '</div>';
+
+  // Vergelijkingstabel per actieve indicator
+  var keysToCompare = _activeIndicators.length > 0 ? _activeIndicators : ['aantal_inwoners','gem_woz_waarde','gem_inkomen_inwoner'];
+
+  html += '<table style="width:100%;border-collapse:collapse;font-size:10px">';
+  html += '<thead><tr style="border-bottom:2px solid rgba(255,255,255,.1)">';
+  html += '<th style="text-align:left;padding:4px 6px;font:600 9px \'DM Sans\',sans-serif;color:var(--mt)">Indicator</th>';
+  items.forEach(function(item, idx){
+    var col = itemColors[idx % itemColors.length];
+    var n = (item.properties[nameField] || '-');
+    if(n.length > 12) n = n.substring(0,12)+'\u2026';
+    html += '<th style="text-align:right;padding:4px 4px;font:600 9px \'Space Mono\',monospace;color:'+col+'">'+n+'</th>';
+  });
+  html += '<th style="text-align:right;padding:4px 4px;font:600 9px \'Space Mono\',monospace;color:var(--mt)">NL</th>';
+  html += '</tr></thead><tbody>';
+
+  keysToCompare.forEach(function(key){
+    var ind = getIndicator(key);
+    var ns = _nationalStats[key];
+    var isReverse = REVERSE_KEYS.indexOf(key) >= 0;
+
+    // Verzamel waarden
+    var vals = items.map(function(item){ return item.properties[key]; }).filter(function(v){ return v !== undefined && v !== null; });
+    if(vals.length === 0) return;
+
+    var maxV = Math.max.apply(null, vals);
+    var minV = Math.min.apply(null, vals);
+
+    html += '<tr style="border-bottom:1px solid rgba(255,255,255,.04)">';
+    html += '<td style="padding:4px 6px;font:500 9px \'DM Sans\',sans-serif;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px" title="'+ind.naam+'"><span class="mi" style="font-size:10px;color:var(--mt);margin-right:2px">'+ind.icon+'</span>'+ind.naam+'</td>';
+
+    items.forEach(function(item, idx){
+      var v = item.properties[key];
+      if(v === undefined || v === null){
+        html += '<td style="text-align:right;padding:4px 4px;color:var(--mt)">-</td>';
+        return;
+      }
+      // Bepaal of dit de beste of slechtste is
+      var isBest = isReverse ? (v === minV) : (v === maxV);
+      var isWorst = isReverse ? (v === maxV) : (v === minV);
+      var bgColor = 'transparent';
+      var textColor = 'var(--tx)';
+      if(items.length >= 2 && maxV !== minV){
+        if(isBest){ bgColor = 'rgba(74,222,128,.1)'; textColor = '#4ade80'; }
+        else if(isWorst){ bgColor = 'rgba(239,68,68,.1)'; textColor = '#ef4444'; }
+      }
+      html += '<td style="text-align:right;padding:4px 4px;font:600 10px \'Space Mono\',monospace;color:'+textColor+';background:'+bgColor+'">'+formatTooltipVal(v, ind.eenheid, key)+'</td>';
+    });
+
+    // NL gemiddelde
+    if(ns){
+      html += '<td style="text-align:right;padding:4px 4px;font:400 9px \'Space Mono\',monospace;color:var(--mt)">'+formatTooltipVal(ns.avg, ind.eenheid, key)+'</td>';
+    } else {
+      html += '<td style="text-align:right;padding:4px 4px;color:var(--mt)">-</td>';
+    }
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+
+  // Legenda
+  html += '<div style="margin-top:10px;font:400 9px \'DM Sans\',sans-serif;color:var(--mt);display:flex;gap:12px;align-items:center">';
+  html += '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(74,222,128,.2)"></span><span style="color:#4ade80">Beste</span></span>';
+  html += '<span style="display:flex;align-items:center;gap:3px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(239,68,68,.2)"></span><span style="color:#ef4444">Laagste</span></span>';
+  html += '<span style="margin-left:auto;cursor:pointer;color:var(--ai);text-decoration:underline" onclick="showCompareDialog()">Uitgebreid rapport \u2192</span>';
+  html += '</div>';
+
+  document.getElementById('infoContent').innerHTML = html;
+  document.getElementById('infoPanel').classList.add('show');
+}
+
+// ============================================================
+// VERGELIJK TAB — Sidebar vergelijkingsweergave
+// ============================================================
+function renderVergelijkTab(){
+  var el = document.getElementById('vergelijkContent');
+  if(!el) return;
+
+  // Bepaal geselecteerde gebieden
+  var items = [];
+  var nameField = 'gemeentenaam';
+  var compareType = 'gemeenten';
+
+  if(_selectedBuurten.length >= 2 && _buurtData){
+    compareType = 'buurten'; nameField = 'buurtnaam';
+    _buurtData.features.forEach(function(f){
+      if(_selectedBuurten.indexOf(f.properties.buurtnaam) >= 0) items.push(f);
+    });
+  } else if(_selectedWijken.length >= 2 && _wijkData){
+    compareType = 'wijken'; nameField = 'wijknaam';
+    _wijkData.features.forEach(function(f){
+      if(_selectedWijken.indexOf(f.properties.wijknaam) >= 0) items.push(f);
+    });
+  } else if(_selectedGemeenten.length >= 2 && _gemeenteData){
+    _gemeenteData.features.forEach(function(f){
+      if(_selectedGemeenten.indexOf(f.properties.gemeentenaam) >= 0) items.push(f);
+    });
+  }
+
+  if(items.length < 2){
+    el.innerHTML = '<div style="text-align:center;padding:20px 10px;color:var(--mt)">' +
+      '<span class="mi" style="font-size:40px;display:block;margin-bottom:8px;opacity:.3">compare_arrows</span>' +
+      '<div style="font:600 12px \'DM Sans\',sans-serif;color:var(--tx);margin-bottom:6px">Selecteer minimaal 2 gebieden</div>' +
+      '<div style="font:400 10px \'DM Sans\',sans-serif;line-height:1.6">Gebruik de filters of klik op gebieden in de kaart.</div></div>';
+    return;
+  }
+
+  if(!_nationalStats || !Object.keys(_nationalStats).length) computeNationalStats();
+
+  var itemColors = ['#39ff14','#38bdf8','#fbbf24','#f472b6','#a78bfa','#06b6d4','#ef4444','#84cc16'];
+
+  var html = '';
+  // Header met gebied-labels
+  html += '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">';
+  items.forEach(function(item, idx){
+    var col = itemColors[idx % itemColors.length];
+    html += '<span style="font:600 9px \'DM Sans\',sans-serif;padding:2px 6px;border-radius:4px;background:'+col+'18;color:'+col+'">'+
+      '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:'+col+';margin-right:3px"></span>'+
+      (item.properties[nameField]||'-')+'</span>';
+  });
+  html += '</div>';
+
+  // Per-categorie vergelijking
+  INDICATOR_CATEGORIES.forEach(function(cat){
+    var catInds = INDICATORS.filter(function(fm){ return fm.cat === cat.id; });
+    var hasData = false;
+    catInds.forEach(function(fm){
+      for(var i=0; i<items.length; i++){
+        if(items[i].properties[fm.key] !== undefined && items[i].properties[fm.key] !== null){ hasData = true; return; }
+      }
+    });
+    if(!hasData) return;
+
+    html += '<div style="margin-bottom:8px">';
+    html += '<div style="font:600 9px \'DM Sans\',sans-serif;color:'+cat.color+';margin-bottom:4px;display:flex;align-items:center;gap:3px">';
+    html += '<span class="mi" style="font-size:11px">'+cat.icon+'</span>'+cat.naam+'</div>';
+
+    html += '<table style="width:100%;border-collapse:collapse;font-size:9px">';
+    catInds.forEach(function(fm){
+      var vals = items.map(function(item){ return item.properties[fm.key]; });
+      var hasVal = vals.some(function(v){ return v !== undefined && v !== null; });
+      if(!hasVal) return;
+
+      var numVals = vals.filter(function(v){ return typeof v === 'number'; });
+      var maxV = numVals.length ? Math.max.apply(null, numVals) : 0;
+      var minV = numVals.length ? Math.min.apply(null, numVals) : 0;
+      var isReverse = REVERSE_KEYS.indexOf(fm.key) >= 0;
+      var ns = _nationalStats[fm.key];
+
+      html += '<tr style="border-bottom:1px solid rgba(255,255,255,.03)">';
+      html += '<td style="padding:2px 4px;color:var(--mt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70px" title="'+fm.naam+'">'+fm.naam+'</td>';
+      items.forEach(function(item, idx){
+        var v = item.properties[fm.key];
+        if(v === undefined || v === null){
+          html += '<td style="text-align:right;padding:2px 3px;color:var(--mt)">-</td>'; return;
+        }
+        var isBest = isReverse ? (v === minV) : (v === maxV);
+        var isWorst = isReverse ? (v === maxV) : (v === minV);
+        var c = 'var(--tx)';
+        if(numVals.length >= 2 && maxV !== minV){
+          if(isBest) c = '#4ade80';
+          else if(isWorst) c = '#ef4444';
+        }
+        html += '<td style="text-align:right;padding:2px 3px;font:600 9px \'Space Mono\',monospace;color:'+c+'">'+formatTooltipVal(v, fm.eenheid, fm.key)+'</td>';
+      });
+      // NL
+      if(ns){
+        html += '<td style="text-align:right;padding:2px 3px;font:400 8px \'Space Mono\',monospace;color:var(--mt)">'+formatTooltipVal(ns.avg, fm.eenheid, fm.key)+'</td>';
+      }
+      html += '</tr>';
+    });
+    html += '</table></div>';
+  });
+
+  // Uitgebreid rapport knop
+  html += '<div style="margin-top:10px;text-align:center">';
+  html += '<button class="btn btn-p" onclick="showCompareDialog()" style="font-size:11px"><span class="mi mi-sm">open_in_new</span> Uitgebreid rapport in nieuw venster</button>';
+  html += '</div>';
+
+  el.innerHTML = html;
 }
 
 // ===== VERGELIJK DIALOOG =====

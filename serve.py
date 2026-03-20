@@ -20,7 +20,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-PORT = int(sys.argv[sys.argv.index('--port') + 1]) if '--port' in sys.argv else 8080
+PORT = int(sys.argv[sys.argv.index('--port') + 1]) if '--port' in sys.argv else 8091
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 os.chdir(APP_DIR)
 
