@@ -3,6 +3,7 @@
 ## Project
 Standalone kaartapplicatie voor CBS buurtdata en BAG adressen met Leaflet.
 Locatie: `E:\scripts\webscraper\CBSbuurt\geoinzicht-app\`
+GitHub: AnneVersion/geoinzicht-app
 
 ## Starten
 ```bash
@@ -25,17 +26,22 @@ Werk op `develop`. Alleen mergen naar `main` als het stabiel is.
 - `build_geojson.py` - Bouwt GeoJSON vanuit PDOK WFS CBS data
 - Werkt ALLEEN met API calls en lokale GeoJSON - nooit direct met databases
 
+## CBS Data
+- **CBS 2024**: 89 indicatoren (dataset 85618NED), verrijkt via `enrich_cbs_2024.py`
+- **CBS 2025**: 83 indicatoren (dataset 86165NED), verrijkt via `enrich_cbs_2025.py`
+  - Nieuwe indicatoren 2025: aardgasvrije woningen, zonnestroom, armoede, laadpalen
+- **Auto-detectie**: Start automatisch met het nieuwste beschikbare CBS jaar
+
 ## Features (maart 2026)
-- **Auto-detectie nieuwste jaar**: Start automatisch met het nieuwste beschikbare CBS jaar
 - **21 domeinen**: Bevolking, Inkomen, Wonen, Energie, Economie, Zorgkosten, Criminaliteit, Flora/Fauna, etc.
 - **100+ indicatoren**: Automatisch gefilterd op beschikbaarheid per jaar
 - **Contextuele vergelijking**: Bij klik op gebied: tabel met buurt vs wijk vs gemeente vs NL
-- **Vergelijken tab**: Side-by-side vergelijking van 2+ geselecteerde gebieden
-- **Inline vergelijking**: Groen/rood kleurcodering voor beste/slechtste waarden
+- **Vergelijken tab**: Side-by-side vergelijking van 2+ geselecteerde gebieden (window.open fix)
 - **Uitgebreid rapport**: Vergelijkingsrapport in nieuw venster met alle indicatoren
-- **Tooltips**: Professionele tooltips met geformatteerde waarden en percentiel-positie
+- **Tooltips**: Professionele tooltips met geformateerde waarden en percentiel-positie
 - **NL Dashboard**: Landelijk overzicht met KPI's en distributies per indicator
 - **Indicator info**: Per-indicator popup met databron, analysemethode en landelijke statistieken
+- **Legenda**: Viridis kleurenpalet (colorblind-friendly)
 - **BAG adressen**: Vector tiles, WMS, lokale GeoJSON met filters
 - **Zoeken**: PDOK Locatieserver integratie
 - **Upload**: Eigen CSV/Excel data op de kaart
@@ -52,15 +58,6 @@ Werk op `develop`. Alleen mergen naar `main` als het stabiel is.
 | Vektis Zorgkosten | Open Data | Jaarlijks |
 | Politie Criminaliteit | data.politie.nl | Jaarlijks |
 | PDOK Locatieserver | REST API | Continu |
-
-## Waar gebleven (maart 2026)
-- Complete overhaul: auto-detectie nieuwste jaar, contextuele vergelijking, vergelijk-tab
-- Verbeterde tooltips met geformatteerde waarden en percentiel-positie
-- NL Dashboard met KPI's
-- Indicator info popups met databronnen en datakwaliteit
-- Onverzekerden & Uitkeringen proxy-analyse
-- Analytics API uitgebreid met nieuwe endpoints
-- BAG bulk download verbeterd
 
 ## Let op
 - BAG GeoJSON bestanden staan in .gitignore (te groot) - lokaal genereren
