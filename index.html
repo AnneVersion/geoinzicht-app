@@ -971,7 +971,7 @@ var _cacheBust = '?v=' + Date.now();
 // BAG data: lokaal laden als app niet op localhost draait (GitHub Pages → localhost:8091)
 var BAG_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
   ? '' : 'http://localhost:8091/';
-var CBS_YEARS = [2012, 2017, 2018, 2019, 2022, 2023, 2024];
+var CBS_YEARS = [2012, 2017, 2018, 2019, 2022, 2023, 2024, 2025];
 var _activeYear = CBS_YEARS[CBS_YEARS.length - 1];  // Start met nieuwste jaar, auto-detectie bij init
 function gemUrl(y){ return 'gemeenten_'+(y||_activeYear)+'.geojson'+_cacheBust; }
 function buurtUrl(y){ return 'buurten_'+(y||_activeYear)+'.geojson'+_cacheBust; }
@@ -1063,6 +1063,8 @@ var INDICATORS = [
   {key:'pct_hh_hoog_inkomen',   naam:'Hoog inkomen huish.',     eenheid:'%',         icon:'trending_up',         cat:'inkomen'},
   {key:'pct_hh_laag_inkomen',   naam:'Laag inkomen huish.',     eenheid:'%',         icon:'trending_down',       cat:'inkomen'},
   {key:'pct_rond_sociaal_min',  naam:'Rond sociaal minimum',   eenheid:'%',         icon:'warning',             cat:'inkomen'},
+  {key:'personen_armoede',      naam:'Personen in armoede',     eenheid:'personen',  icon:'crisis_alert',        cat:'inkomen'},
+  {key:'pct_armoede',           naam:'Armoede',                 eenheid:'%',         icon:'priority_high',       cat:'inkomen'},
 
   // ── Wonen & Woningmarkt ──
   {key:'gem_woz_waarde',        naam:'Gem. WOZ-waarde',         eenheid:'x1000',     icon:'home',                cat:'wonen'},
@@ -1079,6 +1081,10 @@ var INDICATORS = [
   // ── Energie ──
   {key:'gem_aardgas',           naam:'Gem. aardgas',            eenheid:'m\u00b3',   icon:'local_fire_department',cat:'energie'},
   {key:'gem_elektriciteit',     naam:'Gem. elektriciteit',      eenheid:'kWh',       icon:'bolt',                cat:'energie'},
+  {key:'aardgasvrije_woningen', naam:'Aardgasvrije woningen',   eenheid:'aantal',    icon:'gas_meter',           cat:'energie'},
+  {key:'pct_aardgasvrij',       naam:'Aardgasvrij',             eenheid:'%',         icon:'eco',                 cat:'energie'},
+  {key:'woningen_zonnestroom',  naam:'Woningen met zonnestroom',eenheid:'aantal',    icon:'solar_power',         cat:'energie'},
+  {key:'pct_zonnestroom',       naam:'Zonnestroom',             eenheid:'%',         icon:'wb_sunny',            cat:'energie'},
 
   // ── Economie & Arbeid ──
   {key:'arbeidsparticipatie',   naam:'Arbeidsparticipatie',     eenheid:'%',         icon:'work',                cat:'economie'},
@@ -1114,6 +1120,7 @@ var INDICATORS = [
   {key:'auto_per_huishouden',   naam:"Auto's per huishouden",   eenheid:'aantal',    icon:'garage',              cat:'mobiliteit'},
   {key:'auto_per_km2',          naam:"Auto's per km\u00b2",     eenheid:'aantal',    icon:'traffic',             cat:'mobiliteit'},
   {key:'motorfietsen',          naam:'Motorfietsen',            eenheid:'aantal',    icon:'two_wheeler',         cat:'mobiliteit'},
+  {key:'laadpalen',             naam:'Publieke laadpalen',      eenheid:'aantal',    icon:'ev_station',          cat:'mobiliteit'},
   {key:'afstand_oprit',         naam:'Afstand oprit snelweg',   eenheid:'km',        icon:'edit_road',           cat:'mobiliteit'},
 
   // ── Oppervlakte ──
@@ -5403,6 +5410,18 @@ function showFeatureInfo(p, cfg, type, isClick, geoFeature){
     html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
     html += '<span style="font-size:11px;color:var(--mt)"><span class="mi mi-sm" style="font-size:13px;color:var(--ai);vertical-align:-2px">tag</span> Code</span>';
     html += '<span style="font:700 11px Space Mono,monospace;color:var(--ai)">'+(p[cfg.codeField]||'-')+'</span></div>';
+    // CBS Cijfers op de Kaart link
+    var _cbsCode = (p[cfg.codeField]||'').trim();
+    if(_cbsCode){
+      var _cbsType = _cbsCode.startsWith('GM') ? 'gemeente' : (_cbsCode.startsWith('WK') ? 'wijk' : 'buurt');
+      html += '<div style="padding:4px 0 2px">';
+      html += '<a href="https://www.cbs.nl/nl-nl/visualisaties/cijfers-op-de-kaart" target="_blank" rel="noopener" ';
+      html += 'style="display:inline-flex;align-items:center;gap:4px;font-size:10px;color:#60a5fa;text-decoration:none;padding:3px 8px;border:1px solid rgba(96,165,250,.3);border-radius:6px;transition:all .2s" ';
+      html += 'onmouseover="this.style.background=\'rgba(96,165,250,.1)\';this.style.borderColor=\'rgba(96,165,250,.6)\'" ';
+      html += 'onmouseout="this.style.background=\'transparent\';this.style.borderColor=\'rgba(96,165,250,.3)\'" ';
+      html += 'title="Bekijk '+name+' op CBS Cijfers op de Kaart">';
+      html += '<span class="mi" style="font-size:13px">open_in_new</span> CBS Cijfers op de Kaart</a></div>';
+    }
   }
   if(type !== 'gemeenten' && p.gemeentenaam){
     html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0">';
