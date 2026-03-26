@@ -425,6 +425,7 @@ select option{background:var(--bg);color:var(--tx)}
       <div class="tab" data-tab="vergelijk" onclick="switchTab('vergelijk');renderVergelijkTab()"><span class="mi mi-sm" style="vertical-align:-3px">compare_arrows</span> Vergelijk</div>
       <div class="tab" data-tab="upload" onclick="switchTab('upload')"><span class="mi mi-sm" style="vertical-align:-3px">upload_file</span> Upload</div>
       <div class="tab" data-tab="info" onclick="switchTab('info')"><span class="mi mi-sm" style="vertical-align:-3px">info</span> Info</div>
+      <div class="tab" data-tab="catalog" onclick="switchTab('catalog');initCatalogGraph()"><span class="mi mi-sm" style="vertical-align:-3px">hub</span> Catalogus</div>
       <div class="tab" data-tab="log" id="tabLog" style="display:none" onclick="switchTab('log');renderLogView()"><span class="mi mi-sm" style="vertical-align:-3px">admin_panel_settings</span> Log</div>
     </div>
 
@@ -436,6 +437,16 @@ select option{background:var(--bg);color:var(--tx)}
         <button class="btn btn-s" data-layer="buurten" onclick="toggleLayer('buurten')"><span class="mi mi-sm">grid_on</span> Buurten</button>
         <button class="btn btn-s" data-layer="wijken" onclick="toggleLayer('wijken')"><span class="mi mi-sm">grid_view</span> Wijken</button>
         <button class="btn btn-s" data-layer="bag" onclick="toggleLayer('bag')"><span class="mi mi-sm">location_on</span> BAG Adressen <span id="bagBtnCount" style="font:700 9px 'Space Mono',monospace;color:var(--ai)"></span></button>
+      </div>
+      <div id="bagPreloadStatus" style="display:none;margin:6px 0;padding:6px 10px;background:rgba(57,255,20,.06);border:1px solid rgba(57,255,20,.15);border-radius:6px;font-size:10px;color:var(--mt)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+          <span><span class="mi mi-sm" style="color:var(--ai);vertical-align:middle">downloading</span> BAG Preload</span>
+          <span id="bagPreloadPct" style="font-weight:700;color:var(--ai)">0%</span>
+        </div>
+        <div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
+          <div id="bagPreloadBar" style="height:100%;width:0%;background:var(--ai);border-radius:2px;transition:width .3s"></div>
+        </div>
+        <div id="bagPreloadDetail" style="margin-top:3px;font-size:9px;color:var(--dm)">Laden...</div>
       </div>
 
       <div class="sh" id="bagStatusSection" style="display:none"><span class="mi">filter_alt</span> BAG Status filter</div>
@@ -892,6 +903,13 @@ select option{background:var(--bg);color:var(--tx)}
     </div>
 
     <!-- LOG TAB -->
+    <div class="pane" id="p-catalog">
+      <div class="sh"><span class="mi">hub</span> Data Catalogus</div>
+      <p style="font-size:11px;color:var(--mt);margin-bottom:8px">179 objecten, 174 relaties. Klik op een node voor details. Zoom/pan met muis.</p>
+      <link rel="stylesheet" href="data-catalog-graph.css">
+      <div id="catalogGraphEmbed" style="height:calc(100vh - 200px);min-height:400px;border-radius:10px;overflow:hidden"></div>
+    </div>
+
     <div class="pane" id="p-log">
       <div class="sh"><span class="mi">history</span> Gebruikslog</div>
       <div class="card" style="margin-bottom:8px">
@@ -1507,8 +1525,12 @@ function switchYear(year){
     // Herlaad buurten en wijken op achtergrond (altijd, voor filters en stats)
     setTimeout(function(){ loadBackgroundCbsData(); }, 500);
 
-    // BAG aantallen per gemeente prefetchen (lichtgewicht hits queries)
-    setTimeout(function(){ loadBagIndex().then(function(){ prefetchBagCounts(); }); }, 2000);
+    // BAG aantallen per gemeente prefetchen en direct op achtergrond alle adressen preloaden
+    setTimeout(function(){ loadBagIndex().then(function(){
+      prefetchBagCounts();
+      // Direct achtergrond preload starten (zonder BAG laag te tonen)
+      setTimeout(function(){ bagSilentPreload(); }, 1000);
+    }); }, 2000);
 
     document.getElementById('dsJaar').textContent = year;
     toast('CBS '+year+' geladen \u2714 ('+availableIndicators.length+' indicatoren)');
@@ -4403,10 +4425,10 @@ function autoPreloadBagLocal(){
   var startTime = Date.now();
   var renderInterval = Math.max(5, Math.floor(available.length / 20)); // ~20 renders
 
-  // Batch laden: 3 tegelijk voor snelheid
+  // Batch laden: 6 tegelijk voor maximale snelheid
   var queue = available.slice();
   var running = 0;
-  var maxConcurrent = 3;
+  var maxConcurrent = 6;
 
   function processNext(){
     while(queue.length > 0 && running < maxConcurrent){
@@ -4493,6 +4515,103 @@ function autoPreloadBagLocal(){
   processNext();
 }
 var _bagPollTimer = null;
+
+// Stille achtergrond preload: laadt alle BAG data zonder de BAG laag te tonen
+function bagSilentPreload(){
+  if(!_bagIndex || !_gemeenteData) return;
+  var allAvailable = Object.keys(_bagIndex).filter(function(code){
+    var info = _bagIndex[code];
+    return info && info.count > 0 && info.size_mb > 0;
+  });
+  if(allAvailable.length === 0) return;
+
+  // Filter: skip gemeenten die al in IndexedDB cache zitten
+  var available = allAvailable.filter(function(code){
+    return !_bagCachedGems[code] || _bagCachedGems[code] === 0;
+  });
+  var alreadyCached = allAvailable.length - available.length;
+
+  // Totaal adressen berekenen
+  var totalExpectedAll = allAvailable.reduce(function(s,c){ return s + (_bagIndex[c].count||0); }, 0);
+
+  var statusEl = document.getElementById('bagPreloadStatus');
+  var pctEl = document.getElementById('bagPreloadPct');
+  var barEl = document.getElementById('bagPreloadBar');
+  var detailEl = document.getElementById('bagPreloadDetail');
+  var btnCount = document.getElementById('bagBtnCount');
+
+  // Als alles al gecacht is
+  if(available.length === 0 && alreadyCached > 0){
+    statusEl.style.display = 'block';
+    statusEl.style.borderColor = 'rgba(57,255,20,.3)';
+    pctEl.textContent = '100%';
+    barEl.style.width = '100%';
+    detailEl.textContent = _bagMemCount.toLocaleString('nl-NL')+' / '+totalExpectedAll.toLocaleString('nl-NL')+' adressen · '+alreadyCached+' gemeenten · klaar';
+    btnCount.textContent = '('+_bagMemCount.toLocaleString('nl-NL')+')';
+    setTimeout(function(){ statusEl.style.display = 'none'; }, 5000);
+    console.log('BAG silent preload: alles al in cache ('+_bagMemCount+' adressen)');
+    return;
+  }
+
+  // Sorteer: kleinste eerst
+  available.sort(function(a,b){ return (_bagIndex[a].size_mb||0) - (_bagIndex[b].size_mb||0); });
+
+  statusEl.style.display = 'block';
+  pctEl.textContent = '0%';
+  barEl.style.width = '0%';
+  detailEl.textContent = '0 / '+totalExpectedAll.toLocaleString('nl-NL')+' adressen · '+available.length+' gemeenten laden...';
+  btnCount.textContent = '(0)';
+
+  var totalLoaded = alreadyCached > 0 ? _bagMemCount : 0;
+  var completed = 0;
+  var startTime = Date.now();
+  var queue = available.slice();
+  var running = 0;
+  var maxConcurrent = 6;
+
+  function updateUI(){
+    var pct = Math.round((totalLoaded / totalExpectedAll) * 100);
+    pctEl.textContent = pct + '%';
+    barEl.style.width = pct + '%';
+    var elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+    detailEl.textContent = totalLoaded.toLocaleString('nl-NL')+' / '+totalExpectedAll.toLocaleString('nl-NL')+' adressen · '+completed+'/'+available.length+' gem. · '+elapsed+'s';
+    btnCount.textContent = '('+totalLoaded.toLocaleString('nl-NL')+')';
+  }
+
+  function processNext(){
+    while(queue.length > 0 && running < maxConcurrent){
+      (function(code){
+        running++;
+        loadBagForGemeente(code).then(function(n){
+          running--;
+          totalLoaded += n;
+          completed++;
+          updateUI();
+          processNext();
+        }).catch(function(e){
+          running--;
+          completed++;
+          updateUI();
+          processNext();
+        });
+      })(queue.shift());
+    }
+
+    if(queue.length === 0 && running === 0){
+      // Klaar
+      pctEl.textContent = '100%';
+      barEl.style.width = '100%';
+      var elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      detailEl.textContent = totalLoaded.toLocaleString('nl-NL')+' / '+totalExpectedAll.toLocaleString('nl-NL')+' adressen · alle gemeenten · '+elapsed+'s';
+      btnCount.textContent = '('+totalLoaded.toLocaleString('nl-NL')+')';
+      statusEl.style.borderColor = 'rgba(57,255,20,.3)';
+      console.log('BAG silent preload klaar: '+totalLoaded+' adressen in '+elapsed+'s');
+      // Na 8 seconden voortgang verbergen
+      setTimeout(function(){ statusEl.style.display = 'none'; }, 8000);
+    }
+  }
+  processNext();
+}
 
 function startBagBackgroundLoad(){
   if(_bagBgRunning){ toast('Achtergrond laden is al bezig'); return; }
@@ -11085,6 +11204,24 @@ function autoLoadBagForGemeente(gemeentecode, gemeentenaam){
 }
 
 init();
+
+// ── Data Catalogus Graph ──
+var _catalogInitialized = false;
+function initCatalogGraph() {
+  if (_catalogInitialized) return;
+  _catalogInitialized = true;
+  var s1 = document.createElement('script');
+  s1.src = 'https://d3js.org/d3.v7.min.js';
+  s1.onload = function() {
+    var s2 = document.createElement('script');
+    s2.src = 'data-catalog-graph.js';
+    s2.onload = function() {
+      new DataCatalogGraph('#catalogGraphEmbed', { dataUrl: 'catalog.json' });
+    };
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s1);
+}
 </script>
 </body>
 </html>
