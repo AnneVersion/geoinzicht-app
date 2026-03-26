@@ -4400,6 +4400,11 @@ var _bagLocalMode = false; // true = renderen vanuit lokale data (geen WMS/VT)
 
 function autoPreloadBagLocal(){
   if(!_bagIndex || !_gemeenteData) return;
+  // Op GitHub Pages: geen lokale bestanden, gebruik PDOK Vector Tiles
+  if(location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'){
+    console.log('BAG preload: overgeslagen (GitHub Pages - gebruik PDOK Vector Tiles)');
+    return;
+  }
   var allAvailable = Object.keys(_bagIndex).filter(function(code){
     var info = _bagIndex[code];
     return info && info.count > 0 && info.size_mb > 0;
