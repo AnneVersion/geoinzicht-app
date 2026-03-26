@@ -1373,7 +1373,30 @@ var STAT_META = {
  'bag_adressen_industrie':{f:'Snapshot',m:'n.v.t.',i:'BAG industriefunctie: momentopname.'},
  'bag_adressen_overig':{f:'Snapshot',m:'n.v.t.',i:'BAG overige functies: momentopname.'},
  'bag_gem_oppervlakte':{f:'Snapshot',m:'n.v.t.',i:'Gem. gebouwoppervlakte: BAG momentopname.'},
- 'bag_med_bouwjaar':{f:'Snapshot',m:'n.v.t.',i:'Mediaan bouwjaar: BAG momentopname.'}
+ 'bag_med_bouwjaar':{f:'Snapshot',m:'n.v.t.',i:'Mediaan bouwjaar: BAG momentopname.'},
+ // Gezondheid (RIVM Gezondheidsmonitor)
+ 'gz_ervaren_gezondheid':{f:'Stabiel',m:'Meetjaren',i:'% dat eigen gezondheid als goed of zeer goed beoordeelt. Bron: RIVM/GGD Gezondheidsmonitor.'},
+ 'gz_langdurige_aandoeningen':{f:'Licht stijgend',m:'Meetjaren',i:'% met een of meer langdurige aandoeningen of chronische ziekten.'},
+ 'gz_langdurig_beperkt':{f:'Stabiel',m:'Meetjaren',i:'% dat langdurig beperkt is in dagelijkse activiteiten door gezondheid.'},
+ 'gz_angst_depressie':{f:'Licht stijgend',m:'Meetjaren',i:'% met hoog risico op angststoornis of depressie (MHI-5 score).'},
+ 'gz_stress':{f:'Stijgend',m:'Meetjaren',i:'% dat afgelopen 4 weken (heel) veel stress heeft ervaren.'},
+ 'gz_eenzaam':{f:'Stijgend',m:'Meetjaren',i:'% dat zich eenzaam voelt (De Jong Gierveld schaal).'},
+ 'gz_sterk_eenzaam':{f:'Stijgend',m:'Meetjaren',i:'% dat zich sterk tot zeer sterk eenzaam voelt.'},
+ 'gz_emotioneel_eenzaam':{f:'Stijgend',m:'Meetjaren',i:'% dat emotionele eenzaamheid ervaart (gemis hechte band).'},
+ 'gz_sociaal_eenzaam':{f:'Stijgend',m:'Meetjaren',i:'% dat sociale eenzaamheid ervaart (gemis bredere kring).'},
+ 'gz_lage_veerkracht':{f:'Variabel',m:'Meetjaren',i:'% met lage of zeer lage psychologische veerkracht.'},
+ 'gz_regie_eigen_leven':{f:'Stabiel',m:'Meetjaren',i:'% dat matig tot veel regie ervaart over het eigen leven.'},
+ 'gz_mantelzorger':{f:'Stabiel',m:'Meetjaren',i:'% dat mantelzorg geeft aan zieke of hulpbehoevende naasten.'},
+ 'gz_vrijwilligerswerk':{f:'Licht dalend',m:'Meetjaren',i:'% dat vrijwilligerswerk doet.'},
+ 'gz_steun_van_anderen':{f:'Stabiel',m:'Meetjaren',i:'% dat redelijk tot veel steun ervaart van de sociale omgeving.'},
+ 'gz_moeite_rondkomen':{f:'Variabel',m:'Meetjaren',i:'% dat moeite heeft met financieel rondkomen. Sterk buurtafhankelijk.'},
+ 'gz_overgewicht':{f:'Licht stijgend',m:'Meetjaren',i:'% met BMI >= 25 (overgewicht incl. obesitas).'},
+ 'gz_obesitas':{f:'Stijgend',m:'Meetjaren',i:'% met BMI >= 30 (ernstig overgewicht / obesitas).'},
+ 'gz_rookt':{f:'Dalend',m:'Meetjaren',i:'% dat tabak rookt. Dalende trend door rookbeleid.'},
+ 'gz_overmatig_drinken':{f:'Stabiel',m:'Meetjaren',i:'% dat per week meer alcohol drinkt dan de richtlijn.'},
+ 'gz_voldoet_beweegrichtlijn':{f:'Licht stijgend',m:'Meetjaren',i:'% dat voldoet aan de beweegrichtlijn (150 min/week matig intensief).'},
+ 'gz_tevreden_woning':{f:'Stabiel',m:'Meetjaren',i:'% dat tevreden is met de huidige woning.'},
+ 'gz_tevreden_woonomgeving':{f:'Stabiel',m:'Meetjaren',i:'% dat tevreden is met de woonomgeving.'}
 };
 
 // Welke categorieën zijn ingeklapt (default: alles dicht)
@@ -5817,6 +5840,7 @@ function buildIndicatorList(){
     else if(cat.jaar==='gbif') _ilJaar = 'cum.';
     else if(cat.jaar==='zk') _ilJaar = _ilMeta.zk_jaar||'?';
     else if(cat.jaar==='cr') _ilJaar = _ilMeta.cr_jaar||'?';
+    else if(cat.jaar==='gz') _ilJaar = _ilMeta.gz_jaar||'2024';
     else if(cat.jaar==='sa') _ilJaar = _ilMeta.sa_jaar||'?';
     else if(cat.jaar==='bag'){var _bd2=_ilMeta.enriched_at||'';_ilJaar=_bd2?_bd2.substring(0,10):'actueel';}
     if(_ilJaar) html += '<span style="font:500 8px Space Mono,monospace;color:var(--mt);opacity:.7;margin-left:4px" title="'+cat.bron+'">'+_ilJaar+'</span>';
@@ -5835,16 +5859,13 @@ function buildIndicatorList(){
           var idx = fm.naam.toLowerCase().indexOf(search);
           displayName = fm.naam.substring(0,idx)+'<span class="ind-search-highlight">'+fm.naam.substring(idx,idx+search.length)+'</span>'+fm.naam.substring(idx+search.length);
         }
-        var smTip = 'Dubbelklik: maak primair (kaartkleur)';
-        var sm = STAT_META[fm.key];
-        if(sm) smTip += '\n─── Analyse ───\nFunctie: '+sm.f+'\nMethode: '+sm.m+'\n'+sm.i;
-        html += '<div class="'+cls+'" data-ind="'+fm.key+'" style="--cat-color:'+cat.color+'" onclick="toggleIndicator(\''+fm.key+'\')" title="'+smTip+'">';
+        html += '<div class="'+cls+'" data-ind="'+fm.key+'" style="--cat-color:'+cat.color+'" onclick="toggleIndicator(\''+fm.key+'\')" onmouseenter="showIndTooltip(event,\''+fm.key+'\')" onmouseleave="hideIndTooltip()">';
         html += '<div class="ind-icon"><span class="mi">check</span></div>';
         html += '<span class="ind-name">'+displayName+'</span>';
         html += '<span class="ind-unit">'+fm.eenheid+'</span>';
         html += '<span class="ind-badge">KAART</span>';
         // Info knop met databron
-        html += '<span class="mi mi-sm" style="font-size:12px;color:var(--mt);opacity:.4;cursor:help;flex-shrink:0" onclick="event.stopPropagation();showIndInfo(\''+fm.key+'\')" title="Toon details over deze indicator">\u24D8</span>';
+        html += '<span class="mi mi-sm" style="font-size:12px;color:var(--mt);opacity:.4;cursor:help;flex-shrink:0" onclick="event.stopPropagation();showIndInfo(\''+fm.key+'\')" title="Toon details">\u24D8</span>';
         html += '</div>';
       });
     }
@@ -5863,6 +5884,76 @@ function buildIndicatorList(){
 
   // Update domein-toggles
   if(typeof updateDomainToggles === 'function') updateDomainToggles();
+}
+
+// ── Indicator hover tooltip ──
+var _indTooltipEl = null;
+var _indTooltipTimer = null;
+
+function showIndTooltip(event, key){
+  clearTimeout(_indTooltipTimer);
+  _indTooltipTimer = setTimeout(function(){
+    var ind = getIndicator(key);
+    if(!ind) return;
+    var cat = INDICATOR_CATEGORIES.filter(function(c){ return c.id === ind.cat; })[0];
+    var sm = STAT_META[key];
+    var ns = _nationalStats[key];
+
+    if(!_indTooltipEl){
+      _indTooltipEl = document.createElement('div');
+      _indTooltipEl.id = 'indTooltip';
+      _indTooltipEl.style.cssText = 'position:fixed;z-index:9999;background:rgba(10,15,26,.96);backdrop-filter:blur(16px);border:1px solid rgba(57,255,20,.25);border-radius:10px;padding:10px 12px;font:400 10px "DM Sans",sans-serif;color:#e2e8f0;max-width:300px;pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,.5);line-height:1.6;transition:opacity .15s;opacity:0';
+      document.body.appendChild(_indTooltipEl);
+    }
+
+    var html = '';
+    // Naam + eenheid
+    html += '<div style="font:600 12px DM Sans,sans-serif;color:#fff;margin-bottom:4px;display:flex;align-items:center;gap:4px">';
+    html += '<span class="mi" style="font-size:14px;color:'+(cat?cat.color:'var(--ai)')+'">'+ind.icon+'</span> '+ind.naam;
+    html += '</div>';
+    // Categorie + bron
+    if(cat){
+      html += '<div style="font-size:9px;color:#94a3b8;margin-bottom:6px">'+cat.naam+' · '+cat.bron+'</div>';
+    }
+    // Eenheid
+    html += '<div style="display:flex;gap:8px;margin-bottom:4px">';
+    html += '<span style="color:#64748b">Eenheid:</span> <span style="color:#e2e8f0">'+ind.eenheid+'</span>';
+    html += '</div>';
+    // Landelijke statistieken als beschikbaar
+    if(ns && ns.mean !== undefined){
+      html += '<div style="display:flex;gap:8px;margin-bottom:4px">';
+      html += '<span style="color:#64748b">NL gem.:</span> <span style="color:#39ff14;font-weight:600">'+ns.mean.toLocaleString('nl-NL',{maximumFractionDigits:1})+'</span>';
+      if(ns.min !== undefined) html += ' <span style="color:#64748b;font-size:9px">('+ns.min.toLocaleString('nl-NL',{maximumFractionDigits:0})+' - '+ns.max.toLocaleString('nl-NL',{maximumFractionDigits:0})+')</span>';
+      html += '</div>';
+    }
+    // Trend + insight
+    if(sm){
+      html += '<div style="border-top:1px solid rgba(255,255,255,.06);margin-top:4px;padding-top:4px">';
+      html += '<div style="display:flex;gap:8px;margin-bottom:2px"><span style="color:#64748b">Trend:</span> <span style="color:#fbbf24;font-weight:500">'+sm.f+'</span></div>';
+      html += '<div style="color:#94a3b8;font-size:9px;font-style:italic">'+sm.i+'</div>';
+      html += '</div>';
+    }
+    _indTooltipEl.innerHTML = html;
+    _indTooltipEl.style.opacity = '1';
+
+    // Positie: rechts van het element, of links als geen ruimte
+    var rect = event.target.closest('.ind-item').getBoundingClientRect();
+    var ttWidth = 300;
+    var left = rect.right + 8;
+    if(left + ttWidth > window.innerWidth){
+      left = rect.left - ttWidth - 8;
+    }
+    if(left < 4) left = 4;
+    var top = rect.top;
+    if(top + 200 > window.innerHeight) top = window.innerHeight - 210;
+    _indTooltipEl.style.left = left + 'px';
+    _indTooltipEl.style.top = top + 'px';
+  }, 350); // 350ms delay voor hover
+}
+
+function hideIndTooltip(){
+  clearTimeout(_indTooltipTimer);
+  if(_indTooltipEl) _indTooltipEl.style.opacity = '0';
 }
 
 // Toon indicator info popup
