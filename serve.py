@@ -56,7 +56,9 @@ def run_refresh():
         {'naam': 'CBS Kerncijfers (PDOK WFS)', 'cmd': [sys.executable, 'build_geojson.py']},
         {'naam': 'Bodemgebruik + Landbouw (CBS API)', 'cmd': [sys.executable, 'enrich_from_sql.py']},
         {'naam': 'Flora & Fauna (GBIF API)', 'cmd': [sys.executable, 'enrich_flora_fauna.py']},
-        {'naam': 'Zorgkosten + Criminaliteit (DWH)', 'cmd': [sys.executable, 'enrich_from_dwh.py']},
+        {'naam': 'Zorgkosten (DWH)', 'cmd': [sys.executable, 'enrich_from_dwh.py', '--domains', 'zorgkosten']},
+        {'naam': 'Criminaliteit (Politie API)', 'cmd': [sys.executable, 'enrich_from_politie_api.py']},
+        {'naam': 'Gezondheid (RIVM API)', 'cmd': [sys.executable, 'enrich_from_rivm.py']},
     ]
 
     try:

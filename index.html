@@ -1033,6 +1033,7 @@ var INDICATOR_CATEGORIES = [
   {id:'landbouw',        naam:'Landbouw',                 icon:'agriculture',        color:'#ca8a04', bron:'CBS Landbouwtelling (tabel 80781ned)', jaar:'cbsjaar'},
   {id:'zorgkosten',      naam:'Zorgkosten',               icon:'local_pharmacy',     color:'#ef4444', bron:'Vektis Open Data (zorgverzekeraars)', jaar:'zk'},
   {id:'onverzekerden',   naam:'Onverzekerden & Uitkeringen', icon:'shield_question', color:'#be123c', bron:'CBS Bevolking + Vektis + CBS Uitkeringen (proxy-analyse)', jaar:'sa'},
+  {id:'gezondheid',      naam:'Gezondheid',               icon:'favorite',           color:'#f472b6', bron:'RIVM Gezondheidsmonitor (GGD/CBS/RIVM, tabel 50150NED)', jaar:'gz'},
   {id:'criminaliteit',   naam:'Criminaliteit',            icon:'gavel',              color:'#dc2626', bron:'Politie (data.politie.nl)', jaar:'cr'},
   {id:'bag_adressen',    naam:'BAG Adressen',             icon:'home',               color:'#39ff14', bron:'Kadaster BAG via PDOK', jaar:'bag'},
 ];
@@ -1188,6 +1189,30 @@ var INDICATORS = [
   {key:'sa_wajong',            naam:'Wajong',                   eenheid:'personen',  icon:'child_care',          cat:'onverzekerden'},
   {key:'sa_pct_uitkeringen',   naam:'% Uitkeringsontvangers',   eenheid:'%',         icon:'percent',             cat:'onverzekerden'},
   {key:'sa_uitk_onverzekerd',  naam:'Uitk.ontv. zonder verz.',  eenheid:'personen',  icon:'warning',             cat:'onverzekerden'},
+
+  // ── Gezondheid (RIVM Gezondheidsmonitor) ──
+  {key:'gz_ervaren_gezondheid',     naam:'Goed ervaren gezondheid',     eenheid:'%', icon:'favorite',           cat:'gezondheid'},
+  {key:'gz_langdurige_aandoeningen',naam:'Langdurige aandoeningen',     eenheid:'%', icon:'healing',            cat:'gezondheid'},
+  {key:'gz_langdurig_beperkt',      naam:'Langdurig beperkt',           eenheid:'%', icon:'accessible',         cat:'gezondheid'},
+  {key:'gz_angst_depressie',        naam:'Risico angst/depressie',      eenheid:'%', icon:'psychology',         cat:'gezondheid'},
+  {key:'gz_stress',                 naam:'Veel stress',                 eenheid:'%', icon:'sentiment_stressed', cat:'gezondheid'},
+  {key:'gz_eenzaam',                naam:'Eenzaam',                     eenheid:'%', icon:'person_off',         cat:'gezondheid'},
+  {key:'gz_sterk_eenzaam',          naam:'Sterk eenzaam',               eenheid:'%', icon:'heart_broken',       cat:'gezondheid'},
+  {key:'gz_emotioneel_eenzaam',     naam:'Emotioneel eenzaam',          eenheid:'%', icon:'mood_bad',           cat:'gezondheid'},
+  {key:'gz_sociaal_eenzaam',        naam:'Sociaal eenzaam',             eenheid:'%', icon:'group_off',          cat:'gezondheid'},
+  {key:'gz_lage_veerkracht',        naam:'Lage veerkracht',             eenheid:'%', icon:'fitness_center',     cat:'gezondheid'},
+  {key:'gz_regie_eigen_leven',      naam:'Regie over eigen leven',      eenheid:'%', icon:'self_improvement',   cat:'gezondheid'},
+  {key:'gz_mantelzorger',           naam:'Mantelzorger',                eenheid:'%', icon:'volunteer_activism',  cat:'gezondheid'},
+  {key:'gz_vrijwilligerswerk',      naam:'Vrijwilligerswerk',           eenheid:'%', icon:'handshake',          cat:'gezondheid'},
+  {key:'gz_steun_van_anderen',      naam:'Steun van anderen',           eenheid:'%', icon:'diversity_3',        cat:'gezondheid'},
+  {key:'gz_moeite_rondkomen',       naam:'Moeite met rondkomen',        eenheid:'%', icon:'money_off',          cat:'gezondheid'},
+  {key:'gz_overgewicht',            naam:'Overgewicht',                 eenheid:'%', icon:'monitor_weight',     cat:'gezondheid'},
+  {key:'gz_obesitas',               naam:'Obesitas',                    eenheid:'%', icon:'scale',              cat:'gezondheid'},
+  {key:'gz_rookt',                  naam:'Rookt',                       eenheid:'%', icon:'smoking_rooms',      cat:'gezondheid'},
+  {key:'gz_overmatig_drinken',      naam:'Overmatig drinken',           eenheid:'%', icon:'local_bar',          cat:'gezondheid'},
+  {key:'gz_voldoet_beweegrichtlijn',naam:'Voldoet aan beweegrichtlijn', eenheid:'%', icon:'directions_run',     cat:'gezondheid'},
+  {key:'gz_tevreden_woning',        naam:'Tevreden met woning',         eenheid:'%', icon:'home',               cat:'gezondheid'},
+  {key:'gz_tevreden_woonomgeving',  naam:'Tevreden met woonomgeving',   eenheid:'%', icon:'park',               cat:'gezondheid'},
 
   // ── Criminaliteit (Politie) ──
   {key:'cr_totaal_misdrijven',  naam:'Totaal misdrijven',        eenheid:'aantal',    icon:'gavel',               cat:'criminaliteit'},
@@ -1358,7 +1383,7 @@ var _collapsedCategories = {
   economie:true, sociale_zekerheid:true, voorzieningen:true,
   natuur:true, mobiliteit:true, oppervlakte:true,
   bodemgebruik:true, flora_fauna:true, landbouw:true,
-  zorgkosten:true, criminaliteit:true, bag_adressen:true
+  zorgkosten:true, gezondheid:true, criminaliteit:true, bag_adressen:true
 };
 
 // Actieve indicatoren (toggle aan/uit), eerste = primair (kaartkleur)
@@ -1525,11 +1550,18 @@ function switchYear(year){
     // Herlaad buurten en wijken op achtergrond (altijd, voor filters en stats)
     setTimeout(function(){ loadBackgroundCbsData(); }, 500);
 
-    // BAG aantallen per gemeente prefetchen en direct op achtergrond alle adressen preloaden
+    // BAG aantallen per gemeente prefetchen
     setTimeout(function(){ loadBagIndex().then(function(){
       prefetchBagCounts();
-      // Direct achtergrond preload starten (zonder BAG laag te tonen)
-      setTimeout(function(){ bagSilentPreload(); }, 1000);
+      // Wacht tot IDB cache hersteld is, dan pas preloaden
+      function waitAndPreload(){
+        if(_bagCacheReady){
+          bagSilentPreload();
+        } else {
+          setTimeout(waitAndPreload, 500);
+        }
+      }
+      setTimeout(waitAndPreload, 1000);
     }); }, 2000);
 
     document.getElementById('dsJaar').textContent = year;
@@ -4519,6 +4551,11 @@ var _bagPollTimer = null;
 // Stille achtergrond preload: laadt alle BAG data zonder de BAG laag te tonen
 function bagSilentPreload(){
   if(!_bagIndex || !_gemeenteData) return;
+  // Alleen preloaden als we op localhost draaien (BAG bestanden zijn te groot voor GitHub)
+  if(location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'){
+    console.log('BAG silent preload: overgeslagen (niet op localhost, gebruik PDOK Vector Tiles)');
+    return;
+  }
   var allAvailable = Object.keys(_bagIndex).filter(function(code){
     var info = _bagIndex[code];
     return info && info.count > 0 && info.size_mb > 0;
@@ -6907,10 +6944,9 @@ function updateCompareButton(){
 function updateSelectionBadge(count){
   var badge = document.getElementById('selectionBadge');
   if(!badge){
-    // Maak floating badge
     badge = document.createElement('div');
     badge.id = 'selectionBadge';
-    badge.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:1100;background:rgba(10,15,26,.92);backdrop-filter:blur(12px);border:1px solid rgba(57,255,20,.4);border-radius:24px;padding:8px 16px;display:none;align-items:center;gap:8px;font:500 12px "DM Sans",sans-serif;color:#e2e8f0;box-shadow:0 4px 20px rgba(0,0,0,.5)';
+    badge.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:1100;background:rgba(10,15,26,.95);backdrop-filter:blur(12px);border:1px solid rgba(57,255,20,.4);border-radius:16px;padding:10px 14px;display:none;flex-direction:column;gap:6px;font:500 11px "DM Sans",sans-serif;color:#e2e8f0;box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:90vw;max-height:200px;overflow-y:auto';
     document.body.appendChild(badge);
   }
   if(count === 0){
@@ -6918,15 +6954,46 @@ function updateSelectionBadge(count){
     return;
   }
   badge.style.display = 'flex';
-  var parts = [];
-  if(_selectedGemeenten.length) parts.push(_selectedGemeenten.length + ' gem.');
-  if(_selectedWijken.length) parts.push(_selectedWijken.length + ' wijken');
-  if(_selectedBuurten.length) parts.push(_selectedBuurten.length + ' buurten');
+
+  // Bouw chips voor elke selectie
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
+  function chip(naam, type, color, icon){
+    return '<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(255,255,255,.06);border:1px solid '+color+'40;border-radius:10px;padding:3px 8px 3px 6px;font-size:10px;white-space:nowrap">' +
+      '<span class="mi" style="font-size:12px;color:'+color+'">'+icon+'</span>' +
+      '<span>'+naam+'</span>' +
+      '<button onclick="removeSelection(\''+type+'\',\''+naam.replace(/'/g,"\\'")+'\')" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 0 0 2px;line-height:1" title="Verwijder"><span class="mi" style="font-size:13px">close</span></button>' +
+    '</span>';
+  }
+  _selectedGemeenten.forEach(function(g){ html += chip(g, 'gemeente', '#39ff14', 'domain'); });
+  _selectedWijken.forEach(function(w){ html += chip(w, 'wijk', '#38bdf8', 'grid_view'); });
+  _selectedBuurten.forEach(function(b){ html += chip(b, 'buurt', '#fbbf24', 'grid_on'); });
+  html += '</div>';
+
+  // Actieknoppen
   var canCompare = _selectedGemeenten.length >= 2 || _selectedWijken.length >= 2 || _selectedBuurten.length >= 2;
-  badge.innerHTML = '<span class="mi" style="color:#39ff14;font-size:16px">check_circle</span> ' +
-    '<span>' + parts.join(' + ') + ' geselecteerd</span>' +
-    (canCompare ? ' <button onclick="showCompareDialog()" style="background:#39ff14;color:#0a0f1a;border:none;border-radius:12px;padding:4px 12px;font:700 11px \'DM Sans\',sans-serif;cursor:pointer;margin-left:4px">Vergelijk</button>' : '') +
-    ' <button onclick="clearAllSelections()" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;padding:2px 4px" title="Selectie wissen"><span class="mi" style="font-size:16px">close</span></button>';
+  html += '<div style="display:flex;gap:6px;align-items:center;justify-content:flex-end">';
+  if(canCompare){
+    html += '<button onclick="showCompareDialog()" style="background:#39ff14;color:#0a0f1a;border:none;border-radius:10px;padding:4px 12px;font:700 10px \'DM Sans\',sans-serif;cursor:pointer">Vergelijk</button>';
+  }
+  html += '<button onclick="clearAllSelections()" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:4px 10px;font:500 10px \'DM Sans\',sans-serif;cursor:pointer;color:#94a3b8">Alles wissen</button>';
+  html += '</div>';
+  badge.innerHTML = html;
+}
+
+function removeSelection(type, naam){
+  if(type === 'gemeente'){
+    _selectedGemeenten = _selectedGemeenten.filter(function(g){ return g !== naam; });
+    buildGemeenteFilter();
+  } else if(type === 'wijk'){
+    _selectedWijken = _selectedWijken.filter(function(w){ return w !== naam; });
+    if(_wijkData) buildWijkFilter();
+  } else if(type === 'buurt'){
+    _selectedBuurten = _selectedBuurten.filter(function(b){ return b !== naam; });
+    if(_buurtData) buildBuurtFilter();
+  }
+  updateCompareButton();
+  updateMap();
+  applyGemeenteFilter();
 }
 
 function clearAllSelections(){
