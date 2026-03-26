@@ -9367,6 +9367,9 @@ function renderUploadMarkers(rec){
 
 // Sync upload naar SQL Server
 function syncUploadToServer(rec){
+  // Privacy: upload data wordt NIET naar de server gestuurd.
+  // Uploads zijn privé en blijven alleen in de browser (IndexedDB).
+  // We loggen alleen metadata (naam, aantal rijen) voor analytics, NOOIT de data zelf.
   if(!_apiOnline) return;
   try {
     fetch(ANALYTICS_API + '/upload', {
@@ -9383,13 +9386,13 @@ function syncUploadToServer(rec){
         color: rec.color,
         label_column: rec.label_column || '',
         columns_json: JSON.stringify(rec.columns || []),
-        data_json: JSON.stringify(rec.data || []),
+        // DATA WORDT NIET VERSTUURD - privacy
+        data_json: '[]',
         row_count: rec.row_count || 0,
         uploaded_at: rec.uploaded_at
       })
     }).then(function(r){
       if(r.ok){
-        // Markeer als gesynct
         rec.synced = 1;
         idbPut('uploads', rec);
       }
@@ -9429,18 +9432,19 @@ function updateUploadLayerList(){
   section.style.display = '';
 
   list.innerHTML = _uploadLayers.map(function(ul, idx){
-    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
-      '<div style="width:24px;height:24px;background:'+ul.color+';border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0"><span class="mi" style="font-size:14px;color:#fff">'+ul.icon+'</span></div>' +
-      '<div style="flex:1">' +
+    var visible = _map.hasLayer(ul.layer);
+    return '<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)">' +
+      '<div style="width:24px;height:24px;background:'+ul.color+';border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:'+(visible?'1':'.4')+'"><span class="mi" style="font-size:14px;color:#fff">'+ul.icon+'</span></div>' +
+      '<div style="flex:1;opacity:'+(visible?'1':'.5')+'">' +
         '<div style="font:600 11px \'DM Sans\',sans-serif;color:var(--tx)">'+escapeHtml(ul.name)+'</div>' +
-        '<div style="font-size:9px;color:var(--mt)">'+ul.count+' locaties</div>' +
+        '<div style="font-size:9px;color:var(--mt)">'+ul.count+' locaties · <span style="color:#39ff14">alleen voor jou zichtbaar</span></div>' +
       '</div>' +
-      '<button class="btn btn-s" onclick="toggleUploadLayer('+idx+')" style="font-size:9px;padding:2px 6px" title="Toon/verberg">' +
-        '<span class="mi mi-sm" style="font-size:11px">'+(_map.hasLayer(ul.layer)?'visibility':'visibility_off')+'</span></button>' +
+      '<button class="btn btn-s" onclick="toggleUploadLayer('+idx+')" style="font-size:9px;padding:2px 6px;'+(visible?'color:var(--ai)':'color:var(--mt)')+'" title="'+(visible?'Verberg':'Toon')+'">' +
+        '<span class="mi mi-sm" style="font-size:13px">'+(visible?'visibility':'visibility_off')+'</span></button>' +
       '<button class="btn btn-s" onclick="zoomToUploadLayer('+idx+')" style="font-size:9px;padding:2px 6px" title="Zoom naar">' +
         '<span class="mi mi-sm" style="font-size:11px">zoom_in</span></button>' +
-      '<button class="btn btn-s" onclick="removeUploadLayer('+idx+')" style="font-size:9px;padding:2px 6px" title="Verberg (data blijft bewaard)">' +
-        '<span class="mi mi-sm" style="font-size:11px">visibility_off</span></button>' +
+      '<button class="btn btn-s" onclick="removeUploadLayer('+idx+')" style="font-size:9px;padding:2px 6px;color:#ef4444" title="Verwijder van kaart">' +
+        '<span class="mi mi-sm" style="font-size:13px">close</span></button>' +
     '</div>';
   }).join('');
 }
