@@ -2071,6 +2071,44 @@ function openBagIDB(){
 
 // Laad ALLE gemeenten uit IndexedDB naar in-memory cache
 function loadBagFromIDB(){
+  // Snelle versie: laad alleen gemeente-codes + counts, NIET alle features
+  // Features worden lazy geladen wanneer BAG laag geactiveerd wordt
+  return openBagIDB().then(function(db){
+    return new Promise(function(resolve){
+      var tx = db.transaction(BAG_IDB_STORE, 'readonly');
+      var store = tx.objectStore(BAG_IDB_STORE);
+      // Gebruik een cursor om alleen code+count te lezen zonder features in geheugen te laden
+      _bagMem = {};
+      _bagMemCount = 0;
+      _bagCachedGems = {};
+      var totalCount = 0;
+      var gemCount = 0;
+      var cursorReq = store.openCursor();
+      cursorReq.onsuccess = function(e){
+        var cursor = e.target.result;
+        if(cursor){
+          var item = cursor.value;
+          _bagCachedGems[item.code] = item.count || 0;
+          totalCount += (item.count || 0);
+          gemCount++;
+          cursor.continue();
+        } else {
+          // Cursor klaar - alle gemeente-codes geladen, features NIET in geheugen
+          _bagMemCount = totalCount;
+          _bagCacheReady = true;
+          console.log('BAG cache index hersteld:', totalCount, 'adressen in', gemCount, 'gemeenten (features lazy)');
+          updateBagCacheUI();
+          resolve(totalCount);
+        }
+      };
+      cursorReq.onerror = function(){ _bagCacheReady = true; resolve(0); };
+    });
+  }).catch(function(e){ console.warn('BAG IDB load error:', e); _bagCacheReady = true; return 0; });
+}
+
+// Lazy load: laad features uit IDB naar geheugen wanneer BAG laag geactiveerd wordt
+function loadBagFeaturesFromIDB(){
+  if(Object.keys(_bagMem).length > 0) return Promise.resolve(_bagMemCount); // Al geladen
   return openBagIDB().then(function(db){
     return new Promise(function(resolve){
       var tx = db.transaction(BAG_IDB_STORE, 'readonly');
@@ -2080,9 +2118,7 @@ function loadBagFromIDB(){
         var items = req.result || [];
         _bagMem = {};
         _bagMemCount = 0;
-        _bagCachedGems = {};
         items.forEach(function(item){
-          _bagCachedGems[item.code] = item.count || 0;
           (item.features || []).forEach(function(f){
             var id = f.properties && (f.properties.identificatie || f.properties.id);
             if(id && !_bagMem[id]){
@@ -2091,14 +2127,12 @@ function loadBagFromIDB(){
             }
           });
         });
-        _bagCacheReady = true;
-        console.log('BAG cache hersteld:', _bagMemCount, 'adressen uit', items.length, 'gemeenten');
-        updateBagCacheUI();
+        console.log('BAG features geladen uit IDB:', _bagMemCount, 'adressen');
         resolve(_bagMemCount);
       };
-      req.onerror = function(){ _bagCacheReady = true; resolve(0); };
+      req.onerror = function(){ resolve(0); };
     });
-  }).catch(function(e){ console.warn('BAG IDB load error:', e); _bagCacheReady = true; return 0; });
+  }).catch(function(){ return 0; });
 }
 
 // Sla gemeente features op in IndexedDB (1 record per gemeente)
@@ -3255,6 +3289,19 @@ function toggleBagLayer(on){
     statusSection.style.display = '';
     statusBtns.style.display = 'flex';
     document.getElementById('bagFiltersSection').style.display = 'block';
+    // Lazy load: als er gecachete BAG data is, laad features nu in geheugen
+    if(Object.keys(_bagCachedGems).length > 0 && Object.keys(_bagMem).length === 0){
+      toast('BAG features laden uit cache...');
+      loadBagFeaturesFromIDB().then(function(n){
+        if(n > 0){
+          _bagLocalMode = true;
+          _bagVectorData = getCachedBagFeatures();
+          renderBagVectors();
+          updateBagCacheUI();
+          toast(n.toLocaleString('nl-NL')+' BAG adressen geladen uit cache');
+        }
+      });
+    }
     document.getElementById('bagCacheInfo').style.display = 'flex';
     updateBagCacheUI();
     dimChoroplethLayers(true);
@@ -11241,38 +11288,22 @@ async function init(){
     // Start achtergrond laden van buurten en wijken na 1.5s
     setTimeout(function(){ loadBackgroundCbsData(); }, 1500);
 
-    // BAG: eerst cache herstellen uit IndexedDB, dan evt. ontbrekende laden
+    // BAG: alleen cache-index herstellen (snel), features lazy laden bij activatie
     setTimeout(function(){
-      // Stap 1: IndexedDB cache herstellen (snel, geen server-fetch)
       loadBagFromIDB().then(function(cachedCount){
-        console.log('BAG cache hersteld:', cachedCount, 'adressen uit', Object.keys(_bagCachedGems).length, 'gemeenten');
-        // Herstel _bagBgLoaded tracker vanuit IDB cache
+        console.log('BAG cache index:', cachedCount, 'adressen in', Object.keys(_bagCachedGems).length, 'gemeenten (lazy)');
         for(var gc in _bagCachedGems){
           var naam = (_bagIndex && _bagIndex[gc]) ? _bagIndex[gc].naam : gc;
           _bagBgLoaded[naam || gc] = true;
         }
-        if(cachedCount > 0){
-          // We hebben gecachete BAG data — activeer BAG layer + render
-          _bagLocalMode = true;
-          if(!_layerState.bag) toggleLayer('bag');
-          _bagVectorData = getCachedBagFeatures();
-          renderBagVectors();
-          updateBagCacheUI();
-          toast(cachedCount.toLocaleString('nl-NL')+' BAG adressen hersteld uit cache', 'success');
+        // Toon BAG count op knop maar activeer de laag NIET automatisch
+        var btnCount = document.getElementById('bagBtnCount');
+        if(btnCount && cachedCount > 0){
+          btnCount.textContent = '('+cachedCount.toLocaleString('nl-NL')+')';
         }
-        // Stap 2: Check of er nieuwe/ontbrekende bestanden op de server zijn
-        return loadBagIndex().then(function(){
-          var localCount = _bagIndex ? Object.keys(_bagIndex).filter(function(c){
-            return _bagIndex[c] && _bagIndex[c].size_mb > 0;
-          }).length : 0;
-          if(localCount >= 10){
-            console.log('BAG auto-preload: '+localCount+' lokale bestanden beschikbaar');
-            if(!_layerState.bag) toggleLayer('bag');
-            setTimeout(function(){ autoPreloadBagLocal(); }, 500);
-          } else if(cachedCount === 0){
-            prefetchBagCounts();
-          }
-        });
+        updateBagCacheUI();
+        // Laad BAG index voor prefetch counts
+        return loadBagIndex().then(function(){ prefetchBagCounts(); });
       });
     }, 2000);
 
