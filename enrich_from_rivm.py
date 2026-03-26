@@ -154,15 +154,15 @@ def fetch_all_data_unfiltered():
         skip += PAGE_SIZE
         time.sleep(0.5)
 
-    # Filter in Python: alleen Totaal leeftijd en Waarde (geen marges)
+    # Filter in Python: alleen "18 jaar of ouder" en "Waarde" (geen marges)
     log.info("  Filtering %d rows in Python...", len(all_rows))
     filtered = []
     for row in all_rows:
         leeftijd = str(row.get("Leeftijd", "")).strip()
         marges = str(row.get("Marges", "")).strip()
-        # T001038 = "Totaal (18 jaar of ouder)" of vergelijkbaar
-        # MW00000 = "Waarde" (de schatting, niet de marge)
-        if "T001038" in leeftijd and "MW00000" in marges:
+        # 20300 = "18 jaar of ouder" (totaal)
+        # MW00000 = "Waarde" (de schatting, niet de betrouwbaarheidsmarge)
+        if leeftijd == "20300" and marges == "MW00000":
             filtered.append(row)
     log.info("  Na filtering: %d rows", len(filtered))
     return filtered
