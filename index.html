@@ -4624,56 +4624,99 @@ function autoPreloadBagLocal(){
 }
 var _bagPollTimer = null;
 
-// Stille achtergrond preload: laadt alle BAG data zonder de BAG laag te tonen
+// BAG preload: check cache, vraag toestemming, download
 function bagSilentPreload(){
   if(!_bagIndex || !_gemeenteData) return;
-  // Alleen preloaden als we op localhost draaien (BAG bestanden zijn te groot voor GitHub)
-  if(location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'){
-    console.log('BAG silent preload: overgeslagen (niet op localhost, gebruik PDOK Vector Tiles)');
-    return;
-  }
+
   var allAvailable = Object.keys(_bagIndex).filter(function(code){
     var info = _bagIndex[code];
     return info && info.count > 0 && info.size_mb > 0;
   });
   if(allAvailable.length === 0) return;
 
-  // Filter: skip gemeenten die al in IndexedDB cache zitten
   var available = allAvailable.filter(function(code){
     return !_bagCachedGems[code] || _bagCachedGems[code] === 0;
   });
   var alreadyCached = allAvailable.length - available.length;
+  var totalExpectedAll = allAvailable.reduce(function(s,c){ return s + (_bagIndex[c].count||0); }, 0);
+  var totalSizeMb = available.reduce(function(s,c){ return s + (_bagIndex[c].size_mb||0); }, 0);
+  var sizeGb = (totalSizeMb / 1024).toFixed(1);
 
-  // Totaal adressen berekenen
+  var statusEl = document.getElementById('bagPreloadStatus');
+  var btnCount = document.getElementById('bagBtnCount');
+
+  // ── ALLES AL IN CACHE: klaar ──
+  if(available.length === 0 && alreadyCached > 0){
+    btnCount.textContent = '('+_bagMemCount.toLocaleString('nl-NL')+')';
+    console.log('BAG: alle '+alreadyCached+' gemeenten in cache');
+    return;
+  }
+
+  // ── DEELS GECACHT: toon voortgang en ga automatisch door ──
+  if(alreadyCached > 0){
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = '<div style="display:flex;align-items:center;gap:6px;font-size:10px">' +
+      '<span class="mi" style="font-size:14px;color:var(--ai)">downloading</span>' +
+      '<span style="color:var(--mt)">'+alreadyCached+'/'+allAvailable.length+' gemeenten in cache · '+available.length+' laden ('+sizeGb+' GB)...</span></div>' +
+      '<div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-top:4px">' +
+      '<div id="bagPreloadBar" style="height:100%;width:'+Math.round(alreadyCached/allAvailable.length*100)+'%;background:var(--ai);border-radius:2px;transition:width .3s"></div></div>' +
+      '<div id="bagPreloadDetail" style="margin-top:3px;font-size:9px;color:var(--dm)">Hervatten...</div>';
+    bagRunPreload(available, allAvailable, totalExpectedAll, alreadyCached);
+    return;
+  }
+
+  // ── NIETS GECACHT: vraag toestemming ──
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = '<div style="display:flex;align-items:flex-start;gap:10px">' +
+    '<span class="mi" style="font-size:20px;color:var(--ai);margin-top:2px">download_for_offline</span>' +
+    '<div style="flex:1">' +
+      '<div style="font:600 11px DM Sans,sans-serif;color:var(--tx);margin-bottom:4px">BAG Adressen downloaden?</div>' +
+      '<div style="font-size:9px;color:var(--mt);line-height:1.5">' +
+        totalExpectedAll.toLocaleString('nl-NL')+' adressen · '+allAvailable.length+' gemeenten · <b>~'+sizeGb+' GB</b><br>' +
+        'Eenmalig — data wordt lokaal opgeslagen in je browser.<br>De volgende keer hoeft het niet opnieuw.' +
+      '</div>' +
+      '<div style="display:flex;gap:6px;margin-top:8px">' +
+        '<button onclick="bagStartDownload()" style="background:var(--ai);color:#0a0f1a;border:none;border-radius:8px;padding:6px 16px;font:700 11px DM Sans,sans-serif;cursor:pointer">Downloaden</button>' +
+        '<button onclick="bagDismissDownload()" style="background:none;border:1px solid var(--br);border-radius:8px;padding:6px 12px;font:500 10px DM Sans,sans-serif;cursor:pointer;color:var(--mt)">Niet nu</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function bagStartDownload(){
+  var allAvailable = Object.keys(_bagIndex).filter(function(code){
+    return _bagIndex[code] && _bagIndex[code].count > 0 && _bagIndex[code].size_mb > 0;
+  });
+  var available = allAvailable.filter(function(code){
+    return !_bagCachedGems[code] || _bagCachedGems[code] === 0;
+  });
+  var alreadyCached = allAvailable.length - available.length;
   var totalExpectedAll = allAvailable.reduce(function(s,c){ return s + (_bagIndex[c].count||0); }, 0);
 
   var statusEl = document.getElementById('bagPreloadStatus');
+  statusEl.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">' +
+    '<span><span class="mi mi-sm" style="color:var(--ai);vertical-align:middle">downloading</span> BAG downloaden...</span>' +
+    '<span id="bagPreloadPct" style="font-weight:700;color:var(--ai)">0%</span></div>' +
+    '<div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">' +
+    '<div id="bagPreloadBar" style="height:100%;width:0%;background:var(--ai);border-radius:2px;transition:width .3s"></div></div>' +
+    '<div id="bagPreloadDetail" style="margin-top:3px;font-size:9px;color:var(--dm)">Starten...</div>';
+
+  bagRunPreload(available, allAvailable, totalExpectedAll, alreadyCached);
+}
+
+function bagDismissDownload(){
+  document.getElementById('bagPreloadStatus').style.display = 'none';
+  toast('BAG download overgeslagen · PDOK Vector Tiles beschikbaar bij zoom 17+');
+}
+
+function bagRunPreload(available, allAvailable, totalExpectedAll, alreadyCached){
+  available.sort(function(a,b){ return (_bagIndex[a].size_mb||0) - (_bagIndex[b].size_mb||0); });
+
   var pctEl = document.getElementById('bagPreloadPct');
   var barEl = document.getElementById('bagPreloadBar');
   var detailEl = document.getElementById('bagPreloadDetail');
   var btnCount = document.getElementById('bagBtnCount');
-
-  // Als alles al gecacht is
-  if(available.length === 0 && alreadyCached > 0){
-    statusEl.style.display = 'block';
-    statusEl.style.borderColor = 'rgba(57,255,20,.3)';
-    pctEl.textContent = '100%';
-    barEl.style.width = '100%';
-    detailEl.textContent = _bagMemCount.toLocaleString('nl-NL')+' / '+totalExpectedAll.toLocaleString('nl-NL')+' adressen · '+alreadyCached+' gemeenten · klaar';
-    btnCount.textContent = '('+_bagMemCount.toLocaleString('nl-NL')+')';
-    setTimeout(function(){ statusEl.style.display = 'none'; }, 5000);
-    console.log('BAG silent preload: alles al in cache ('+_bagMemCount+' adressen)');
-    return;
-  }
-
-  // Sorteer: kleinste eerst
-  available.sort(function(a,b){ return (_bagIndex[a].size_mb||0) - (_bagIndex[b].size_mb||0); });
-
-  statusEl.style.display = 'block';
-  pctEl.textContent = '0%';
-  barEl.style.width = '0%';
-  detailEl.textContent = '0 / '+totalExpectedAll.toLocaleString('nl-NL')+' adressen · '+available.length+' gemeenten laden...';
-  btnCount.textContent = '(0)';
+  var statusEl = document.getElementById('bagPreloadStatus');
 
   var totalLoaded = alreadyCached > 0 ? _bagMemCount : 0;
   var completed = 0;
@@ -4684,13 +4727,13 @@ function bagSilentPreload(){
 
   function updateUI(){
     var pct = Math.round((totalLoaded / totalExpectedAll) * 100);
-    pctEl.textContent = pct + '%';
-    barEl.style.width = pct + '%';
+    if(pctEl) pctEl.textContent = pct + '%';
+    if(barEl) barEl.style.width = pct + '%';
     var elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
     var speed = elapsed > 0 ? Math.round(totalLoaded / elapsed) : 0;
     var eta = speed > 0 ? Math.round((totalExpectedAll - totalLoaded) / speed) : '?';
-    detailEl.textContent = totalLoaded.toLocaleString('nl-NL')+' / '+totalExpectedAll.toLocaleString('nl-NL')+' adressen · '+completed+'/'+available.length+' gem. · '+elapsed+'s · ETA '+eta+'s';
-    btnCount.textContent = '('+totalLoaded.toLocaleString('nl-NL')+')';
+    if(detailEl) detailEl.textContent = totalLoaded.toLocaleString('nl-NL')+' / '+totalExpectedAll.toLocaleString('nl-NL')+' adressen · '+completed+'/'+available.length+' gem. · '+elapsed+'s · ~'+eta+'s resterend';
+    if(btnCount) btnCount.textContent = '('+totalLoaded.toLocaleString('nl-NL')+')';
   }
 
   function processNext(){
@@ -4713,16 +4756,14 @@ function bagSilentPreload(){
     }
 
     if(queue.length === 0 && running === 0){
-      // Klaar
-      pctEl.textContent = '100%';
-      barEl.style.width = '100%';
+      if(pctEl) pctEl.textContent = '100%';
+      if(barEl) barEl.style.width = '100%';
       var elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-      detailEl.textContent = totalLoaded.toLocaleString('nl-NL')+' / '+totalExpectedAll.toLocaleString('nl-NL')+' adressen · alle gemeenten · '+elapsed+'s';
-      btnCount.textContent = '('+totalLoaded.toLocaleString('nl-NL')+')';
-      statusEl.style.borderColor = 'rgba(57,255,20,.3)';
-      console.log('BAG silent preload klaar: '+totalLoaded+' adressen in '+elapsed+'s');
-      // Na 8 seconden voortgang verbergen
-      setTimeout(function(){ statusEl.style.display = 'none'; }, 8000);
+      if(detailEl) detailEl.textContent = totalLoaded.toLocaleString('nl-NL')+' adressen · '+allAvailable.length+' gemeenten · klaar in '+elapsed+'s';
+      if(btnCount) btnCount.textContent = '('+totalLoaded.toLocaleString('nl-NL')+')';
+      if(statusEl) statusEl.style.borderColor = 'rgba(57,255,20,.3)';
+      toast(totalLoaded.toLocaleString('nl-NL')+' BAG adressen opgeslagen in browser \u2714');
+      setTimeout(function(){ if(statusEl) statusEl.style.display = 'none'; }, 8000);
     }
   }
   processNext();
