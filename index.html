@@ -438,6 +438,8 @@ select option{background:var(--bg);color:var(--tx)}
         <button class="btn btn-s" data-layer="wijken" onclick="toggleLayer('wijken')"><span class="mi mi-sm">grid_view</span> Wijken</button>
         <button class="btn btn-s" data-layer="bag" onclick="toggleLayer('bag')"><span class="mi mi-sm">location_on</span> BAG Adressen <span id="bagBtnCount" style="font:700 9px 'Space Mono',monospace;color:var(--ai)"></span></button>
       </div>
+      <!-- Upload lagen toggles (verschijnen na upload) -->
+      <div id="uploadLayerToggles" style="display:none;margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"></div>
       <div id="bagPreloadStatus" style="display:none;margin:6px 0;padding:6px 10px;background:rgba(57,255,20,.06);border:1px solid rgba(57,255,20,.15);border-radius:6px;font-size:10px;color:var(--mt)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
           <span><span class="mi mi-sm" style="color:var(--ai);vertical-align:middle">downloading</span> BAG Preload</span>
@@ -5941,7 +5943,8 @@ function showIndTooltip(event, key){
     _indTooltipEl.style.opacity = '1';
 
     // Positie: rechts van het element, of links als geen ruimte
-    var rect = event.target.closest('.ind-item').getBoundingClientRect();
+    var el = event.target.closest('.ind-item') || event.target;
+    var rect = el.getBoundingClientRect();
     var ttWidth = 300;
     var left = rect.right + 8;
     if(left + ttWidth > window.innerWidth){
@@ -8774,7 +8777,7 @@ function adminReplotUpload(uploadId){
     if(!rec){ toast('Upload niet gevonden'); return; }
     var layerInfo = renderUploadMarkers(rec);
     _uploadLayers.push(layerInfo);
-    updateUploadLayerList();
+    updateUploadLayerList(); updateUploadLayerToggles();
     try{ _map.fitBounds(layerInfo.layer.getBounds(), {padding:[40,40], maxZoom:14}); }catch(e){}
     toast(layerInfo.count + ' markers op kaart geplaatst');
   });
@@ -9124,7 +9127,7 @@ function addUploadToMap(){
   }
 
   // Update actieve uploads lijst
-  updateUploadLayerList();
+  updateUploadLayerList(); updateUploadLayerToggles();
   updateSavedUploadsList();
 
   toast(layerInfo.count + ' markers op kaart geplaatst \u00b7 ' + (isOverwrite ? 'Overschreven' : 'Data opgeslagen'));
@@ -9412,7 +9415,7 @@ function loadSavedUploads(){
       _uploadLayers.push(layerInfo);
     });
     if(_uploadLayers.length > 0){
-      updateUploadLayerList();
+      updateUploadLayerList(); updateUploadLayerToggles();
       toast(_uploadLayers.length + ' opgeslagen upload(s) geladen');
     }
     updateSavedUploadsList();
@@ -9492,7 +9495,28 @@ function toggleUploadLayer(idx){
   } else {
     ul.layer.addTo(_map);
   }
-  updateUploadLayerList();
+  updateUploadLayerList(); updateUploadLayerToggles();
+  updateUploadLayerToggles();
+}
+
+function updateUploadLayerToggles(){
+  var container = document.getElementById('uploadLayerToggles');
+  if(!container) return;
+  if(_uploadLayers.length === 0){
+    container.style.display = 'none';
+    return;
+  }
+  container.style.display = 'flex';
+  container.innerHTML = _uploadLayers.map(function(ul, idx){
+    var visible = _map.hasLayer(ul.layer);
+    return '<button class="btn btn-s'+(visible?' active':'')+'" onclick="toggleUploadLayer('+idx+')" style="font-size:10px;gap:3px;border-color:'+(visible?ul.color+'60':'var(--br)')+'">' +
+      '<span class="mi mi-sm" style="font-size:12px;color:'+ul.color+'">'+ul.icon+'</span> ' +
+      '<span style="max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(ul.name)+'</span>' +
+      ' <span class="mi mi-sm" style="font-size:11px;color:'+(visible?'var(--ai)':'var(--mt)')+'">'+
+        (visible?'visibility':'visibility_off')+'</span>' +
+      ' <span class="mi mi-sm" onclick="event.stopPropagation();removeUploadLayer('+idx+')" style="font-size:12px;color:#ef4444;cursor:pointer" title="Verwijder">close</span>' +
+    '</button>';
+  }).join('');
 }
 
 function zoomToUploadLayer(idx){
@@ -9509,7 +9533,7 @@ function removeUploadLayer(idx){
   if(!ul) return;
   if(_map.hasLayer(ul.layer)) _map.removeLayer(ul.layer);
   _uploadLayers.splice(idx, 1);
-  updateUploadLayerList();
+  updateUploadLayerList(); updateUploadLayerToggles();
   updateSavedUploadsList();
   toast('Upload van kaart verwijderd \u00b7 Data bewaard');
 }
@@ -9524,7 +9548,7 @@ function deleteUploadPermanent(uploadId){
       _uploadLayers.splice(i, 1);
     }
   }
-  updateUploadLayerList();
+  updateUploadLayerList(); updateUploadLayerToggles();
   // Verwijder uit IndexedDB
   if(_analyticsDb){
     try {
