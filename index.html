@@ -440,7 +440,7 @@ select option{background:var(--bg);color:var(--tx)}
       </div>
       <!-- Upload lagen toggles (verschijnen na upload) -->
       <div id="uploadLayerToggles" style="display:none;margin-top:4px;display:flex;gap:4px;flex-wrap:wrap"></div>
-      <div id="bagPreloadStatus" style="display:none;margin:6px 0;padding:6px 10px;background:rgba(57,255,20,.06);border:1px solid rgba(57,255,20,.15);border-radius:6px;font-size:10px;color:var(--mt)">
+      <div id="bagPreloadStatus" style="display:none;margin:6px 0;padding:8px 10px;background:rgba(57,255,20,.06);border:1px solid rgba(57,255,20,.15);border-radius:6px;font-size:10px;color:var(--mt)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
           <span><span class="mi mi-sm" style="color:var(--ai);vertical-align:middle">downloading</span> BAG Preload</span>
           <span id="bagPreloadPct" style="font-weight:700;color:var(--ai)">0%</span>
@@ -4680,14 +4680,16 @@ function bagSilentPreload(){
   var startTime = Date.now();
   var queue = available.slice();
   var running = 0;
-  var maxConcurrent = 6;
+  var maxConcurrent = 10;
 
   function updateUI(){
     var pct = Math.round((totalLoaded / totalExpectedAll) * 100);
     pctEl.textContent = pct + '%';
     barEl.style.width = pct + '%';
     var elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
-    detailEl.textContent = totalLoaded.toLocaleString('nl-NL')+' / '+totalExpectedAll.toLocaleString('nl-NL')+' adressen · '+completed+'/'+available.length+' gem. · '+elapsed+'s';
+    var speed = elapsed > 0 ? Math.round(totalLoaded / elapsed) : 0;
+    var eta = speed > 0 ? Math.round((totalExpectedAll - totalLoaded) / speed) : '?';
+    detailEl.textContent = totalLoaded.toLocaleString('nl-NL')+' / '+totalExpectedAll.toLocaleString('nl-NL')+' adressen · '+completed+'/'+available.length+' gem. · '+elapsed+'s · ETA '+eta+'s';
     btnCount.textContent = '('+totalLoaded.toLocaleString('nl-NL')+')';
   }
 
