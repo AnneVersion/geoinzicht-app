@@ -61,7 +61,42 @@ Werk op `develop`. Alleen mergen naar `main` als het stabiel is.
 | GBIF | REST API | Flora & Fauna waarnemingen |
 | Vektis | Open Data | Zorgkosten per gemeente |
 | data.politie.nl | Open Data | Criminaliteitscijfers |
-| GeoInzicht DWH | localhost:8888 | Zorgkosten + Criminaliteit (apart project) |
+| GeoInzicht DWH | localhost:8888 | Volledige DWH met 16 bronnen, 74 indicatoren (apart project) |
+
+### GeoInzicht DWH API Endpoints (localhost:8888)
+Het DWH project biedt uitgebreide API's die de app kan gebruiken:
+
+**KvK Bedrijfsdata:**
+| Endpoint | Methode | Beschrijving |
+|----------|---------|-------------|
+| `/api/kvk/nearby?lat=X&lon=Y&radius=150` | GET | Bedrijven op dichtstbijzijnde adres (bestuurders, jaarrekeningen, SBI) |
+| `/api/kvk/profiel?kvk=12345678` | GET | Volledig bedrijfsprofiel met financieel |
+| `/api/kvk/refresh` | POST | Ververs materialized view (na data load) |
+
+**Metadata & Lineage:**
+| Endpoint | Methode | Beschrijving |
+|----------|---------|-------------|
+| `/api/meta/bronnen` | GET | 16 geregistreerde databronnen met URL, licentie, eigenaar |
+| `/api/meta/indicatoren` | GET | 74 indicatoren met beschrijving, bron, peildatum |
+| `/api/meta/indicatoren?domein=Bevolking` | GET | Gefilterd op domein |
+| `/api/meta/lineage` | GET | ETL audit trail (wanneer is data geladen) |
+| `/api/meta/checks` | GET | Data quality checks |
+
+**BAG Statistieken:**
+| Endpoint | Methode | Beschrijving |
+|----------|---------|-------------|
+| `/api/bag/stats` | GET | Nederland totaal: 9.7M adressen, m2, per functie/bouwjaar |
+
+**GeoServer WFS (localhost:9090):**
+| Layer | Beschrijving |
+|-------|-------------|
+| `CBS:v_gemeente_data` | 343 gemeenten, 70+ indicatoren, 2013-2025 |
+| `CBS:v_wijk_data` | 3.475 wijken met CBS data + geometrie |
+| `CBS:v_buurt_data` | 14.668 buurten met CBS data + geometrie |
+| `KvK:handelsregister_geo` | 1.9M bedrijven als puntlocaties |
+
+**Beschikbare databronnen in DWH:**
+CBS Open Data, PDOK BAG (9.7M adressen), KvK Handelsregister (1.9M bedrijven), CompanyInfo (316K bestuurders), Northdata (249K jaarrekeningen), KvK XBRL Jaarrekeningen (2.3M), CBS Bodemgebruik, Politie Misdrijven, Vektis Zorgkosten, GBIF Biodiversiteit, RIVM Luchtkwaliteit, KNMI Weer, Rechtspraak Open Data (800K+ uitspraken), CBS Landbouw, CBS Onderwijs, CBS Energie
 
 ### GeoJSON Bestanden (lokaal)
 Bestanden per jaar en gebiedsniveau. Grote bestanden staan in `.gitignore`.
@@ -132,13 +167,49 @@ python enrich_cbs_2024.py        # Verrijk met CBS 2024 data (89 indicatoren)
 ```
 Of via de API: `http://localhost:8091/api/refresh` (draait het volledige pipeline).
 
-## 7. TODO
+## 7. DWH API Endpoints (localhost:8888)
+
+De GeoInzicht DWH draait als apart project op `http://localhost:8888` en biedt de volgende API's:
+
+### KvK Bedrijfsdata
+| Endpoint | Methode | Beschrijving |
+|----------|---------|-------------|
+| `/api/kvk/nearby?lat=X&lon=Y&radius=150` | GET | Bedrijven op dichtstbijzijnde adres (bestuurders, jaarrekeningen, SBI) |
+| `/api/kvk/profiel?kvk=12345678` | GET | Volledig bedrijfsprofiel |
+| `/api/kvk/refresh` | POST | Ververs materialized view |
+
+### Metadata
+| Endpoint | Methode | Beschrijving |
+|----------|---------|-------------|
+| `/api/meta/bronnen` | GET | 16 geregistreerde databronnen |
+| `/api/meta/indicatoren` | GET | 74 indicatoren met beschrijving, bron, peildatum |
+| `/api/meta/indicatoren?domein=Bevolking` | GET | Gefilterd op domein |
+| `/api/meta/lineage` | GET | ETL audit trail |
+| `/api/meta/checks` | GET | Data quality checks |
+
+### BAG
+| Endpoint | Methode | Beschrijving |
+|----------|---------|-------------|
+| `/api/bag/stats` | GET | Nederland totaal: adressen, m2, per functie/bouwjaar |
+
+### GeoServer WFS (port 9090)
+| Layer | Beschrijving |
+|-------|-------------|
+| `CBS:v_gemeente_data` | 343 gemeenten, 70+ indicatoren, 2013-2025 |
+| `CBS:v_wijk_data` | 3.475 wijken |
+| `CBS:v_buurt_data` | 14.668 buurten |
+| `KvK:handelsregister_geo` | 1.9M bedrijven als punten |
+
+### Beschikbare Databronnen (16)
+CBS Open Data, PDOK BAG, KvK Handelsregister, CompanyInfo, Northdata, KvK Jaarrekeningen (XBRL), CBS Bodemgebruik, Politie Misdrijven, Vektis Zorgkosten, GBIF Biodiversiteit, RIVM Luchtkwaliteit, KNMI Weer, Rechtspraak Open Data, CBS Landbouw, CBS Onderwijs, CBS Energie
+
+## 8. TODO
 - GBIF Flora & Fauna data nog niet volledig geladen
 - BAG bulk download optimalisatie
 - Edak project koppeling (wacht op Excel input)
 - Performance optimalisatie index.html (11.000+ regels in 1 bestand)
 
-## 8. Belangrijke Regels
+## 9. Belangrijke Regels
 - **ALLEEN API's, nooit direct database**: De app werkt uitsluitend met REST API calls en lokale GeoJSON bestanden. Geen directe database connecties.
 - **DWH is een apart project**: GeoInzicht DWH draait op localhost:8888 (project: geoinzicht-dwh). De app kan er data van ophalen via API, maar is er niet afhankelijk van.
 - **Poort 8091**: Standaard poort, niet wijzigen (andere projecten verwijzen hiernaar).
