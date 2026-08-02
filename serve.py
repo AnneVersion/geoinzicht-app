@@ -178,6 +178,151 @@ def run_refresh():
         _refresh_running = False
 
 
+# === Services: status, startknoppen en autostart (config in services.json) ===
+SERVICES_FILE = os.path.join(APP_DIR, 'services.json')
+_service_procs = {}
+
+
+def _load_services():
+    try:
+        with open(SERVICES_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f).get('services', [])
+    except Exception:
+        return []
+
+
+def _port_open(port):
+    if not port:
+        return None
+    s = socket.socket()
+    s.settimeout(0.4)
+    try:
+        s.connect(('127.0.0.1', int(port)))
+        s.close()
+        return True
+    except Exception:
+        return False
+
+
+def services_status():
+    out = [{'name': 'serve', 'label': 'GeoInzicht server', 'port': PORT, 'running': True, 'startbaar': False}]
+    for svc in _load_services():
+        out.append({
+            'name': svc.get('name'),
+            'label': svc.get('label') or svc.get('name'),
+            'port': svc.get('port'),
+            'running': _port_open(svc.get('port')),
+            'startbaar': bool(svc.get('cmd')),
+        })
+    return {'services': out}
+
+
+def service_start(name):
+    for svc in _load_services():
+        if svc.get('name') == name:
+            if not svc.get('cmd'):
+                return {'error': f'Geen startcommando geconfigureerd voor {name}; vul cmd/cwd in services.json in.'}
+            if _port_open(svc.get('port')):
+                return {'status': 'al actief'}
+            try:
+                cwd = svc.get('cwd') or APP_DIR
+                if cwd == '.':
+                    cwd = APP_DIR
+                p = subprocess.Popen(svc['cmd'], cwd=cwd,
+                                     creationflags=getattr(subprocess, 'CREATE_NEW_CONSOLE', 0))
+                _service_procs[name] = p.pid
+                return {'status': 'gestart', 'pid': p.pid}
+            except Exception as e:
+                return {'error': f'Start mislukt: {e}'}
+    return {'error': f'Onbekende service: {name}'}
+
+
+def services_autostart():
+    """Start bij het opstarten van serve.py alle services met autostart=true die nog niet draaien."""
+    for svc in _load_services():
+        if svc.get('autostart') and svc.get('cmd') and not _port_open(svc.get('port')):
+            r = service_start(svc.get('name'))
+            print(f"  AUTOSTART {svc.get('name')}: {r}")
+
+
+# === Overheid Catalogus: data.overheid.nl (CKAN package_search) ===
+_ovh_cache = {}
+
+
+def overheidcatalogus_zoek(q, sort, rows):
+    """Zoek datasets op data.overheid.nl; sortering standaard op peildatum (metadata_modified)."""
+    key = f'{q}|{sort}|{rows}'
+    if key in _ovh_cache:
+        return _ovh_cache[key]
+    params = urllib.parse.urlencode({'q': q, 'rows': rows, 'sort': sort})
+    url = 'https://data.overheid.nl/data/api/3/action/package_search?' + params
+    req = urllib.request.Request(url, headers={'Accept': 'application/json', 'User-Agent': 'GeoInzicht-app'})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+    except Exception as e:
+        return {'error': f'data.overheid.nl niet bereikbaar: {e}'}
+    _ovh_cache[key] = data
+    return data
+
+
+# === Officiële bekendmakingen (Gemeenteblad e.d.) via KOOP SRU API ===
+BEKENDMAKINGEN_SRU = 'https://repository.overheid.nl/sru'
+_bekendmakingen_cache = {}
+
+
+def bekendmakingen_zoek(adres):
+    """Zoek officiële bekendmakingen (o.a. Gemeenteblad) op een adres via de open SRU-API."""
+    if adres in _bekendmakingen_cache:
+        return _bekendmakingen_cache[adres]
+    schoon = adres.replace('"', ' ').strip()
+    query = f'(cql.textAndIndexes="{schoon}") AND c.product-area=="officielepublicaties" sortBy dt.modified/sort.descending'
+    params = urllib.parse.urlencode({
+        'operation': 'searchRetrieve',
+        'version': '2.0',
+        'query': query,
+        'maximumRecords': '15',
+        'startRecord': '1',
+    })
+    req = urllib.request.Request(BEKENDMAKINGEN_SRU + '?' + params,
+                                 headers={'Accept': 'application/xml', 'User-Agent': 'GeoInzicht-app'})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            xml_data = resp.read()
+    except Exception as e:
+        return {'error': f'SRU-API niet bereikbaar: {e}'}
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(xml_data)
+    except ET.ParseError as e:
+        return {'error': f'SRU-antwoord niet leesbaar: {e}'}
+    items = []
+    for rec in root.iter():
+        if not rec.tag.endswith('recordData'):
+            continue
+        titel = datum = url_ = bron = ''
+        for el in rec.iter():
+            tag = el.tag.split('}')[-1].lower()
+            tekst = (el.text or '').strip()
+            if not tekst:
+                continue
+            if tag == 'title' and not titel:
+                titel = tekst
+            elif tag in ('issued', 'modified', 'date', 'available') and not datum:
+                datum = tekst[:10]
+            elif tag in ('preferredurl', 'itemurl') and not url_:
+                url_ = tekst
+            elif tag == 'identifier' and not url_ and tekst.startswith('http'):
+                url_ = tekst
+            elif tag in ('publicationname', 'creator') and not bron:
+                bron = tekst
+        if titel or url_:
+            items.append({'titel': titel, 'datum': datum, 'url': url_, 'bron': bron})
+    resultaat = {'adres': adres, 'aantal': len(items), 'bekendmakingen': items}
+    _bekendmakingen_cache[adres] = resultaat
+    return resultaat
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -209,6 +354,30 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 'last': _refresh_last,
                 'error': _refresh_error,
             })
+
+        if self.path.startswith('/api/services/status'):
+            return self._json_response(services_status())
+
+        if self.path.startswith('/api/services/start'):
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            naam = (qs.get('name') or [''])[0].strip()
+            if not naam:
+                return self._json_response({'error': 'Geef een service mee via ?name='}, 400)
+            return self._json_response(service_start(naam))
+
+        if self.path.startswith('/api/overheidcatalogus'):
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            q = (qs.get('q') or [''])[0]
+            sort = (qs.get('sort') or ['metadata_modified desc'])[0]
+            rows = (qs.get('rows') or ['25'])[0]
+            return self._json_response(overheidcatalogus_zoek(q, sort, rows))
+
+        if self.path.startswith('/api/bekendmakingen'):
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            adres = (qs.get('q') or [''])[0].strip()
+            if not adres:
+                return self._json_response({'error': 'Geef een adres mee via ?q='}, 400)
+            return self._json_response(bekendmakingen_zoek(adres))
 
         if self.path.startswith('/api/bag/lvc'):
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -275,6 +444,7 @@ with ThreadedServer(("0.0.0.0", PORT), Handler) as httpd:
     print(f"  Status:  http://localhost:{PORT}/api/status")
     if freshness:
         print(f"\n  Data laatst verrijkt: {freshness}")
+    services_autostart()
     print(f"\n  Ctrl+C om te stoppen\n")
     try:
         httpd.serve_forever()

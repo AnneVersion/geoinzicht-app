@@ -1,0 +1,2556 @@
+{
+  "nodes": [
+    {
+      "id": "nl",
+      "naam": "Nederland",
+      "type": "geo_level",
+      "beschrijving": "1 land",
+      "kleur": "#5BA4B5"
+    },
+    {
+      "id": "provincie",
+      "naam": "Provincie",
+      "type": "geo_level",
+      "beschrijving": "12 provincies",
+      "kleur": "#5BA4B5"
+    },
+    {
+      "id": "corop",
+      "naam": "COROP",
+      "type": "geo_level",
+      "beschrijving": "40 regio's",
+      "kleur": "#5BA4B5"
+    },
+    {
+      "id": "gemeente",
+      "naam": "Gemeente",
+      "type": "geo_level",
+      "beschrijving": "343 gemeenten",
+      "kleur": "#5BA4B5"
+    },
+    {
+      "id": "wijk",
+      "naam": "Wijk",
+      "type": "geo_level",
+      "beschrijving": "3.475 wijken",
+      "kleur": "#5BA4B5"
+    },
+    {
+      "id": "buurt",
+      "naam": "Buurt",
+      "type": "geo_level",
+      "beschrijving": "14.700+ buurten",
+      "kleur": "#5BA4B5"
+    },
+    {
+      "id": "adres",
+      "naam": "Adres (BAG)",
+      "type": "geo_level",
+      "beschrijving": "9.7M adressen",
+      "kleur": "#5BA4B5"
+    },
+    {
+      "id": "cbs",
+      "naam": "CBS StatLine",
+      "type": "data_source",
+      "beschrijving": "Centraal Bureau voor de Statistiek — OData API",
+      "kleur": "#C9A96E"
+    },
+    {
+      "id": "bag",
+      "naam": "Kadaster BAG",
+      "type": "data_source",
+      "beschrijving": "Basisregistratie Adressen en Gebouwen via PDOK",
+      "kleur": "#C9A96E"
+    },
+    {
+      "id": "politie",
+      "naam": "Politie",
+      "type": "data_source",
+      "beschrijving": "data.politie.nl — Criminaliteitsregistratie",
+      "kleur": "#C9A96E"
+    },
+    {
+      "id": "vektis",
+      "naam": "Vektis",
+      "type": "data_source",
+      "beschrijving": "Vektis Open Data — Zorgkosten per gemeente",
+      "kleur": "#C9A96E"
+    },
+    {
+      "id": "pdok",
+      "naam": "PDOK",
+      "type": "data_source",
+      "beschrijving": "Publieke Dienstverlening Op de Kaart — Geo services",
+      "kleur": "#C9A96E"
+    },
+    {
+      "id": "gbif",
+      "naam": "GBIF",
+      "type": "data_source",
+      "beschrijving": "Global Biodiversity Information Facility",
+      "kleur": "#C9A96E"
+    },
+    {
+      "id": "ft_bevolking",
+      "naam": "fact_bevolking",
+      "type": "fact_table",
+      "beschrijving": "Bevolkingsgegevens per buurt per jaar",
+      "rij_telling": 136000,
+      "jaar_bereik": "2013-2024",
+      "granulariteit": "buurt",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "ft_inkomen",
+      "naam": "fact_inkomen",
+      "type": "fact_table",
+      "beschrijving": "Inkomensgegevens per buurt per jaar",
+      "rij_telling": 136000,
+      "jaar_bereik": "2013-2024",
+      "granulariteit": "buurt",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "ft_wonen",
+      "naam": "fact_wonen",
+      "type": "fact_table",
+      "beschrijving": "Woningmarktdata per buurt per jaar",
+      "rij_telling": 136000,
+      "jaar_bereik": "2013-2024",
+      "granulariteit": "buurt",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "ft_energie",
+      "naam": "fact_energie",
+      "type": "fact_table",
+      "beschrijving": "Energieverbruik per buurt per jaar",
+      "rij_telling": 54000,
+      "jaar_bereik": "2013-2024",
+      "granulariteit": "buurt",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "ft_soz",
+      "naam": "fact_sociale_zekerheid",
+      "type": "fact_table",
+      "beschrijving": "Sociale zekerheid per buurt per jaar",
+      "rij_telling": 136000,
+      "jaar_bereik": "2013-2024",
+      "granulariteit": "buurt",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "ft_misdrijven",
+      "naam": "fact_misdrijven",
+      "type": "fact_table",
+      "beschrijving": "Criminaliteitsdata per buurt per jaar",
+      "rij_telling": 206000,
+      "jaar_bereik": "2012-2025",
+      "granulariteit": "buurt",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "ft_zorgkosten",
+      "naam": "fact_zorgkosten",
+      "type": "fact_table",
+      "beschrijving": "Zorgkosten per gemeente",
+      "rij_telling": 2400,
+      "jaar_bereik": "2019-2024",
+      "granulariteit": "gemeente",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "dim_buurt",
+      "naam": "dim_buurt",
+      "type": "dimension",
+      "beschrijving": "Buurt dimensie (14.700 buurten)",
+      "rij_telling": 14700,
+      "kleur": "#a78bfa"
+    },
+    {
+      "id": "dim_wijk",
+      "naam": "dim_wijk",
+      "type": "dimension",
+      "beschrijving": "Wijk dimensie (3.200 wijken)",
+      "rij_telling": 3200,
+      "kleur": "#a78bfa"
+    },
+    {
+      "id": "dim_gemeente",
+      "naam": "dim_gemeente",
+      "type": "dimension",
+      "beschrijving": "Gemeente dimensie (340 gemeenten)",
+      "rij_telling": 340,
+      "kleur": "#a78bfa"
+    },
+    {
+      "id": "dim_tijd",
+      "naam": "dim_tijd",
+      "type": "dimension",
+      "beschrijving": "Tijd dimensie (2013-2025)",
+      "rij_telling": 13,
+      "kleur": "#a78bfa"
+    },
+    {
+      "id": "dom_bevolking",
+      "naam": "Bevolking",
+      "type": "domein",
+      "kleur": "#38bdf8",
+      "icon": "groups"
+    },
+    {
+      "id": "dom_leeftijd",
+      "naam": "Leeftijdsopbouw",
+      "type": "domein",
+      "kleur": "#a78bfa",
+      "icon": "cake"
+    },
+    {
+      "id": "dom_herkomst",
+      "naam": "Herkomst & Diversiteit",
+      "type": "domein",
+      "kleur": "#fb923c",
+      "icon": "public"
+    },
+    {
+      "id": "dom_huishoudens",
+      "naam": "Huishoudens",
+      "type": "domein",
+      "kleur": "#f472b6",
+      "icon": "family_restroom"
+    },
+    {
+      "id": "dom_opleiding",
+      "naam": "Opleiding",
+      "type": "domein",
+      "kleur": "#c084fc",
+      "icon": "school"
+    },
+    {
+      "id": "dom_inkomen",
+      "naam": "Inkomen & Welvaart",
+      "type": "domein",
+      "kleur": "#4ade80",
+      "icon": "payments"
+    },
+    {
+      "id": "dom_wonen",
+      "naam": "Wonen & Woningmarkt",
+      "type": "domein",
+      "kleur": "#22c55e",
+      "icon": "home"
+    },
+    {
+      "id": "dom_energie",
+      "naam": "Energie",
+      "type": "domein",
+      "kleur": "#fbbf24",
+      "icon": "bolt"
+    },
+    {
+      "id": "dom_economie",
+      "naam": "Economie & Arbeid",
+      "type": "domein",
+      "kleur": "#f97316",
+      "icon": "work"
+    },
+    {
+      "id": "dom_sociale_zekerheid",
+      "naam": "Sociale Zekerheid",
+      "type": "domein",
+      "kleur": "#f43f5e",
+      "icon": "health_and_safety"
+    },
+    {
+      "id": "dom_voorzieningen",
+      "naam": "Voorzieningen",
+      "type": "domein",
+      "kleur": "#ec4899",
+      "icon": "local_hospital"
+    },
+    {
+      "id": "dom_natuur",
+      "naam": "Natuur & Groen",
+      "type": "domein",
+      "kleur": "#34d399",
+      "icon": "park"
+    },
+    {
+      "id": "dom_mobiliteit",
+      "naam": "Mobiliteit",
+      "type": "domein",
+      "kleur": "#06b6d4",
+      "icon": "directions_car"
+    },
+    {
+      "id": "dom_oppervlakte",
+      "naam": "Oppervlakte",
+      "type": "domein",
+      "kleur": "#94a3b8",
+      "icon": "straighten"
+    },
+    {
+      "id": "dom_bodemgebruik",
+      "naam": "Bodemgebruik",
+      "type": "domein",
+      "kleur": "#a3e635",
+      "icon": "landscape"
+    },
+    {
+      "id": "dom_flora_fauna",
+      "naam": "Flora & Fauna",
+      "type": "domein",
+      "kleur": "#84cc16",
+      "icon": "pets"
+    },
+    {
+      "id": "dom_landbouw",
+      "naam": "Landbouw",
+      "type": "domein",
+      "kleur": "#ca8a04",
+      "icon": "agriculture"
+    },
+    {
+      "id": "dom_zorgkosten",
+      "naam": "Zorgkosten",
+      "type": "domein",
+      "kleur": "#ef4444",
+      "icon": "local_pharmacy"
+    },
+    {
+      "id": "dom_onverzekerden",
+      "naam": "Onverzekerden & Uitkeringen",
+      "type": "domein",
+      "kleur": "#be123c",
+      "icon": "shield"
+    },
+    {
+      "id": "dom_criminaliteit",
+      "naam": "Criminaliteit",
+      "type": "domein",
+      "kleur": "#dc2626",
+      "icon": "gavel"
+    },
+    {
+      "id": "dom_bag_adressen",
+      "naam": "BAG Adressen",
+      "type": "domein",
+      "kleur": "#39ff14",
+      "icon": "home"
+    },
+    {
+      "id": "attr_aantal_inwoners",
+      "key": "aantal_inwoners",
+      "naam": "Aantal inwoners",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS Kerncijfers",
+      "domein": "bevolking",
+      "kleur": "#38bdf8"
+    },
+    {
+      "id": "attr_mannen",
+      "key": "mannen",
+      "naam": "Mannen",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS Kerncijfers",
+      "domein": "bevolking",
+      "kleur": "#38bdf8"
+    },
+    {
+      "id": "attr_vrouwen",
+      "key": "vrouwen",
+      "naam": "Vrouwen",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS Kerncijfers",
+      "domein": "bevolking",
+      "kleur": "#38bdf8"
+    },
+    {
+      "id": "attr_bevolkingsdichtheid",
+      "key": "bevolkingsdichtheid",
+      "naam": "Bevolkingsdichtheid",
+      "type": "attribuut",
+      "eenheid": "/km²",
+      "bron": "CBS Kerncijfers",
+      "domein": "bevolking",
+      "kleur": "#38bdf8"
+    },
+    {
+      "id": "attr_geboorte_relatief",
+      "key": "geboorte_relatief",
+      "naam": "Geboorten per 1000 inw.",
+      "type": "attribuut",
+      "eenheid": "‰",
+      "bron": "CBS Kerncijfers",
+      "domein": "bevolking",
+      "kleur": "#38bdf8"
+    },
+    {
+      "id": "attr_sterfte_relatief",
+      "key": "sterfte_relatief",
+      "naam": "Sterfte relatief",
+      "type": "attribuut",
+      "eenheid": "‰",
+      "bron": "CBS Kerncijfers",
+      "domein": "bevolking",
+      "kleur": "#38bdf8"
+    },
+    {
+      "id": "attr_stedelijkheid",
+      "key": "stedelijkheid",
+      "naam": "Stedelijkheid (OAD)",
+      "type": "attribuut",
+      "eenheid": "adr/km²",
+      "bron": "CBS Kerncijfers",
+      "domein": "bevolking",
+      "kleur": "#38bdf8"
+    },
+    {
+      "id": "attr_0_15",
+      "key": "0_15",
+      "naam": "0-15 jaar",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "leeftijd",
+      "kleur": "#a78bfa"
+    },
+    {
+      "id": "attr_15_25",
+      "key": "15_25",
+      "naam": "15-25 jaar",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "leeftijd",
+      "kleur": "#a78bfa"
+    },
+    {
+      "id": "attr_25_45",
+      "key": "25_45",
+      "naam": "25-45 jaar",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "leeftijd",
+      "kleur": "#a78bfa"
+    },
+    {
+      "id": "attr_45_65",
+      "key": "45_65",
+      "naam": "45-65 jaar",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "leeftijd",
+      "kleur": "#a78bfa"
+    },
+    {
+      "id": "attr_65plus",
+      "key": "65plus",
+      "naam": "65-plussers",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "leeftijd",
+      "kleur": "#a78bfa"
+    },
+    {
+      "id": "attr_pct_herkomst_nl",
+      "key": "pct_herkomst_nl",
+      "naam": "Herkomst Nederland",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "herkomst",
+      "kleur": "#fb923c"
+    },
+    {
+      "id": "attr_pct_herkomst_europa",
+      "key": "pct_herkomst_europa",
+      "naam": "Herkomst Europa",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "herkomst",
+      "kleur": "#fb923c"
+    },
+    {
+      "id": "attr_pct_herkomst_buiten_europa",
+      "key": "pct_herkomst_buiten_europa",
+      "naam": "Herkomst buiten Europa",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "herkomst",
+      "kleur": "#fb923c"
+    },
+    {
+      "id": "attr_huishoudens",
+      "key": "huishoudens",
+      "naam": "Huishoudens",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "CBS Kerncijfers",
+      "domein": "huishoudens",
+      "kleur": "#f472b6"
+    },
+    {
+      "id": "attr_gem_huishouden_grootte",
+      "key": "gem_huishouden_grootte",
+      "naam": "Gem. huishoudensgrootte",
+      "type": "attribuut",
+      "eenheid": "pers.",
+      "bron": "CBS Kerncijfers",
+      "domein": "huishoudens",
+      "kleur": "#f472b6"
+    },
+    {
+      "id": "attr_pct_eenpersoonshhd",
+      "key": "pct_eenpersoonshhd",
+      "naam": "Eenpersoonshuishoudens",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "huishoudens",
+      "kleur": "#f472b6"
+    },
+    {
+      "id": "attr_pct_hhd_met_kind",
+      "key": "pct_hhd_met_kind",
+      "naam": "Huishoudens met kinderen",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "huishoudens",
+      "kleur": "#f472b6"
+    },
+    {
+      "id": "attr_pct_hhd_zonder_kind",
+      "key": "pct_hhd_zonder_kind",
+      "naam": "Huish. zonder kinderen",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "huishoudens",
+      "kleur": "#f472b6"
+    },
+    {
+      "id": "attr_pct_gehuwd",
+      "key": "pct_gehuwd",
+      "naam": "Gehuwd",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "huishoudens",
+      "kleur": "#f472b6"
+    },
+    {
+      "id": "attr_pct_ongehuwd",
+      "key": "pct_ongehuwd",
+      "naam": "Ongehuwd",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "huishoudens",
+      "kleur": "#f472b6"
+    },
+    {
+      "id": "attr_opl_hoog",
+      "key": "opl_hoog",
+      "naam": "Opleidingsniveau hoog",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "opleiding",
+      "kleur": "#c084fc"
+    },
+    {
+      "id": "attr_opl_midden",
+      "key": "opl_midden",
+      "naam": "Opleidingsniveau midden",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "opleiding",
+      "kleur": "#c084fc"
+    },
+    {
+      "id": "attr_opl_laag",
+      "key": "opl_laag",
+      "naam": "Opleidingsniveau laag",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "opleiding",
+      "kleur": "#c084fc"
+    },
+    {
+      "id": "attr_gem_inkomen_inwoner",
+      "key": "gem_inkomen_inwoner",
+      "naam": "Gem. inkomen/inwoner",
+      "type": "attribuut",
+      "eenheid": "x1000",
+      "bron": "CBS Kerncijfers",
+      "domein": "inkomen",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "attr_gem_inkomen_ontvanger",
+      "key": "gem_inkomen_ontvanger",
+      "naam": "Gem. inkomen/ontvanger",
+      "type": "attribuut",
+      "eenheid": "EUR",
+      "bron": "CBS Kerncijfers",
+      "domein": "inkomen",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "attr_gem_gestand_inkomen",
+      "key": "gem_gestand_inkomen",
+      "naam": "Gem. gestand. inkomen",
+      "type": "attribuut",
+      "eenheid": "x1000",
+      "bron": "CBS Kerncijfers",
+      "domein": "inkomen",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "attr_mediaan_vermogen",
+      "key": "mediaan_vermogen",
+      "naam": "Mediaan vermogen huish.",
+      "type": "attribuut",
+      "eenheid": "x1000",
+      "bron": "CBS Kerncijfers",
+      "domein": "inkomen",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "attr_pct_hh_hoog_inkomen",
+      "key": "pct_hh_hoog_inkomen",
+      "naam": "Hoog inkomen huish.",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "inkomen",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "attr_pct_hh_laag_inkomen",
+      "key": "pct_hh_laag_inkomen",
+      "naam": "Laag inkomen huish.",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "inkomen",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "attr_pct_rond_sociaal_min",
+      "key": "pct_rond_sociaal_min",
+      "naam": "Rond sociaal minimum",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "inkomen",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "attr_personen_armoede",
+      "key": "personen_armoede",
+      "naam": "Personen in armoede",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS Kerncijfers",
+      "domein": "inkomen",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "attr_pct_armoede",
+      "key": "pct_armoede",
+      "naam": "Armoede",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "inkomen",
+      "kleur": "#4ade80"
+    },
+    {
+      "id": "attr_gem_woz_waarde",
+      "key": "gem_woz_waarde",
+      "naam": "Gem. WOZ-waarde",
+      "type": "attribuut",
+      "eenheid": "x1000",
+      "bron": "CBS Kerncijfers",
+      "domein": "wonen",
+      "kleur": "#22c55e"
+    },
+    {
+      "id": "attr_woningvoorraad",
+      "key": "woningvoorraad",
+      "naam": "Woningvoorraad",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "CBS Kerncijfers",
+      "domein": "wonen",
+      "kleur": "#22c55e"
+    },
+    {
+      "id": "attr_koopwoningen",
+      "key": "koopwoningen",
+      "naam": "Koopwoningen",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "wonen",
+      "kleur": "#22c55e"
+    },
+    {
+      "id": "attr_huurwoningen",
+      "key": "huurwoningen",
+      "naam": "Huurwoningen",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "wonen",
+      "kleur": "#22c55e"
+    },
+    {
+      "id": "attr_pct_eengezins",
+      "key": "pct_eengezins",
+      "naam": "Eengezinswoningen",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "wonen",
+      "kleur": "#22c55e"
+    },
+    {
+      "id": "attr_pct_meergezins",
+      "key": "pct_meergezins",
+      "naam": "Meergezinswoningen",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "wonen",
+      "kleur": "#22c55e"
+    },
+    {
+      "id": "attr_pct_bouwjaar_na_2000",
+      "key": "pct_bouwjaar_na_2000",
+      "naam": "Bouwjaar na 2000",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "wonen",
+      "kleur": "#22c55e"
+    },
+    {
+      "id": "attr_pct_leegstand",
+      "key": "pct_leegstand",
+      "naam": "Leegstand woningen",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "wonen",
+      "kleur": "#22c55e"
+    },
+    {
+      "id": "attr_pct_stadsverwarming",
+      "key": "pct_stadsverwarming",
+      "naam": "Stadsverwarming",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "wonen",
+      "kleur": "#22c55e"
+    },
+    {
+      "id": "attr_pct_huurcorporatie",
+      "key": "pct_huurcorporatie",
+      "naam": "Huur woningcorporatie",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "wonen",
+      "kleur": "#22c55e"
+    },
+    {
+      "id": "attr_gem_aardgas",
+      "key": "gem_aardgas",
+      "naam": "Gem. aardgas",
+      "type": "attribuut",
+      "eenheid": "m³",
+      "bron": "CBS Kerncijfers",
+      "domein": "energie",
+      "kleur": "#fbbf24"
+    },
+    {
+      "id": "attr_gem_elektriciteit",
+      "key": "gem_elektriciteit",
+      "naam": "Gem. elektriciteit",
+      "type": "attribuut",
+      "eenheid": "kWh",
+      "bron": "CBS Kerncijfers",
+      "domein": "energie",
+      "kleur": "#fbbf24"
+    },
+    {
+      "id": "attr_aardgasvrije_woningen",
+      "key": "aardgasvrije_woningen",
+      "naam": "Aardgasvrije woningen",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "CBS Kerncijfers",
+      "domein": "energie",
+      "kleur": "#fbbf24"
+    },
+    {
+      "id": "attr_pct_aardgasvrij",
+      "key": "pct_aardgasvrij",
+      "naam": "Aardgasvrij",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "energie",
+      "kleur": "#fbbf24"
+    },
+    {
+      "id": "attr_woningen_zonnestroom",
+      "key": "woningen_zonnestroom",
+      "naam": "Woningen met zonnestroom",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "CBS Kerncijfers",
+      "domein": "energie",
+      "kleur": "#fbbf24"
+    },
+    {
+      "id": "attr_pct_zonnestroom",
+      "key": "pct_zonnestroom",
+      "naam": "Zonnestroom",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "energie",
+      "kleur": "#fbbf24"
+    },
+    {
+      "id": "attr_arbeidsparticipatie",
+      "key": "arbeidsparticipatie",
+      "naam": "Arbeidsparticipatie",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "economie",
+      "kleur": "#f97316"
+    },
+    {
+      "id": "attr_bedrijfsvestigingen",
+      "key": "bedrijfsvestigingen",
+      "naam": "Bedrijfsvestigingen",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "CBS Kerncijfers",
+      "domein": "economie",
+      "kleur": "#f97316"
+    },
+    {
+      "id": "attr_pct_werknemers",
+      "key": "pct_werknemers",
+      "naam": "Werknemers",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "economie",
+      "kleur": "#f97316"
+    },
+    {
+      "id": "attr_pct_zelfstandigen",
+      "key": "pct_zelfstandigen",
+      "naam": "Zelfstandigen",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "economie",
+      "kleur": "#f97316"
+    },
+    {
+      "id": "attr_wmo_per_1000",
+      "key": "wmo_per_1000",
+      "naam": "WMO-clienten/1000 inw.",
+      "type": "attribuut",
+      "eenheid": "‰",
+      "bron": "CBS Kerncijfers",
+      "domein": "sociale_zekerheid",
+      "kleur": "#f43f5e"
+    },
+    {
+      "id": "attr_pct_jeugdzorg",
+      "key": "pct_jeugdzorg",
+      "naam": "Jongeren met jeugdzorg",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Kerncijfers",
+      "domein": "sociale_zekerheid",
+      "kleur": "#f43f5e"
+    },
+    {
+      "id": "attr_afstand_huisarts",
+      "key": "afstand_huisarts",
+      "naam": "Afstand huisarts",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "voorzieningen",
+      "kleur": "#ec4899"
+    },
+    {
+      "id": "attr_afstand_supermarkt",
+      "key": "afstand_supermarkt",
+      "naam": "Afstand supermarkt",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "voorzieningen",
+      "kleur": "#ec4899"
+    },
+    {
+      "id": "attr_afstand_treinstation",
+      "key": "afstand_treinstation",
+      "naam": "Afstand treinstation",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "voorzieningen",
+      "kleur": "#ec4899"
+    },
+    {
+      "id": "attr_afstand_apotheek",
+      "key": "afstand_apotheek",
+      "naam": "Afstand apotheek",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "voorzieningen",
+      "kleur": "#ec4899"
+    },
+    {
+      "id": "attr_afstand_basisonderwijs",
+      "key": "afstand_basisonderwijs",
+      "naam": "Afstand basisschool",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "voorzieningen",
+      "kleur": "#ec4899"
+    },
+    {
+      "id": "attr_afstand_kdv",
+      "key": "afstand_kdv",
+      "naam": "Afstand kinderdagverblijf",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "voorzieningen",
+      "kleur": "#ec4899"
+    },
+    {
+      "id": "attr_afstand_ziekenhuis",
+      "key": "afstand_ziekenhuis",
+      "naam": "Afstand ziekenhuis",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "voorzieningen",
+      "kleur": "#ec4899"
+    },
+    {
+      "id": "attr_afstand_bibliotheek",
+      "key": "afstand_bibliotheek",
+      "naam": "Afstand bibliotheek",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "voorzieningen",
+      "kleur": "#ec4899"
+    },
+    {
+      "id": "attr_afstand_restaurant",
+      "key": "afstand_restaurant",
+      "naam": "Afstand restaurant",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "voorzieningen",
+      "kleur": "#ec4899"
+    },
+    {
+      "id": "attr_afstand_cafe",
+      "key": "afstand_cafe",
+      "naam": "Afstand cafe",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "voorzieningen",
+      "kleur": "#ec4899"
+    },
+    {
+      "id": "attr_afstand_park",
+      "key": "afstand_park",
+      "naam": "Afstand park/plantsoen",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "natuur",
+      "kleur": "#34d399"
+    },
+    {
+      "id": "attr_afstand_bos",
+      "key": "afstand_bos",
+      "naam": "Afstand bos",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "natuur",
+      "kleur": "#34d399"
+    },
+    {
+      "id": "attr_afstand_openbaar_groen",
+      "key": "afstand_openbaar_groen",
+      "naam": "Afstand openbaar groen",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "natuur",
+      "kleur": "#34d399"
+    },
+    {
+      "id": "attr_afstand_natuur",
+      "key": "afstand_natuur",
+      "naam": "Afstand natuurterrein",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "natuur",
+      "kleur": "#34d399"
+    },
+    {
+      "id": "attr_afstand_sportterrein",
+      "key": "afstand_sportterrein",
+      "naam": "Afstand sportterrein",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "natuur",
+      "kleur": "#34d399"
+    },
+    {
+      "id": "attr_personenautos",
+      "key": "personenautos",
+      "naam": "Personenauto's",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "CBS Kerncijfers",
+      "domein": "mobiliteit",
+      "kleur": "#06b6d4"
+    },
+    {
+      "id": "attr_auto_per_huishouden",
+      "key": "auto_per_huishouden",
+      "naam": "Auto's per huishouden",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "CBS Kerncijfers",
+      "domein": "mobiliteit",
+      "kleur": "#06b6d4"
+    },
+    {
+      "id": "attr_auto_per_km2",
+      "key": "auto_per_km2",
+      "naam": "Auto's per km²",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "CBS Kerncijfers",
+      "domein": "mobiliteit",
+      "kleur": "#06b6d4"
+    },
+    {
+      "id": "attr_motorfietsen",
+      "key": "motorfietsen",
+      "naam": "Motorfietsen",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "CBS Kerncijfers",
+      "domein": "mobiliteit",
+      "kleur": "#06b6d4"
+    },
+    {
+      "id": "attr_laadpalen",
+      "key": "laadpalen",
+      "naam": "Publieke laadpalen",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "CBS Kerncijfers",
+      "domein": "mobiliteit",
+      "kleur": "#06b6d4"
+    },
+    {
+      "id": "attr_afstand_oprit",
+      "key": "afstand_oprit",
+      "naam": "Afstand oprit snelweg",
+      "type": "attribuut",
+      "eenheid": "km",
+      "bron": "CBS Kerncijfers",
+      "domein": "mobiliteit",
+      "kleur": "#06b6d4"
+    },
+    {
+      "id": "attr_opp_land",
+      "key": "opp_land",
+      "naam": "Oppervlakte land",
+      "type": "attribuut",
+      "eenheid": "ha",
+      "bron": "CBS Kerncijfers",
+      "domein": "oppervlakte",
+      "kleur": "#94a3b8"
+    },
+    {
+      "id": "attr_opp_water",
+      "key": "opp_water",
+      "naam": "Oppervlakte water",
+      "type": "attribuut",
+      "eenheid": "ha",
+      "bron": "CBS Kerncijfers",
+      "domein": "oppervlakte",
+      "kleur": "#94a3b8"
+    },
+    {
+      "id": "attr_pct_bebouwd",
+      "key": "pct_bebouwd",
+      "naam": "Bebouwd terrein",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Bodemgebruik",
+      "domein": "bodemgebruik",
+      "kleur": "#a3e635"
+    },
+    {
+      "id": "attr_pct_agrarisch",
+      "key": "pct_agrarisch",
+      "naam": "Agrarisch terrein",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Bodemgebruik",
+      "domein": "bodemgebruik",
+      "kleur": "#a3e635"
+    },
+    {
+      "id": "attr_pct_natuur",
+      "key": "pct_natuur",
+      "naam": "Natuurterrein",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Bodemgebruik",
+      "domein": "bodemgebruik",
+      "kleur": "#a3e635"
+    },
+    {
+      "id": "attr_pct_recreatie",
+      "key": "pct_recreatie",
+      "naam": "Recreatieterrein",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS Bodemgebruik",
+      "domein": "bodemgebruik",
+      "kleur": "#a3e635"
+    },
+    {
+      "id": "attr_opp_woonterrein_ha",
+      "key": "opp_woonterrein_ha",
+      "naam": "Woonterrein",
+      "type": "attribuut",
+      "eenheid": "ha",
+      "bron": "CBS Bodemgebruik",
+      "domein": "bodemgebruik",
+      "kleur": "#a3e635"
+    },
+    {
+      "id": "attr_opp_bedrijventerrein_ha",
+      "key": "opp_bedrijventerrein_ha",
+      "naam": "Bedrijventerrein",
+      "type": "attribuut",
+      "eenheid": "ha",
+      "bron": "CBS Bodemgebruik",
+      "domein": "bodemgebruik",
+      "kleur": "#a3e635"
+    },
+    {
+      "id": "attr_ff_totaal_soorten",
+      "key": "ff_totaal_soorten",
+      "naam": "Totaal soorten",
+      "type": "attribuut",
+      "eenheid": "soorten",
+      "bron": "GBIF",
+      "domein": "flora_fauna",
+      "kleur": "#84cc16"
+    },
+    {
+      "id": "attr_ff_totaal_waarnemingen",
+      "key": "ff_totaal_waarnemingen",
+      "naam": "Totaal waarnemingen",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "GBIF",
+      "domein": "flora_fauna",
+      "kleur": "#84cc16"
+    },
+    {
+      "id": "attr_ff_soorten_vogels",
+      "key": "ff_soorten_vogels",
+      "naam": "Vogelsoorten",
+      "type": "attribuut",
+      "eenheid": "soorten",
+      "bron": "GBIF",
+      "domein": "flora_fauna",
+      "kleur": "#84cc16"
+    },
+    {
+      "id": "attr_ff_soorten_zoogdieren",
+      "key": "ff_soorten_zoogdieren",
+      "naam": "Zoogdiersoorten",
+      "type": "attribuut",
+      "eenheid": "soorten",
+      "bron": "GBIF",
+      "domein": "flora_fauna",
+      "kleur": "#84cc16"
+    },
+    {
+      "id": "attr_ff_soorten_planten",
+      "key": "ff_soorten_planten",
+      "naam": "Plantensoorten",
+      "type": "attribuut",
+      "eenheid": "soorten",
+      "bron": "GBIF",
+      "domein": "flora_fauna",
+      "kleur": "#84cc16"
+    },
+    {
+      "id": "attr_lbt_totaal_cultuurgrond_ha",
+      "key": "lbt_totaal_cultuurgrond_ha",
+      "naam": "Cultuurgrond",
+      "type": "attribuut",
+      "eenheid": "ha",
+      "bron": "CBS Landbouwtelling",
+      "domein": "landbouw",
+      "kleur": "#ca8a04"
+    },
+    {
+      "id": "attr_lbt_totaal_rundvee",
+      "key": "lbt_totaal_rundvee",
+      "naam": "Rundvee",
+      "type": "attribuut",
+      "eenheid": "dieren",
+      "bron": "CBS Landbouwtelling",
+      "domein": "landbouw",
+      "kleur": "#ca8a04"
+    },
+    {
+      "id": "attr_lbt_totaal_varkens",
+      "key": "lbt_totaal_varkens",
+      "naam": "Varkens",
+      "type": "attribuut",
+      "eenheid": "dieren",
+      "bron": "CBS Landbouwtelling",
+      "domein": "landbouw",
+      "kleur": "#ca8a04"
+    },
+    {
+      "id": "attr_lbt_totaal_kippen",
+      "key": "lbt_totaal_kippen",
+      "naam": "Kippen",
+      "type": "attribuut",
+      "eenheid": "dieren",
+      "bron": "CBS Landbouwtelling",
+      "domein": "landbouw",
+      "kleur": "#ca8a04"
+    },
+    {
+      "id": "attr_lbt_aantal_bedrijven",
+      "key": "lbt_aantal_bedrijven",
+      "naam": "Landbouwbedrijven",
+      "type": "attribuut",
+      "eenheid": "bedrijven",
+      "bron": "CBS Landbouwtelling",
+      "domein": "landbouw",
+      "kleur": "#ca8a04"
+    },
+    {
+      "id": "attr_zk_kosten_totaal",
+      "key": "zk_kosten_totaal",
+      "naam": "Totale zorgkosten/verz.",
+      "type": "attribuut",
+      "eenheid": "EUR",
+      "bron": "Vektis Open Data",
+      "domein": "zorgkosten",
+      "kleur": "#ef4444"
+    },
+    {
+      "id": "attr_zk_kosten_medspec",
+      "key": "zk_kosten_medspec",
+      "naam": "Medisch specialist/verz.",
+      "type": "attribuut",
+      "eenheid": "EUR",
+      "bron": "Vektis Open Data",
+      "domein": "zorgkosten",
+      "kleur": "#ef4444"
+    },
+    {
+      "id": "attr_zk_kosten_farmacie",
+      "key": "zk_kosten_farmacie",
+      "naam": "Farmacie/verz.",
+      "type": "attribuut",
+      "eenheid": "EUR",
+      "bron": "Vektis Open Data",
+      "domein": "zorgkosten",
+      "kleur": "#ef4444"
+    },
+    {
+      "id": "attr_zk_kosten_ggz",
+      "key": "zk_kosten_ggz",
+      "naam": "GGZ/verz.",
+      "type": "attribuut",
+      "eenheid": "EUR",
+      "bron": "Vektis Open Data",
+      "domein": "zorgkosten",
+      "kleur": "#ef4444"
+    },
+    {
+      "id": "attr_zk_kosten_huisarts",
+      "key": "zk_kosten_huisarts",
+      "naam": "Huisarts/verz.",
+      "type": "attribuut",
+      "eenheid": "EUR",
+      "bron": "Vektis Open Data",
+      "domein": "zorgkosten",
+      "kleur": "#ef4444"
+    },
+    {
+      "id": "attr_zk_kosten_paramedisch",
+      "key": "zk_kosten_paramedisch",
+      "naam": "Paramedisch/verz.",
+      "type": "attribuut",
+      "eenheid": "EUR",
+      "bron": "Vektis Open Data",
+      "domein": "zorgkosten",
+      "kleur": "#ef4444"
+    },
+    {
+      "id": "attr_zk_aantal_verzekerden",
+      "key": "zk_aantal_verzekerden",
+      "naam": "Aantal verzekerden",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "Vektis Open Data",
+      "domein": "zorgkosten",
+      "kleur": "#ef4444"
+    },
+    {
+      "id": "attr_sa_bevolking",
+      "key": "sa_bevolking",
+      "naam": "CBS Bevolking",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS + Vektis",
+      "domein": "onverzekerden",
+      "kleur": "#be123c"
+    },
+    {
+      "id": "attr_sa_verzekerden",
+      "key": "sa_verzekerden",
+      "naam": "Vektis Verzekerden",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS + Vektis",
+      "domein": "onverzekerden",
+      "kleur": "#be123c"
+    },
+    {
+      "id": "attr_sa_onverzekerd",
+      "key": "sa_onverzekerd",
+      "naam": "Geschat onverzekerd",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS + Vektis",
+      "domein": "onverzekerden",
+      "kleur": "#be123c"
+    },
+    {
+      "id": "attr_sa_pct_onverzekerd",
+      "key": "sa_pct_onverzekerd",
+      "naam": "% Geschat onverzekerd",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS + Vektis",
+      "domein": "onverzekerden",
+      "kleur": "#be123c"
+    },
+    {
+      "id": "attr_sa_uitkeringen",
+      "key": "sa_uitkeringen",
+      "naam": "Uitkeringsontvangers",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS + Vektis",
+      "domein": "onverzekerden",
+      "kleur": "#be123c"
+    },
+    {
+      "id": "attr_sa_ww",
+      "key": "sa_ww",
+      "naam": "WW-uitkeringen",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS Kerncijfers",
+      "domein": "onverzekerden",
+      "kleur": "#be123c"
+    },
+    {
+      "id": "attr_sa_bijstand",
+      "key": "sa_bijstand",
+      "naam": "Bijstand",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS Kerncijfers",
+      "domein": "onverzekerden",
+      "kleur": "#be123c"
+    },
+    {
+      "id": "attr_sa_ao",
+      "key": "sa_ao",
+      "naam": "Arbeidsongeschiktheid",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS Kerncijfers",
+      "domein": "onverzekerden",
+      "kleur": "#be123c"
+    },
+    {
+      "id": "attr_sa_wajong",
+      "key": "sa_wajong",
+      "naam": "Wajong",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS Kerncijfers",
+      "domein": "onverzekerden",
+      "kleur": "#be123c"
+    },
+    {
+      "id": "attr_sa_pct_uitkeringen",
+      "key": "sa_pct_uitkeringen",
+      "naam": "% Uitkeringsontvangers",
+      "type": "attribuut",
+      "eenheid": "%",
+      "bron": "CBS + Vektis",
+      "domein": "onverzekerden",
+      "kleur": "#be123c"
+    },
+    {
+      "id": "attr_sa_uitk_onverzekerd",
+      "key": "sa_uitk_onverzekerd",
+      "naam": "Uitk.ontv. zonder verz.",
+      "type": "attribuut",
+      "eenheid": "personen",
+      "bron": "CBS + Vektis",
+      "domein": "onverzekerden",
+      "kleur": "#be123c"
+    },
+    {
+      "id": "attr_cr_totaal_misdrijven",
+      "key": "cr_totaal_misdrijven",
+      "naam": "Totaal misdrijven",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_cr_inbraak_woning",
+      "key": "cr_inbraak_woning",
+      "naam": "Woninginbraak",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_cr_diefstal_fietsen",
+      "key": "cr_diefstal_fietsen",
+      "naam": "Fietsendiefstal",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_cr_diefstal_motor",
+      "key": "cr_diefstal_motor",
+      "naam": "Diefstal motorvoertuigen",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_cr_mishandeling",
+      "key": "cr_mishandeling",
+      "naam": "Mishandeling",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_cr_bedreiging",
+      "key": "cr_bedreiging",
+      "naam": "Bedreiging",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_cr_vernieling",
+      "key": "cr_vernieling",
+      "naam": "Vernieling",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_cr_straatroof",
+      "key": "cr_straatroof",
+      "naam": "Straatroof",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_cr_drugs_drank",
+      "key": "cr_drugs_drank",
+      "naam": "Drugs/drankoverlast",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_cr_winkeldiefstal",
+      "key": "cr_winkeldiefstal",
+      "naam": "Winkeldiefstal",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_cr_cybercrime",
+      "key": "cr_cybercrime",
+      "naam": "Cybercrime",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_cr_fraude",
+      "key": "cr_fraude",
+      "naam": "Horizontale fraude",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_cr_inbraak_bedrijven",
+      "key": "cr_inbraak_bedrijven",
+      "naam": "Inbraak bedrijven",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Politie",
+      "domein": "criminaliteit",
+      "kleur": "#dc2626"
+    },
+    {
+      "id": "attr_bag_adressen_totaal",
+      "key": "bag_adressen_totaal",
+      "naam": "Totaal adressen",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Kadaster BAG",
+      "domein": "bag_adressen",
+      "kleur": "#39ff14"
+    },
+    {
+      "id": "attr_bag_adressen_woon",
+      "key": "bag_adressen_woon",
+      "naam": "Woningen",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Kadaster BAG",
+      "domein": "bag_adressen",
+      "kleur": "#39ff14"
+    },
+    {
+      "id": "attr_bag_adressen_kantoor",
+      "key": "bag_adressen_kantoor",
+      "naam": "Kantoren",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Kadaster BAG",
+      "domein": "bag_adressen",
+      "kleur": "#39ff14"
+    },
+    {
+      "id": "attr_bag_adressen_winkel",
+      "key": "bag_adressen_winkel",
+      "naam": "Winkels",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Kadaster BAG",
+      "domein": "bag_adressen",
+      "kleur": "#39ff14"
+    },
+    {
+      "id": "attr_bag_adressen_industrie",
+      "key": "bag_adressen_industrie",
+      "naam": "Industrie",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Kadaster BAG",
+      "domein": "bag_adressen",
+      "kleur": "#39ff14"
+    },
+    {
+      "id": "attr_bag_adressen_overig",
+      "key": "bag_adressen_overig",
+      "naam": "Overig",
+      "type": "attribuut",
+      "eenheid": "aantal",
+      "bron": "Kadaster BAG",
+      "domein": "bag_adressen",
+      "kleur": "#39ff14"
+    },
+    {
+      "id": "attr_bag_gem_oppervlakte",
+      "key": "bag_gem_oppervlakte",
+      "naam": "Gem. oppervlakte",
+      "type": "attribuut",
+      "eenheid": "m²",
+      "bron": "Kadaster BAG",
+      "domein": "bag_adressen",
+      "kleur": "#39ff14"
+    },
+    {
+      "id": "attr_bag_med_bouwjaar",
+      "key": "bag_med_bouwjaar",
+      "naam": "Mediaan bouwjaar",
+      "type": "attribuut",
+      "eenheid": "jaar",
+      "bron": "Kadaster BAG",
+      "domein": "bag_adressen",
+      "kleur": "#39ff14"
+    }
+  ],
+  "links": [
+    {
+      "source": "nl",
+      "target": "provincie",
+      "type": "bevat"
+    },
+    {
+      "source": "provincie",
+      "target": "corop",
+      "type": "bevat"
+    },
+    {
+      "source": "corop",
+      "target": "gemeente",
+      "type": "bevat"
+    },
+    {
+      "source": "gemeente",
+      "target": "wijk",
+      "type": "bevat"
+    },
+    {
+      "source": "wijk",
+      "target": "buurt",
+      "type": "bevat"
+    },
+    {
+      "source": "buurt",
+      "target": "adres",
+      "type": "bevat"
+    },
+    {
+      "source": "ft_bevolking",
+      "target": "dim_buurt",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_bevolking",
+      "target": "dim_tijd",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_inkomen",
+      "target": "dim_buurt",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_inkomen",
+      "target": "dim_tijd",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_wonen",
+      "target": "dim_buurt",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_wonen",
+      "target": "dim_tijd",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_energie",
+      "target": "dim_buurt",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_energie",
+      "target": "dim_tijd",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_soz",
+      "target": "dim_buurt",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_soz",
+      "target": "dim_tijd",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_misdrijven",
+      "target": "dim_buurt",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_misdrijven",
+      "target": "dim_tijd",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_zorgkosten",
+      "target": "dim_buurt",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "ft_zorgkosten",
+      "target": "dim_tijd",
+      "type": "koppelt_aan"
+    },
+    {
+      "source": "cbs",
+      "target": "ft_bevolking",
+      "type": "levert_aan"
+    },
+    {
+      "source": "cbs",
+      "target": "ft_inkomen",
+      "type": "levert_aan"
+    },
+    {
+      "source": "cbs",
+      "target": "ft_wonen",
+      "type": "levert_aan"
+    },
+    {
+      "source": "cbs",
+      "target": "ft_energie",
+      "type": "levert_aan"
+    },
+    {
+      "source": "cbs",
+      "target": "ft_soz",
+      "type": "levert_aan"
+    },
+    {
+      "source": "politie",
+      "target": "ft_misdrijven",
+      "type": "levert_aan"
+    },
+    {
+      "source": "vektis",
+      "target": "ft_zorgkosten",
+      "type": "levert_aan"
+    },
+    {
+      "source": "bag",
+      "target": "adres",
+      "type": "levert_aan"
+    },
+    {
+      "source": "pdok",
+      "target": "gemeente",
+      "type": "levert_aan"
+    },
+    {
+      "source": "dom_bevolking",
+      "target": "attr_aantal_inwoners",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bevolking",
+      "target": "attr_mannen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bevolking",
+      "target": "attr_vrouwen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bevolking",
+      "target": "attr_bevolkingsdichtheid",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bevolking",
+      "target": "attr_geboorte_relatief",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bevolking",
+      "target": "attr_sterfte_relatief",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bevolking",
+      "target": "attr_stedelijkheid",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_leeftijd",
+      "target": "attr_0_15",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_leeftijd",
+      "target": "attr_15_25",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_leeftijd",
+      "target": "attr_25_45",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_leeftijd",
+      "target": "attr_45_65",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_leeftijd",
+      "target": "attr_65plus",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_herkomst",
+      "target": "attr_pct_herkomst_nl",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_herkomst",
+      "target": "attr_pct_herkomst_europa",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_herkomst",
+      "target": "attr_pct_herkomst_buiten_europa",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_huishoudens",
+      "target": "attr_huishoudens",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_huishoudens",
+      "target": "attr_gem_huishouden_grootte",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_huishoudens",
+      "target": "attr_pct_eenpersoonshhd",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_huishoudens",
+      "target": "attr_pct_hhd_met_kind",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_huishoudens",
+      "target": "attr_pct_hhd_zonder_kind",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_huishoudens",
+      "target": "attr_pct_gehuwd",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_huishoudens",
+      "target": "attr_pct_ongehuwd",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_opleiding",
+      "target": "attr_opl_hoog",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_opleiding",
+      "target": "attr_opl_midden",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_opleiding",
+      "target": "attr_opl_laag",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_inkomen",
+      "target": "attr_gem_inkomen_inwoner",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_inkomen",
+      "target": "attr_gem_inkomen_ontvanger",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_inkomen",
+      "target": "attr_gem_gestand_inkomen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_inkomen",
+      "target": "attr_mediaan_vermogen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_inkomen",
+      "target": "attr_pct_hh_hoog_inkomen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_inkomen",
+      "target": "attr_pct_hh_laag_inkomen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_inkomen",
+      "target": "attr_pct_rond_sociaal_min",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_inkomen",
+      "target": "attr_personen_armoede",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_inkomen",
+      "target": "attr_pct_armoede",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_wonen",
+      "target": "attr_gem_woz_waarde",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_wonen",
+      "target": "attr_woningvoorraad",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_wonen",
+      "target": "attr_koopwoningen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_wonen",
+      "target": "attr_huurwoningen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_wonen",
+      "target": "attr_pct_eengezins",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_wonen",
+      "target": "attr_pct_meergezins",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_wonen",
+      "target": "attr_pct_bouwjaar_na_2000",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_wonen",
+      "target": "attr_pct_leegstand",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_wonen",
+      "target": "attr_pct_stadsverwarming",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_wonen",
+      "target": "attr_pct_huurcorporatie",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_energie",
+      "target": "attr_gem_aardgas",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_energie",
+      "target": "attr_gem_elektriciteit",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_energie",
+      "target": "attr_aardgasvrije_woningen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_energie",
+      "target": "attr_pct_aardgasvrij",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_energie",
+      "target": "attr_woningen_zonnestroom",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_energie",
+      "target": "attr_pct_zonnestroom",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_economie",
+      "target": "attr_arbeidsparticipatie",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_economie",
+      "target": "attr_bedrijfsvestigingen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_economie",
+      "target": "attr_pct_werknemers",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_economie",
+      "target": "attr_pct_zelfstandigen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_sociale_zekerheid",
+      "target": "attr_wmo_per_1000",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_sociale_zekerheid",
+      "target": "attr_pct_jeugdzorg",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_voorzieningen",
+      "target": "attr_afstand_huisarts",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_voorzieningen",
+      "target": "attr_afstand_supermarkt",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_voorzieningen",
+      "target": "attr_afstand_treinstation",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_voorzieningen",
+      "target": "attr_afstand_apotheek",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_voorzieningen",
+      "target": "attr_afstand_basisonderwijs",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_voorzieningen",
+      "target": "attr_afstand_kdv",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_voorzieningen",
+      "target": "attr_afstand_ziekenhuis",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_voorzieningen",
+      "target": "attr_afstand_bibliotheek",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_voorzieningen",
+      "target": "attr_afstand_restaurant",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_voorzieningen",
+      "target": "attr_afstand_cafe",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_natuur",
+      "target": "attr_afstand_park",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_natuur",
+      "target": "attr_afstand_bos",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_natuur",
+      "target": "attr_afstand_openbaar_groen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_natuur",
+      "target": "attr_afstand_natuur",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_natuur",
+      "target": "attr_afstand_sportterrein",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_mobiliteit",
+      "target": "attr_personenautos",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_mobiliteit",
+      "target": "attr_auto_per_huishouden",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_mobiliteit",
+      "target": "attr_auto_per_km2",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_mobiliteit",
+      "target": "attr_motorfietsen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_mobiliteit",
+      "target": "attr_laadpalen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_mobiliteit",
+      "target": "attr_afstand_oprit",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_oppervlakte",
+      "target": "attr_opp_land",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_oppervlakte",
+      "target": "attr_opp_water",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bodemgebruik",
+      "target": "attr_pct_bebouwd",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bodemgebruik",
+      "target": "attr_pct_agrarisch",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bodemgebruik",
+      "target": "attr_pct_natuur",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bodemgebruik",
+      "target": "attr_pct_recreatie",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bodemgebruik",
+      "target": "attr_opp_woonterrein_ha",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bodemgebruik",
+      "target": "attr_opp_bedrijventerrein_ha",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_flora_fauna",
+      "target": "attr_ff_totaal_soorten",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_flora_fauna",
+      "target": "attr_ff_totaal_waarnemingen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_flora_fauna",
+      "target": "attr_ff_soorten_vogels",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_flora_fauna",
+      "target": "attr_ff_soorten_zoogdieren",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_flora_fauna",
+      "target": "attr_ff_soorten_planten",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_landbouw",
+      "target": "attr_lbt_totaal_cultuurgrond_ha",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_landbouw",
+      "target": "attr_lbt_totaal_rundvee",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_landbouw",
+      "target": "attr_lbt_totaal_varkens",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_landbouw",
+      "target": "attr_lbt_totaal_kippen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_landbouw",
+      "target": "attr_lbt_aantal_bedrijven",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_zorgkosten",
+      "target": "attr_zk_kosten_totaal",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_zorgkosten",
+      "target": "attr_zk_kosten_medspec",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_zorgkosten",
+      "target": "attr_zk_kosten_farmacie",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_zorgkosten",
+      "target": "attr_zk_kosten_ggz",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_zorgkosten",
+      "target": "attr_zk_kosten_huisarts",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_zorgkosten",
+      "target": "attr_zk_kosten_paramedisch",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_zorgkosten",
+      "target": "attr_zk_aantal_verzekerden",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_onverzekerden",
+      "target": "attr_sa_bevolking",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_onverzekerden",
+      "target": "attr_sa_verzekerden",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_onverzekerden",
+      "target": "attr_sa_onverzekerd",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_onverzekerden",
+      "target": "attr_sa_pct_onverzekerd",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_onverzekerden",
+      "target": "attr_sa_uitkeringen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_onverzekerden",
+      "target": "attr_sa_ww",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_onverzekerden",
+      "target": "attr_sa_bijstand",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_onverzekerden",
+      "target": "attr_sa_ao",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_onverzekerden",
+      "target": "attr_sa_wajong",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_onverzekerden",
+      "target": "attr_sa_pct_uitkeringen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_onverzekerden",
+      "target": "attr_sa_uitk_onverzekerd",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_totaal_misdrijven",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_inbraak_woning",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_diefstal_fietsen",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_diefstal_motor",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_mishandeling",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_bedreiging",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_vernieling",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_straatroof",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_drugs_drank",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_winkeldiefstal",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_cybercrime",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_fraude",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "attr_cr_inbraak_bedrijven",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bag_adressen",
+      "target": "attr_bag_adressen_totaal",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bag_adressen",
+      "target": "attr_bag_adressen_woon",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bag_adressen",
+      "target": "attr_bag_adressen_kantoor",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bag_adressen",
+      "target": "attr_bag_adressen_winkel",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bag_adressen",
+      "target": "attr_bag_adressen_industrie",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bag_adressen",
+      "target": "attr_bag_adressen_overig",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bag_adressen",
+      "target": "attr_bag_gem_oppervlakte",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bag_adressen",
+      "target": "attr_bag_med_bouwjaar",
+      "type": "bevat"
+    },
+    {
+      "source": "dom_bevolking",
+      "target": "ft_bevolking",
+      "type": "opgeslagen_in"
+    },
+    {
+      "source": "dom_leeftijd",
+      "target": "ft_bevolking",
+      "type": "opgeslagen_in"
+    },
+    {
+      "source": "dom_herkomst",
+      "target": "ft_bevolking",
+      "type": "opgeslagen_in"
+    },
+    {
+      "source": "dom_huishoudens",
+      "target": "ft_bevolking",
+      "type": "opgeslagen_in"
+    },
+    {
+      "source": "dom_inkomen",
+      "target": "ft_inkomen",
+      "type": "opgeslagen_in"
+    },
+    {
+      "source": "dom_wonen",
+      "target": "ft_wonen",
+      "type": "opgeslagen_in"
+    },
+    {
+      "source": "dom_energie",
+      "target": "ft_energie",
+      "type": "opgeslagen_in"
+    },
+    {
+      "source": "dom_economie",
+      "target": "ft_bevolking",
+      "type": "opgeslagen_in"
+    },
+    {
+      "source": "dom_sociale_zekerheid",
+      "target": "ft_soz",
+      "type": "opgeslagen_in"
+    },
+    {
+      "source": "dom_criminaliteit",
+      "target": "ft_misdrijven",
+      "type": "opgeslagen_in"
+    },
+    {
+      "source": "dom_zorgkosten",
+      "target": "ft_zorgkosten",
+      "type": "opgeslagen_in"
+    }
+  ]
+}

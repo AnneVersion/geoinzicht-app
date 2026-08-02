@@ -1,0 +1,31 @@
+{
+  "_uitleg": "Services voor het paneel linksonder in GeoInzicht. Per service: name (id), label, port (voor statuscheck op 127.0.0.1), cmd (startcommando als lijst), cwd (werkmap), autostart (true = meestarten met serve.py). Vul cmd/cwd van dwh en geoserver in; zonder cmd toont het paneel alleen de status.",
+  "services": [
+    {
+      "name": "analytics",
+      "label": "Analytics API",
+      "port": 5000,
+      "cmd": ["python", "analytics_api.py"],
+      "cwd": ".",
+      "autostart": true
+    },
+    {
+      "name": "dwh",
+      "label": "DWH API",
+      "port": 8888,
+      "cmd": [],
+      "cwd": "",
+      "autostart": false,
+      "_opmerking": "Vul in: cmd = startcommando van het geoinzicht-dwh project, cwd = de projectmap. Daarna autostart op true zetten."
+    },
+    {
+      "name": "geoserver",
+      "label": "GeoServer WFS",
+      "port": 9090,
+      "cmd": [],
+      "cwd": "",
+      "_opmerking": "Vul het GeoServer-startcommando in (bijv. startup.bat in de GeoServer bin-map).",
+      "autostart": false
+    }
+  ]
+}

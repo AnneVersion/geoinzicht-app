@@ -1,0 +1,133 @@
+erDiagram
+    WOONPLAATS ||--o{ OPENBARE_RUIMTE : ligt_in
+    OPENBARE_RUIMTE ||--o{ NUMMERAANDUIDING : heeft
+    NUMMERAANDUIDING ||--o{ VERBLIJFSOBJECT : hoofdadres_van
+    VERBLIJFSOBJECT }o--o{ PAND : VBO_PAND
+    VERBLIJFSOBJECT ||--o{ VBO_GEBRUIKSDOEL : heeft
+    VERBLIJFSOBJECT ||--o{ VBO_VOORKOMEN : historie
+    GEMEENTE ||--o{ WIJK : bevat
+    WIJK ||--o{ BUURT : bevat
+    BUURT ||--o{ VBO_BUURT : bevat
+    VERBLIJFSOBJECT ||--o{ VBO_BUURT : ligt_in
+    BUURT ||--o{ GEBIED_KERNCIJFER : indicatoren
+    BUURT ||--o{ WAARNEMING : waargenomen_in
+    BEDRIJF ||--o{ JAARREKENING : publiceert
+    BEDRIJF ||--o{ FUNCTIONARIS : bestuurd_door
+    BEDRIJF ||--o{ VESTIGING : heeft
+    NUMMERAANDUIDING ||--o{ VESTIGING : gevestigd_op
+    BEKENDMAKING }o--o{ NUMMERAANDUIDING : BEKENDMAKING_ADRES
+
+    WOONPLAATS {
+        string woonplaats_id PK "BAG-identificatie"
+        string naam
+    }
+    OPENBARE_RUIMTE {
+        string or_id PK "BAG-identificatie"
+        string naam
+        string type
+        string woonplaats_id FK
+    }
+    NUMMERAANDUIDING {
+        string na_id PK "BAG-identificatie (business key)"
+        int huisnummer
+        string huisletter
+        string toevoeging
+        string postcode
+        string status
+        string or_id FK
+    }
+    PAND {
+        string pand_id PK "BAG-identificatie"
+        int bouwjaar
+        string status
+        geometry geometrie
+    }
+    VERBLIJFSOBJECT {
+        string vbo_id PK "BAG-identificatie (business key)"
+        string hoofd_na_id FK
+        int oppervlakte_m2
+        string status_actueel
+        geometry punt
+    }
+    VBO_GEBRUIKSDOEL {
+        string vbo_id PK, FK
+        string gebruiksdoel PK
+    }
+    VBO_VOORKOMEN {
+        string vbo_id PK, FK
+        int voorkomen_nr PK
+        date begin_geldigheid
+        date eind_geldigheid "NULL = actueel"
+        string status
+        string documentnummer "brondocument gemeente"
+        date documentdatum
+    }
+    GEMEENTE {
+        string gemeentecode PK "GM-code (business key)"
+        string naam
+        int indelingsjaar PK
+    }
+    WIJK {
+        string wijkcode PK "WK-code"
+        int indelingsjaar PK
+        string naam
+        string gemeentecode FK
+    }
+    BUURT {
+        string buurtcode PK "BU-code"
+        int indelingsjaar PK
+        string naam
+        string wijkcode FK
+        geometry geometrie
+    }
+    VBO_BUURT {
+        string vbo_id PK, FK
+        string buurtcode PK, FK
+        int indelingsjaar PK "ruimtelijke koppeling per CBS-jaar"
+    }
+    GEBIED_KERNCIJFER {
+        string gebiedcode PK "BU-, WK- of GM-code"
+        string niveau PK "buurt, wijk of gemeente"
+        int indelingsjaar PK
+        string indicator PK "bijv. aantal_inwoners, misdrijven_totaal"
+        decimal waarde
+        string bron "CBS-86165NED, Politie, Vektis, RIVM"
+    }
+    WAARNEMING {
+        string waarneming_id PK "GBIF-key"
+        string soort
+        date datum
+        geometry punt
+        string buurtcode FK "afgeleid via geo-koppeling"
+        int indelingsjaar FK
+    }
+    JAARREKENING {
+        string kvk_nr PK, FK
+        int boekjaar PK
+        decimal omzet
+        decimal resultaat
+        string bron "Northdata of KvK-XBRL"
+    }
+    FUNCTIONARIS {
+        string functionaris_id PK
+        string kvk_nr FK
+        string naam
+        string rol "bestuurder, commissaris"
+    }
+    BEDRIJF {
+        string kvk_nr PK "business key"
+        string naam
+        string sbi_hoofdcode
+    }
+    VESTIGING {
+        string vestiging_nr PK
+        string kvk_nr FK
+        string na_id FK "koppeling op adres"
+    }
+    BEKENDMAKING {
+        string bekendmaking_id PK "KOOP-identifier"
+        date publicatiedatum
+        string type "vergunning, verkeersbesluit, ..."
+        string bron "Gemeenteblad etc."
+        string url
+    }

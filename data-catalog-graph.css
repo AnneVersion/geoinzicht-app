@@ -1,0 +1,184 @@
+/* Data Catalog Graph — Reusable Component */
+.dc-graph-container {
+    position: relative;
+    width: 100%;
+    height: 600px;
+    background: #0a0f1a;
+    border-radius: 12px;
+    border: 1px solid rgba(91,164,181,0.15);
+    overflow: hidden;
+}
+.dc-graph-container svg {
+    width: 100%;
+    height: 100%;
+}
+.dc-graph-container .node circle {
+    cursor: pointer;
+    transition: r 0.2s;
+}
+.dc-graph-container .node text {
+    font-family: Verdana, sans-serif;
+    pointer-events: none;
+    fill: #b8b5b0;
+}
+.dc-graph-container .link {
+    stroke-opacity: 0.3;
+    transition: stroke-opacity 0.2s;
+}
+.dc-graph-container .node:hover circle {
+    filter: drop-shadow(0 0 8px currentColor);
+}
+.dc-graph-container .node.active circle {
+    stroke-width: 3;
+    stroke: #fff;
+}
+
+/* Controls */
+.dc-graph-controls {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+}
+.dc-graph-controls input {
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(91,164,181,0.2);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: #e8e6e3;
+    font-family: Verdana, sans-serif;
+    font-size: 12px;
+    width: 220px;
+    outline: none;
+}
+.dc-graph-controls input:focus {
+    border-color: rgba(91,164,181,0.5);
+}
+.dc-graph-controls select {
+    background: rgba(0,0,0,0.6);
+    border: 1px solid rgba(91,164,181,0.2);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #e8e6e3;
+    font-family: Verdana, sans-serif;
+    font-size: 11px;
+    outline: none;
+    cursor: pointer;
+}
+
+/* Detail panel */
+.dc-graph-detail {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 280px;
+    max-height: calc(100% - 24px);
+    overflow-y: auto;
+    background: rgba(10,15,26,0.95);
+    border: 1px solid rgba(91,164,181,0.2);
+    border-radius: 12px;
+    padding: 20px;
+    z-index: 10;
+    display: none;
+}
+.dc-graph-detail.visible { display: block; }
+.dc-graph-detail h3 {
+    font-size: 14px;
+    color: #e8e6e3;
+    margin-bottom: 4px;
+    font-family: Verdana, sans-serif;
+}
+.dc-graph-detail .type-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+}
+.dc-graph-detail p {
+    font-size: 12px;
+    color: #8a8580;
+    line-height: 1.6;
+    margin-bottom: 8px;
+    font-family: Verdana, sans-serif;
+}
+.dc-graph-detail .meta-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    font-size: 11px;
+}
+.dc-graph-detail .meta-row .label { color: #5e5a55; }
+.dc-graph-detail .meta-row .value { color: #b8b5b0; font-weight: 600; }
+.dc-graph-detail .relations {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.dc-graph-detail .relations h4 {
+    font-size: 10px;
+    color: #5BA4B5;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    font-family: Verdana, sans-serif;
+}
+.dc-graph-detail .rel-item {
+    font-size: 11px;
+    color: #8a8580;
+    padding: 3px 0;
+    cursor: pointer;
+}
+.dc-graph-detail .rel-item:hover { color: #5BA4B5; }
+.dc-graph-detail .close-btn {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #5e5a55;
+    font-size: 18px;
+    cursor: pointer;
+}
+.dc-graph-detail .close-btn:hover { color: #e8e6e3; }
+
+/* Legend */
+.dc-graph-legend {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    display: flex;
+    gap: 14px;
+    z-index: 10;
+    flex-wrap: wrap;
+}
+.dc-graph-legend .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: #5e5a55;
+    font-family: Verdana, sans-serif;
+}
+.dc-graph-legend .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+/* Stats bar */
+.dc-graph-stats {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    font-size: 10px;
+    color: #5e5a55;
+    font-family: Verdana, sans-serif;
+    z-index: 10;
+}

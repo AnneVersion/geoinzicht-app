@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gegevenscatalogus — integratielaag GeoInzicht</title>
+<link rel="icon" type="image/x-icon" href="../../favicon.ico">
+<style>
+  :root{
+    --bg:#0f1218; --kaart:#161b24; --rand:#2a3040; --tekst:#b8b5b0; --stil:#8a8580;
+    --wit:#e8e6e3; --accent:#39ff14; --accent-muted:#2ecc10; --accent-zacht:rgba(57,255,20,.10);
+    --sleutel:#C9A96E; --sleutel-zacht:rgba(201,169,110,.14);
+    --font:Verdana,Geneva,Tahoma,sans-serif; --mono:'Courier New',Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tekst);font:12.5px/1.55 var(--font)}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 64px}
+  h1{font:700 20px/1.2 var(--font);color:var(--wit);margin:0 0 4px}
+  .sub{color:var(--stil);margin:0 0 20px;font-size:12px}
+  h2{font:700 14px/1.3 var(--font);color:var(--wit);margin:32px 0 4px;border-bottom:1px solid var(--rand);padding-bottom:6px}
+  .toel{color:var(--stil);font-size:12px;margin:4px 0 12px}
+  .zoek{width:100%;padding:8px 12px;border:1px solid var(--rand);border-radius:6px;font:12.5px var(--font);color:var(--wit);background:var(--kaart);margin:2px 0 4px}
+  .zoek::placeholder{color:var(--stil)}
+  .zoek:focus{outline:none;border-color:var(--accent-muted)}
+  .kaart{background:var(--kaart);border:1px solid var(--rand);border-radius:8px;padding:14px 16px;margin-bottom:10px}
+  .kaart h3{margin:0 0 2px;font:700 13px var(--font);color:var(--wit);letter-spacing:.03em}
+  .kaart .def{color:var(--stil);font-size:12px;margin:0 0 8px}
+  table{width:100%;border-collapse:collapse;font:12px var(--font)}
+  th{text-align:left;color:var(--stil);font-weight:700;font-size:10.5px;padding:3px 8px;border-bottom:1px solid var(--rand)}
+  td{padding:4px 8px;border-bottom:1px solid #1c2230;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .veld{font-family:var(--mono);font-size:12px;color:var(--wit)}
+  .vb{font-family:var(--mono);font-size:11.5px;color:var(--accent-muted);white-space:nowrap}
+  .tag{display:inline-block;font:700 9.5px var(--font);padding:1px 6px;border-radius:8px;margin-left:5px;vertical-align:1px}
+  .pk{background:var(--sleutel-zacht);color:var(--sleutel)}
+  .fk{background:var(--accent-zacht);color:var(--accent-muted)}
+  .std{background:#1c2230;color:var(--stil)}
+  [data-def]{border-bottom:1px dotted #4a5265;cursor:help;position:relative}
+  [data-def]:hover::after{
+    content:attr(data-def);position:absolute;left:0;top:calc(100% + 6px);z-index:10;
+    width:340px;max-width:70vw;background:#232a38;color:#e8e6e3;font:11.5px/1.55 var(--font);
+    border:1px solid var(--rand);
+    padding:9px 11px;border-radius:7px;box-shadow:0 4px 18px rgba(0,0,0,.5);white-space:normal}
+  .relatie{padding:6px 0;border-bottom:1px solid #1c2230;font:12px var(--font)}
+  .relatie:last-child{border-bottom:none}
+  .relatie b{font-weight:700;color:var(--wit)}
+  .kardinaliteit{color:var(--sleutel);font-size:11px;margin-left:6px}
+  .erdbox{background:var(--kaart);border:1px solid var(--rand);border-radius:8px;padding:10px;overflow:auto}
+  .erdbox img{width:100%;min-width:900px;display:block}
+  .erdlink{font-size:11.5px;color:var(--stil);margin:6px 0 0}
+  .erdlink a{color:var(--accent-muted)}
+  /* featurelijst */
+  ol.features{list-style:none;margin:8px 0 0;padding:0;counter-reset:f}
+  ol.features li{counter-increment:f;display:flex;align-items:flex-start;gap:10px;background:var(--kaart);border:1px solid var(--rand);border-radius:7px;padding:8px 12px;margin-bottom:6px}
+  ol.features li::before{content:counter(f) ".";font:700 12px var(--mono);color:var(--accent-muted);min-width:26px;text-align:right;padding-top:2px}
+  ol.features .fic{font-size:15px;width:24px;min-width:24px;text-align:center;line-height:1.5}
+  ol.features b{font-weight:700;color:var(--wit)}
+  ol.features .ft{font-size:12px;line-height:1.5}
+  .voet{margin-top:36px;color:var(--stil);font-size:11.5px;border-top:1px solid var(--rand);padding-top:12px}
+  .none{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Gegevenscatalogus — integratielaag GeoInzicht</h1>
+<p class="sub">DWH-laag <span class="veld">int</span> · Inmon, relationeel 3NF · bron: <span class="veld">docs/informatiemodel/relationeel_model_integratielaag.md</span> (git). Begrippen met een stippellijn tonen bij aanwijzen de definitie.</p>
+
+<input class="zoek" id="zoek" placeholder="Zoek object, veld of begrip… (bijv. verblijfsobject, brondocument, buurtcode)" oninput="filter(this.value)">
+
+<h2>ERD</h2>
+<div class="erdbox"><img src="erd.svg" alt="ERD integratielaag: BAG-adresketen, CBS-gebieden, KvK, bekendmakingen, GBIF"></div>
+<p class="erdlink"><a href="erd.svg" target="_blank">ERD in nieuw tabblad openen</a> — zoomen met Ctrl + scroll. Bewerkbare bron: <span class="veld">relationeel_model_integratielaag.md</span> (Mermaid).</p>
+
+<h2>Features van de app</h2>
+<p class="toel">Volledige lijst, stand 02-08-2026.</p>
+<ol class="features" id="features"></ol>
+
+<h2>Objecten</h2>
+<p class="toel">Het model kent <span data-def="Alle bronnen haken aan op een van twee kernobjecten: het ADRES-anker (nummeraanduiding/verblijfsobject) voor objectbronnen zoals BAG, KvK en bekendmakingen, en het GEBIED-anker (buurt/wijk/gemeente per indelingsjaar) voor statistiekbronnen zoals CBS, politie, Vektis en RIVM. De brug tussen beide is VBO_BUURT.">twee ankers</span>: adres en gebied, verbonden via VBO_BUURT. Bronnen zonder adres of gebied (zoals Rechtspraak Open Data) worden niet geforceerd gekoppeld.</p>
+<p class="toel">Elke tabel heeft twee standaardvelden: <span class="veld" data-def="Datum en tijd waarop de rij door de laadrun is geschreven. Onderdeel van de audit-trail (besluit 02-08-2026: Inmon 3NF met laad-metadata).">geladen_op</span> (voorbeeld: 2026-08-02 03:15:04) en <span class="veld" data-def="De bron waaruit de rij afkomstig is. Maakt elke waarde herleidbaar tot zijn oorsprong.">bron</span> (voorbeeld: PDOK-BAG).</p>
+
+<div id="catalogus"></div>
+
+<h2>Relaties</h2>
+<div class="kaart" id="relaties"></div>
+
+<p class="voet">Presentatielaag: Kimball-sterren, zie <span class="veld">ster_bag_status.md</span>. Bronnenoverzicht: developer.overheid.nl. Wijzigen = commit op develop, mergen naar main.</p>
+
+<script>
+var FEATURES = [
+ ['🗺️','Interactieve kaart','buurten, wijken en gemeenten (Leaflet), CBS-gebiedsindelingen 2013–2025.'],
+ ['📊','CBS-kerncijfers','89 indicatoren 2024 (dataset 85618NED) en 83 indicatoren 2025 (86165NED); het nieuwste jaar wordt automatisch gekozen.'],
+ ['🗂️','21 domeinen','bevolking, inkomen, wonen, energie, economie, zorgkosten, criminaliteit, flora & fauna, bodemgebruik, landbouw, enz.'],
+ ['🎨','Choropleten in Viridis','kleurenblindvriendelijk palet met legenda per indicator.'],
+ ['💬','Hover-tooltip','geformatteerde waarde plus percentielpositie binnen Nederland.'],
+ ['ℹ️','Indicator-informatie','per indicator: databron, analysemethode en landelijke statistieken.'],
+ ['📋','Contexttabel','bij klik op een gebied: buurt, wijk, gemeente en Nederland naast elkaar.'],
+ ['⚖️','Vergelijken-tab','twee of meer geselecteerde gebieden zij aan zij.'],
+ ['📄','Uitgebreid rapport','vergelijkingsrapport met alle indicatoren in een nieuw venster.'],
+ ['📈','NL-dashboard','landelijke KPI’s en verdelingen per indicator.'],
+ ['🏘️','BAG-adressen en -panden','vector tiles, WMS en lokale GeoJSON.'],
+ ['🎚️','BAG-filters','op status, gebruiksdoel, bouwjaar en oppervlakte.'],
+ ['🏷️','BAG-statusbadge','status direct zichtbaar in de hover-tooltip van elk adres.'],
+ ['🔗','Statusbanner in popup','klikbaar; opent de BAG Viewer met levenscyclus en brondocument van het object.'],
+ ['🕓','Levenscyclus-tijdlijn','per verblijfsobject via /api/bag/lvc (Kadaster IB v2), met documentnummer en -datum van elk besluit.'],
+ ['📣','Bekendmakingen per adres','knop bij ieder adres; zoekt officielebekendmakingen.nl via de SRU-API (KOOP).'],
+ ['🏛️','Overheid Catalogus-tab','zoeken in data.overheid.nl (CKAN) met peildatum-badge van de laatste dataset-update.'],
+ ['🔍','Zoeken','adressen en plaatsnamen via de PDOK Locatieserver.'],
+ ['📤','Upload','eigen CSV- of Excel-data op de kaart tonen.'],
+ ['🏢','KvK-bedrijfsdata','via de DWH-API: bedrijven nabij een adres, bestuurders, jaarrekeningen, SBI.'],
+ ['▶️','Services-paneel','linksonder: status en startknoppen voor analytics, DWH en GeoServer; autostart bij serverstart.'],
+ ['🔄','Data-refresh-pipeline','/api/refresh draait de enrich-scripts; live log en versheidsstatus via /api/status.'],
+ ['👥','Analytics','bezoekers- en eventregistratie (IndexedDB, synchronisatie naar SQL Server).'],
+ ['📱','PWA','installeerbaar als app via manifest.json.'],
+ ['☁️','GitHub Pages-versie','valt zonder lokale API’s terug op BAG Viewer-links en de bekendmakingen-zoekpagina.']
+];
+
+var OBJECTEN = [
+ {naam:'WOONPLAATS', def:'Een door de gemeente aangewezen woonplaats (BAG). Het hoogste niveau van de adresketen.',
+  velden:[
+   ['woonplaats_id','string','PK','3386','De unieke BAG-identificatie van de woonplaats (viercijferige code). Business key uit de bron.'],
+   ['naam','string','','Arnhem','De officiële woonplaatsnaam zoals door de gemeente vastgesteld.']]},
+ {naam:'OPENBARE_RUIMTE', def:'Een door de gemeente benoemde buitenruimte: straat, plein, water of weg (BAG).',
+  velden:[
+   ['or_id','string','PK','0202300000123456','Unieke BAG-identificatie van de openbare ruimte (positie 5-6 = 30).'],
+   ['naam','string','','Laarfeldweg','De officiële naam, meestal een straatnaam.'],
+   ['type','string','','Weg','Soort openbare ruimte: weg, water, spoorbaan, terrein, kunstwerk, landschappelijk of administratief gebied.'],
+   ['woonplaats_id','string','FK','3386','Verwijzing naar de woonplaats waarin deze openbare ruimte ligt.']]},
+ {naam:'NUMMERAANDUIDING', def:'Het adres: de door de gemeente toegekende aanduiding van huisnummer, letter, toevoeging en postcode (BAG). Koppelpunt voor KvK-vestigingen en bekendmakingen.',
+  velden:[
+   ['na_id','string','PK','0202200000855871','Unieke BAG-identificatie van de nummeraanduiding (positie 5-6 = 20). Business key; het vaste ankerpunt van een adres.'],
+   ['huisnummer','int','','12','Het huisnummer zoals toegekend door de gemeente.'],
+   ['huisletter','string','','A','Eventuele huisletter.'],
+   ['toevoeging','string','','2','Eventuele toevoeging na het huisnummer.'],
+   ['postcode','string','','6811 KL','De aan het adres gekoppelde postcode.'],
+   ['status','string','','Naamgeving uitgegeven','Actuele BAG-status: Naamgeving uitgegeven of Naamgeving ingetrokken.'],
+   ['or_id','string','FK','0202300000123456','Verwijzing naar de openbare ruimte (straat) waaraan het adres ligt.']]},
+ {naam:'PAND', def:'De kleinste bij de bouw functioneel en bouwkundig zelfstandige eenheid die direct en duurzaam met de aarde is verbonden (BAG). Eén pand kan meerdere verblijfsobjecten bevatten.',
+  velden:[
+   ['pand_id','string','PK','0202100000234567','Unieke BAG-identificatie van het pand (positie 5-6 = 10).'],
+   ['bouwjaar','int','','1936','Jaar waarin het pand oorspronkelijk is of wordt opgeleverd.'],
+   ['status','string','','Pand in gebruik','Actuele pandstatus, bijvoorbeeld: Pand in gebruik, Bouw gestart, Sloopvergunning verleend, Pand gesloopt.'],
+   ['geometrie','geometry','','POLYGON((19030…))','De pandcontour als vlak, RD-coördinaten (EPSG:28992).']]},
+ {naam:'VERBLIJFSOBJECT', def:'De kleinste binnen een of meer panden gelegen eenheid van gebruik met eigen toegang, geschikt voor woon-, bedrijfs- of recreatiedoeleinden (BAG). In de app: het aanklikbare adrespunt.',
+  velden:[
+   ['vbo_id','string','PK','0202010000855871','Unieke BAG-identificatie van het verblijfsobject (positie 5-6 = 01). Business key voor koppelingen en historie.'],
+   ['hoofd_na_id','string','FK','0202200000855871','Verwijzing naar de nummeraanduiding die als hoofdadres geldt.'],
+   ['oppervlakte_m2','int','','86','Gebruiksoppervlakte in vierkante meters volgens de BAG.'],
+   ['status_actueel','string','','Verblijfsobject in gebruik','De huidige status; de volledige geschiedenis staat in VBO_VOORKOMEN.'],
+   ['punt','geometry','','POINT(190305 443850)','Puntlocatie van het verblijfsobject (RD-coördinaten).']]},
+ {naam:'VBO_PAND', def:'Koppeltabel: welk verblijfsobject ligt in welk pand (m:n). Een verblijfsobject kan in meerdere panden liggen; een pand kan meerdere verblijfsobjecten bevatten.',
+  velden:[
+   ['vbo_id','string','PK FK','0202010000855871','Verwijzing naar het verblijfsobject.'],
+   ['pand_id','string','PK FK','0202100000234567','Verwijzing naar het pand.']]},
+ {naam:'VBO_GEBRUIKSDOEL', def:'De toegestane gebruiksdoelen van een verblijfsobject; een object kan er meerdere hebben.',
+  velden:[
+   ['vbo_id','string','PK FK','0202010000855871','Verwijzing naar het verblijfsobject.'],
+   ['gebruiksdoel','string','PK','woonfunctie','Gebruiksdoel volgens de BAG: woonfunctie, kantoorfunctie, winkelfunctie, industriefunctie, logiesfunctie, bijeenkomstfunctie, onderwijsfunctie, gezondheidszorgfunctie, sportfunctie, celfunctie of overige gebruiksfunctie.']]},
+ {naam:'VBO_VOORKOMEN', def:'De levensloop van een verblijfsobject: elke wijziging is een eigen voorkomen met geldigheidsperiode en brondocument. Hieruit wordt de levenscyclus-tijdlijn in de app gevuld.',
+  velden:[
+   ['vbo_id','string','PK FK','0202010000855871','Verwijzing naar het verblijfsobject.'],
+   ['voorkomen_nr','int','PK','3','Volgnummer binnen de levensloop (1 = eerste registratie).'],
+   ['begin_geldigheid','date','','2019-07-01','Eerste dag waarop deze versie geldig was.'],
+   ['eind_geldigheid','date','','(leeg)','Laatste dag van geldigheid; leeg = actuele versie.'],
+   ['status','string','','Verblijfsobject ingetrokken','De status in deze periode: gevormd, in gebruik, verbouwing, ingetrokken, buiten gebruik.'],
+   ['documentnummer','string','','BV05.00043-HLG','Nummer van het gemeentelijke brondocument (besluit) achter deze wijziging. De reden van een wijziging staat niet in de BAG maar in dit document; met nummer en datum opvraagbaar bij de gemeente, desnoods via een Woo-verzoek.'],
+   ['documentdatum','date','','2019-06-24','Datum van het brondocument.']]},
+ {naam:'GEMEENTE', def:'Bestuurlijke gemeente volgens de CBS-indeling. Gebiedsindelingen wijzigen; elke versie is per indelingsjaar vastgelegd.',
+  velden:[
+   ['gemeentecode','string','PK','GM0202','CBS-gemeentecode (GM-code), business key.'],
+   ['indelingsjaar','int','PK','2025','Jaar van de CBS-gebiedsindeling.'],
+   ['naam','string','','Arnhem','De gemeentenaam in dat indelingsjaar.']]},
+ {naam:'WIJK', def:'CBS-wijk: onderdeel van een gemeente, per indelingsjaar.',
+  velden:[
+   ['wijkcode','string','PK','WK020203','CBS-wijkcode (WK-code).'],
+   ['indelingsjaar','int','PK','2025','Jaar van de CBS-gebiedsindeling.'],
+   ['naam','string','','Klarendal','De wijknaam.'],
+   ['gemeentecode','string','FK','GM0202','Verwijzing naar de gemeente.']]},
+ {naam:'BUURT', def:'CBS-buurt: het laagste gebiedsniveau waarop het CBS kerncijfers publiceert, per indelingsjaar.',
+  velden:[
+   ['buurtcode','string','PK','BU02020304','CBS-buurtcode (BU-code), business key.'],
+   ['indelingsjaar','int','PK','2025','Jaar van de CBS-gebiedsindeling.'],
+   ['naam','string','','Klarendal-Zuid','De buurtnaam.'],
+   ['wijkcode','string','FK','WK020203','Verwijzing naar de wijk.'],
+   ['geometrie','geometry','','POLYGON((19010…))','De buurtgrens als vlak.']]},
+ {naam:'VBO_BUURT', def:'Koppeltabel: in welke buurt ligt een verblijfsobject, per indelingsjaar. Ruimtelijk bepaald (punt-in-vlak); de brug tussen het adres-anker en het gebied-anker.',
+  velden:[
+   ['vbo_id','string','PK FK','0202010000855871','Verwijzing naar het verblijfsobject.'],
+   ['buurtcode','string','PK FK','BU02020304','Verwijzing naar de buurt.'],
+   ['indelingsjaar','int','PK','2025','Jaar van de gebiedsindeling waarvoor de koppeling geldt; bij nieuwe buurtgrenzen ontstaat een nieuwe koppeling.']]},
+ {naam:'GEBIED_KERNCIJFER', def:'Alle gebiedsstatistieken in één tabel, als indicator-waarde-paren (EAV): CBS, politie, Vektis, RIVM. Het niveau staat expliciet in de sleutel: een bron die op gemeenteniveau levert wordt nooit stilzwijgend naar buurten verdeeld.',
+  velden:[
+   ['gebiedcode','string','PK','BU02020304','BU-, WK- of GM-code van het gebied.'],
+   ['niveau','string','PK','buurt','Het gebiedsniveau van deze waarde: buurt, wijk of gemeente.'],
+   ['indelingsjaar','int','PK','2025','Jaar van de gebiedsindeling en van de cijferpublicatie.'],
+   ['indicator','string','PK','aantal_inwoners','Naam van de indicator, bijvoorbeeld aantal_inwoners, misdrijven_totaal, zorgkosten_pp.'],
+   ['waarde','decimal','','1235','De waarde van de indicator voor dit gebied in dit jaar.'],
+   ['bron','string','','CBS-86165NED','Herkomst: CBS-dataset (85618NED/86165NED), Politie, Vektis of RIVM.']]},
+ {naam:'WAARNEMING', def:'Een flora- of faunawaarneming uit GBIF, als puntlocatie. De buurtkoppeling wordt via de geometrie afgeleid (punt-in-vlak).',
+  velden:[
+   ['waarneming_id','string','PK','4407389321','De GBIF-sleutel van de waarneming.'],
+   ['soort','string','','Turdus merula','De waargenomen soort (wetenschappelijke naam).'],
+   ['datum','date','','2025-05-14','Datum van de waarneming.'],
+   ['punt','geometry','','POINT(190210 443790)','Puntlocatie van de waarneming.'],
+   ['buurtcode','string','FK','BU02020304','De via geo-koppeling afgeleide buurt.'],
+   ['indelingsjaar','int','FK','2025','Indelingsjaar waarvoor de buurtkoppeling geldt.']]},
+ {naam:'BEDRIJF', def:'Een onderneming uit het KvK Handelsregister.',
+  velden:[
+   ['kvk_nr','string','PK','34123456','Het KvK-nummer, business key.'],
+   ['naam','string','','Voorbeeld Holding B.V.','De statutaire of handelsnaam.'],
+   ['sbi_hoofdcode','string','','6420','SBI-code van de hoofdactiviteit. Indicatief; beperkt niet welke activiteiten feitelijk worden verricht.']]},
+ {naam:'VESTIGING', def:'Een vestiging van een bedrijf op een adres. De koppeling tussen het Handelsregister en de adresketen.',
+  velden:[
+   ['vestiging_nr','string','PK','000012345678','Het vestigingsnummer uit het Handelsregister (12 cijfers).'],
+   ['kvk_nr','string','FK','34123456','Verwijzing naar het bedrijf.'],
+   ['na_id','string','FK','0202200000855871','Verwijzing naar de nummeraanduiding (het adres) van de vestiging.']]},
+ {naam:'JAARREKENING', def:'Een gedeponeerde jaarrekening van een bedrijf, uit Northdata of KvK-XBRL.',
+  velden:[
+   ['kvk_nr','string','PK FK','34123456','Verwijzing naar het bedrijf.'],
+   ['boekjaar','int','PK','2024','Het boekjaar waarop de jaarrekening betrekking heeft.'],
+   ['omzet','decimal','','1250000.00','Netto-omzet, indien gedeponeerd.'],
+   ['resultaat','decimal','','85000.00','Resultaat na belastingen, indien gedeponeerd.'],
+   ['bron','string','','Northdata','Northdata of KvK-XBRL.']]},
+ {naam:'FUNCTIONARIS', def:'Een bestuurder of commissaris van een bedrijf, uit CompanyInfo.',
+  velden:[
+   ['functionaris_id','string','PK','F-20250114-0031','Unieke sleutel van de functionaris-registratie.'],
+   ['kvk_nr','string','FK','34123456','Verwijzing naar het bedrijf.'],
+   ['naam','string','','J. de Vries','Naam van de functionaris.'],
+   ['rol','string','','bestuurder','De rol: bestuurder, commissaris, gevolmachtigde.']]},
+ {naam:'BEKENDMAKING', def:'Een officiële publicatie van de overheid (Gemeenteblad, verkeersbesluit, vergunning) uit de KOOP-collectie op officielebekendmakingen.nl. Hier staat vaak het besluit achter een BAG-wijziging.',
+  velden:[
+   ['bekendmaking_id','string','PK','gmb-2025-123456','De KOOP-identifier van de publicatie.'],
+   ['publicatiedatum','date','','2025-03-12','Datum van officiële publicatie.'],
+   ['type','string','','omgevingsvergunning','Soort bekendmaking: omgevingsvergunning, verkeersbesluit, verordening, enzovoort.'],
+   ['bron','string','','Gemeenteblad','Het publicatieblad.'],
+   ['url','string','','zoek.officielebekendmakingen.nl/gmb-2025-123456','Directe link naar de publicatie.']]},
+ {naam:'BEKENDMAKING_ADRES', def:'Koppeltabel: welke bekendmaking gaat over welk adres (m:n). Hiermee toont de app per adres de bijbehorende besluiten.',
+  velden:[
+   ['bekendmaking_id','string','PK FK','gmb-2025-123456','Verwijzing naar de bekendmaking.'],
+   ['na_id','string','PK FK','0202200000855871','Verwijzing naar de nummeraanduiding.']]}
+];
+
+var RELATIES = [
+ ['WOONPLAATS','OPENBARE_RUIMTE','1 op veel','Elke openbare ruimte ligt in precies één woonplaats; een woonplaats heeft meerdere straten.'],
+ ['OPENBARE_RUIMTE','NUMMERAANDUIDING','1 op veel','Elk adres ligt aan precies één straat; een straat telt meerdere adressen.'],
+ ['NUMMERAANDUIDING','VERBLIJFSOBJECT','1 op veel','Een verblijfsobject heeft één hoofdadres; nevenadressen zijn mogelijk, het hoofdadres is leidend.'],
+ ['VERBLIJFSOBJECT','PAND','veel op veel (via VBO_PAND)','Een verblijfsobject kan zich over meerdere panden uitstrekken; een pand kan meerdere verblijfsobjecten bevatten (bijvoorbeeld een flatgebouw).'],
+ ['VERBLIJFSOBJECT','VBO_GEBRUIKSDOEL','1 op veel','Een verblijfsobject kan meerdere toegestane gebruiksdoelen hebben.'],
+ ['VERBLIJFSOBJECT','VBO_VOORKOMEN','1 op veel','Elke wijziging in de levensloop is een eigen voorkomen; samen vormen ze de volledige geschiedenis.'],
+ ['GEMEENTE','WIJK','1 op veel','Een wijk behoort tot één gemeente, binnen hetzelfde indelingsjaar.'],
+ ['WIJK','BUURT','1 op veel','Een buurt behoort tot één wijk, binnen hetzelfde indelingsjaar.'],
+ ['BUURT','VBO_BUURT / VERBLIJFSOBJECT','1 op veel','Ruimtelijke koppeling tussen adressen en buurten, per indelingsjaar opnieuw bepaald omdat buurtgrenzen wijzigen.'],
+ ['BUURT / WIJK / GEMEENTE','GEBIED_KERNCIJFER','1 op veel','Per gebied, niveau en jaar meerdere indicatoren; voedt de choropleten in de app.'],
+ ['BUURT','WAARNEMING','1 op veel','GBIF-waarnemingen zijn punten; de buurtkoppeling is via geometrie afgeleid.'],
+ ['BEDRIJF','JAARREKENING','1 op veel','Per bedrijf één jaarrekening per boekjaar.'],
+ ['BEDRIJF','FUNCTIONARIS','1 op veel','Een bedrijf heeft een of meer bestuurders of commissarissen.'],
+ ['BEDRIJF','VESTIGING','1 op veel','Een bedrijf kan meerdere vestigingen hebben; elke vestiging hoort bij één bedrijf.'],
+ ['NUMMERAANDUIDING','VESTIGING','1 op veel','Vestigingen koppelen op het adres; zo komen Handelsregister en BAG samen.'],
+ ['BEKENDMAKING','NUMMERAANDUIDING','veel op veel (via BEKENDMAKING_ADRES)','Eén besluit kan meerdere adressen raken; één adres kan in meerdere besluiten voorkomen.']
+];
+
+function bouw(){
+  var fl = document.getElementById('features');
+  fl.innerHTML = FEATURES.map(function(f){
+    return '<li class="feat"><span class="fic">'+f[0]+'</span><span class="ft"><b>'+f[1]+'</b> — '+f[2]+'</span></li>';
+  }).join('');
+
+  var c = document.getElementById('catalogus');
+  var h = '';
+  OBJECTEN.forEach(function(o){
+    h += '<div class="kaart obj"><h3><span data-def="'+esc(o.def)+'">'+o.naam+'</span></h3>';
+    h += '<p class="def">'+o.def+'</p>';
+    h += '<table><tr><th>veld</th><th>type</th><th>sleutel</th><th>voorbeeld</th></tr>';
+    o.velden.forEach(function(v){
+      var tags = '';
+      if(v[2].indexOf('PK')>=0) tags += '<span class="tag pk" data-def="Primaire sleutel: identificeert de rij uniek.">PK</span>';
+      if(v[2].indexOf('FK')>=0) tags += '<span class="tag fk" data-def="Vreemde sleutel: verwijst naar de primaire sleutel van een ander object.">FK</span>';
+      h += '<tr><td class="veld"><span data-def="'+esc(v[4])+'">'+v[0]+'</span></td><td>'+v[1]+'</td><td>'+tags+'</td><td class="vb">'+esc(v[3])+'</td></tr>';
+    });
+    h += '<tr><td class="veld"><span data-def="Standaardveld op elke tabel: datum en tijd van de laadrun (audit-trail).">geladen_op</span> <span class="tag std">standaard</span></td><td>datetime</td><td></td><td class="vb">2026-08-02 03:15:04</td></tr>';
+    h += '<tr><td class="veld"><span data-def="Standaardveld op elke tabel: de herkomst van de rij.">bron</span> <span class="tag std">standaard</span></td><td>string</td><td></td><td class="vb">PDOK-BAG</td></tr>';
+    h += '</table></div>';
+  });
+  c.innerHTML = h;
+
+  var r = document.getElementById('relaties');
+  var rh = '';
+  RELATIES.forEach(function(x){
+    rh += '<div class="relatie rel"><b>'+x[0]+'</b> — <b>'+x[1]+'</b><span class="kardinaliteit">'+x[2]+'</span><div style="color:var(--stil);font-size:12px">'+x[3]+'</div></div>';
+  });
+  r.innerHTML = rh;
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function filter(q){
+  q = q.toLowerCase().trim();
+  ['.obj','.rel','.feat'].forEach(function(sel){
+    document.querySelectorAll(sel).forEach(function(k){
+      k.classList.toggle('none', q && k.textContent.toLowerCase().indexOf(q) < 0);
+    });
+  });
+}
+bouw();
+</script>
+</div>
+</body>
+</html>
