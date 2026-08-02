@@ -2831,8 +2831,8 @@ function _loadBagLvcAndSiblings(vboId, latlng, props){
       lvcEl.innerHTML = '<div style="border-top:1px solid var(--glass-bd);padding:6px 0;font:400 7px DM Sans;color:var(--mt)"><span style="color:#a78bfa;font-weight:700">💡 Tip:</span> Voor volledige levenscyclus (splitsingen, statuswijzigingen) configureer een <a href="https://kadaster.nl/zakelijk/producten/adressen-en-gebouwen/bag-api-individuele-bevragingen" target="_blank" style="color:var(--ac);text-decoration:underline">gratis PDOK BAG API key</a>.</div>';
     }
   }).catch(function(){
-    // API server niet beschikbaar — geen LVC
-    if(lvcEl) lvcEl.innerHTML = '';
+    // API server niet beschikbaar (bijv. GitHub Pages) — link naar BAG Viewer als fallback
+    if(lvcEl) lvcEl.innerHTML = '<div style="border-top:1px solid var(--glass-bd);padding:6px 0;font:400 8px DM Sans"><a href="https://bagviewer.kadaster.nl/lvbag/bag-viewer/?objectId='+encodeURIComponent(vboId)+'" target="_blank" style="color:var(--ac);text-decoration:underline">📄 Levenscyclus &amp; brondocument bekijken in BAG Viewer (Kadaster)</a></div>';
   });
 
   // 2. Gerelateerde VBO's (siblings) — eerst via API, fallback naar _bagMem

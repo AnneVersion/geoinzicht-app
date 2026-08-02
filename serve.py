@@ -17,6 +17,8 @@ import json
 import subprocess
 import threading
 import time
+import urllib.request
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
@@ -30,6 +32,84 @@ _refresh_running = False
 _refresh_log = []
 _refresh_last = None
 _refresh_error = None
+
+# === BAG API Individuele Bevragingen (Kadaster) ===
+# Key: env BAG_API_KEY of apibag.txt (twee mappen omhoog, of naast serve.py).
+# De key blijft server-side; hij komt NOOIT in index.html of het git-repo terecht.
+BAG_IB_BASE = 'https://api.bag.kadaster.nl/lvbag/individuelebevragingen/v2'
+_bag_lvc_cache = {}
+
+
+def _load_bag_api_key():
+    key = os.environ.get('BAG_API_KEY', '').strip()
+    if key:
+        return key
+    for p in (os.path.join(APP_DIR, 'apibag.txt'),
+              os.path.join(APP_DIR, '..', '..', 'apibag.txt')):
+        try:
+            with open(p, 'r', encoding='utf-8') as f:
+                key = f.read().strip()
+            if key:
+                return key
+        except OSError:
+            continue
+    return ''
+
+
+def _bag_object_pad(identificatie):
+    """Bepaal het API-pad op basis van het objecttype in de BAG-identificatie (positie 5-6)."""
+    t = identificatie[4:6] if len(identificatie) >= 6 else ''
+    return {'01': 'verblijfsobjecten', '10': 'panden', '20': 'nummeraanduidingen',
+            '02': 'ligplaatsen', '03': 'standplaatsen'}.get(t, 'verblijfsobjecten')
+
+
+def bag_lvc(identificatie):
+    """Haal de levenscyclus (alle voorkomens incl. brondocument) op bij de Kadaster BAG API."""
+    if identificatie in _bag_lvc_cache:
+        return _bag_lvc_cache[identificatie]
+    key = _load_bag_api_key()
+    if not key:
+        return {'error': 'Geen BAG API key gevonden (BAG_API_KEY of apibag.txt).'}
+    pad = _bag_object_pad(identificatie)
+    url = f"{BAG_IB_BASE}/{pad}/{urllib.parse.quote(identificatie)}/lvc?geheleObject=true"
+    req = urllib.request.Request(url, headers={
+        'X-Api-Key': key,
+        'Accept': 'application/hal+json',
+        'Accept-Crs': 'epsg:28992',
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        return {'error': f'BAG API {e.code}: {e.reason}'}
+    except Exception as e:
+        return {'error': f'BAG API niet bereikbaar: {e}'}
+
+    # Voorkomens kunnen genest zitten; parse defensief.
+    emb = data.get('_embedded', {})
+    ruwe = emb.get('voorkomens') or emb.get(pad) or []
+    versies = []
+    for item in ruwe:
+        obj = item.get('verblijfsobject') or item.get('pand') or item.get('nummeraanduiding') \
+            or item.get('ligplaats') or item.get('standplaats') or item
+        vk = obj.get('voorkomen', {}) if isinstance(obj, dict) else {}
+        gebruiksdoelen = obj.get('gebruiksdoelen') or ([] if not obj.get('gebruiksdoel') else [obj.get('gebruiksdoel')])
+        versies.append({
+            'beginGeldigheid': vk.get('beginGeldigheid') or obj.get('beginGeldigheid'),
+            'eindGeldigheid': vk.get('eindGeldigheid') or obj.get('eindGeldigheid'),
+            'status': obj.get('status', ''),
+            'gebruiksdoel': ', '.join(gebruiksdoelen) if gebruiksdoelen else '',
+            'oppervlakte': obj.get('oppervlakte'),
+            'documentdatum': obj.get('documentdatum') or vk.get('documentdatum'),
+            'documentnummer': obj.get('documentnummer') or vk.get('documentnummer'),
+            'voorkomen': vk.get('voorkomenidentificatie'),
+        })
+    versies.sort(key=lambda v: (v.get('beginGeldigheid') or ''))
+    resultaat = {'bron': 'Kadaster BAG API', 'objecttype': pad, 'versies': versies}
+    if not versies:
+        resultaat['error'] = 'Geen voorkomens gevonden voor dit object.'
+    _bag_lvc_cache[identificatie] = resultaat
+    return resultaat
 
 
 def get_data_freshness():
@@ -129,6 +209,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 'last': _refresh_last,
                 'error': _refresh_error,
             })
+
+        if self.path.startswith('/api/bag/lvc'):
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            identificatie = (qs.get('id') or [''])[0].strip()
+            if not identificatie or not identificatie.isdigit():
+                return self._json_response({'error': 'Geef een geldige BAG-identificatie mee via ?id='}, 400)
+            return self._json_response(bag_lvc(identificatie))
 
         # Normale statische bestanden
         return super().do_GET()
